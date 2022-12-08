@@ -62,6 +62,8 @@ def main():
    
     cli_args = parser.parse_args()
 
+    print(cli_args.download)
+
     StockData(download=cli_args.download,
             download_stock=cli_args.download_stock,
             start=cli_args.start,

@@ -19,7 +19,7 @@ class StockData():
 
     def __init__(self, 
                 download=False,
-                download_stock='AAPL',
+                download_stock=None,
                 start=None,
                 end=None,
                 update=False,
@@ -29,7 +29,7 @@ class StockData():
                 range=0,
                 folder="../../stock/"):
 
-        self._download = download,
+        self._download = download
         self._download_stock = download_stock
         self._start = start
         self._end = end
@@ -45,7 +45,7 @@ class StockData():
             self.stock_market = self.stock_market[:self._range]
         else:
             self.stock_market = pd.read_html('https://en.wikipedia.org/wiki/List_of_S%26P_500_companies')[0]['Symbol']
-
+        
         self.__main()
 
     def __download(self):
@@ -116,8 +116,7 @@ class StockData():
         files = glob.glob(self._folder + '*')
         for f in files:
             if f.find('.') != -1:
-                f = f.split('.', 2)[2]
-                f = f.split('.', 1)[0]
+                f = f.split(self._folder)[-1].split(".")[-2]
             f = f.replace('-', '.')
             stock_market.append(os.path.basename(f))
 
@@ -129,18 +128,19 @@ class StockData():
 
     def __update_stock(self):
 
-        if self._end == "today" or self._end is None:
-            self._end = date.today().strftime("%Y-%m-%d")
-
         self._update_stock = self._update_stock.upper()
 
         if self._update_stock.find('.') != -1:
             self._update_stock = self._update_stock.replace('.', '-')
 
-        self._update_stock = self._update_stock.split('.', 1)[0]
-
         df_1 = pd.read_csv(self._folder + self._update_stock + '.csv', 
-                            parse_dates=False, index_col='Date')
+                            parse_dates=True, index_col='Date')
+
+        if self._end == "today":
+            self._end = date.today().strftime("%Y-%m-%d")
+            
+        if self._end is None and self._start is not None and df_1.size != 0:
+            self._end = df_1.index[-1].strftime("%Y-%m-%d")
                             
         if df_1.size != 0:
             if self._start is None:
@@ -158,7 +158,7 @@ class StockData():
                                     progress=False,
                                     threads=True)
 
-            df.to_csv(self.cli_args.folder + self._update_stock + '.csv', 
+            df.to_csv(self._folder + self._update_stock + '.csv', 
                             index='Date')
 
         if self._update is False:
@@ -175,20 +175,17 @@ class StockData():
         if path.exists():
             if self._download is True:
                 self.__download()
-                exit()
         else:
             if self._download is True:
                 path = self._folder 
                 os.mkdir(self._folder)
                 self.__download()
-                exit()
         
         if self._download_stock is not None:
             self.download_stock()
 
         if self._update is True:
             self.update()
-            exit()
 
         if self._update_stock is not None:
             self.__update_stock()
