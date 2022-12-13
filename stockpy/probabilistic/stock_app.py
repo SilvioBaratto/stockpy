@@ -2,15 +2,21 @@ import argparse
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split 
+from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 from StockPredictorHMM import StockRegressorHMM
+from scipy.spatial.distance import euclidean
+# from fastdtw import fastdtw
 
-def evaluate(input, prediction):
-    errors = abs(prediction - input)
-    mape = 100 * np.mean(errors / input)
-    accuracy = 100 - mape
+def evaluate(y_test, y_pred):
+    mse = mean_squared_error(y_test, y_pred, squared=True)
+    rmse = mean_squared_error(y_test, y_pred, squared=False)
+    mape = mean_absolute_percentage_error(y_test, y_pred)
+    # dtw_distance = fastdtw(y_test, y_pred, dist=euclidean)[0] 
     print('Model Performance')
-    print('Average Error: {:0.4f} degrees.'.format(np.mean(errors)))
-    print('Accuracy = {:0.2f}%.'.format(accuracy))
+    print("Mean squared error = {:0.3f}".format(mse))
+    print("Root mean squared error = {:0.3f}".format(rmse))
+    print('Mean absolute percentage error = {:0.3f}%.'.format((mape)*100))
+    # print('DTW distance = {:0.3f} '.format(dtw_distance))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -75,7 +81,7 @@ def main():
     parser.add_argument('--folder',
                         help="Number of latency days",
                         action="store",
-                        default="../stock/",
+                        default="../../stock/",
                     )     
 
     cli_args = parser.parse_args()
@@ -85,11 +91,11 @@ def main():
                                         fh=cli_args.frac_high,
                                         fl=cli_args.frac_low)
 
-    data = pd.read_csv(cli_args.folder + cli_args.stock + '.csv')
+    data = pd.read_csv(cli_args.folder + cli_args.stock.upper() + '.csv')
     train_data, test_data = train_test_split(
     data, test_size=cli_args.test_size, shuffle=False)
-    y_test = test_data['Close']
     stock_predictor.fit(X_train=train_data)
+    y_test = test_data['Close']
     y_pred = stock_predictor.predict(X_test=test_data, plot=cli_args.plot)
     evaluate(y_test, y_pred)
 
