@@ -17,12 +17,45 @@ from sklearn.model_selection import train_test_split
 from torch.autograd import Variable
 
 class StockDataset(torch.utils.data.Dataset):
-    def __init__(self, dataframe, target, features, sequence_length=5):
-        self.features = features
-        self.target = target
+    def __init__(self, 
+                dataframe, 
+                isValSet_bool=None, 
+                sequence_length=30,
+                test_size=0.2,
+                ):
+
+        len_test = len(dataframe) - int(len(dataframe) * test_size)
+
+        self.dataframe = dataframe
+        self.target= "Close"
+        self.features = ['High', 'Low', 'Open', 'Volume']
+
         self.sequence_length = sequence_length
-        self.y = torch.tensor(dataframe[target].values).float()
-        self.X = torch.tensor(dataframe[features].values).float()
+        self.mean, self.std = self.__normalize_mean_std()
+        
+        if isValSet_bool:
+            dataframe = dataframe[len_test:]
+            self.y = torch.tensor(dataframe[self.target].values).float()
+            self.X = torch.tensor(dataframe[self.features].values).float()
+
+        else:
+            dataframe = dataframe[:len_test]
+            self.y = torch.tensor(dataframe[self.target].values).float()
+            self.X = torch.tensor(dataframe[self.features].values).float()
+
+
+    def __normalize_mean_std(self):
+        target_mean = self.dataframe[self.target].mean()
+        target_stdev = self.dataframe[self.target].std()
+
+        for i in self.dataframe.columns:
+            mean = self.dataframe[i].mean()
+            stdev = self.dataframe[i].std()
+
+            self.dataframe[i] = np.divide((self.dataframe[i] - mean), stdev)
+            self.dataframe[i] = np.divide((self.dataframe[i] - mean), stdev)
+
+        return target_mean, target_stdev
 
     def __len__(self):
         return self.X.shape[0]
@@ -39,7 +72,13 @@ class StockDataset(torch.utils.data.Dataset):
         return x, self.y[i] 
 
 class StockPredictorLSTM(nn.Module):
-    def __init__(self, input_dim=4, hidden_dim=32, num_layers=2, output_dim=1, dropout=0.2):
+    def __init__(self, 
+                input_dim=4,  
+                hidden_dim=32, 
+                num_layers=2, 
+                output_dim=1, 
+                dropout=0.2):
+
         super().__init__()
         self.input_dim = input_dim  # this is the number of features
         self.hidden_dim = hidden_dim
