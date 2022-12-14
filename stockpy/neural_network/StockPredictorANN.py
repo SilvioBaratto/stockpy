@@ -1,10 +1,20 @@
+import math
+import numpy as np
+
 import torch
-from torch import nn
-from torch.utils.data import DataLoader
-from sklearn.datasets import load_boston
-from sklearn.preprocessing import StandardScaler
-import pandas as pd
+from torch import nn as nn
+
+import sys
+sys.path.append("..")
+
+from util.logconf import logging
+
+log = logging.getLogger(__name__)
+# log.setLevel(logging.WARN)
+# log.setLevel(logging.INFO)
+log.setLevel(logging.DEBUG)
 from sklearn.model_selection import train_test_split
+from torch.autograd import Variable
 
 
 class StockDataset(torch.utils.data.Dataset):

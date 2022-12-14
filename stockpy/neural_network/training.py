@@ -13,7 +13,8 @@ import torch.nn as nn
 from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 
-from StockPredictorLSTM import StockDataset, StockPredictorLSTM
+from StockPredictorLSTM import StockPredictorLSTM
+from dataset import StockDataset
 
 from util.util import enumerateWithEstimate
 from util.logconf import logging
