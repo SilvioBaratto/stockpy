@@ -1,49 +1,41 @@
 import math
 import numpy as np
+import pandas as pd
 
 import torch
 from torch import nn as nn
+from sklearn.preprocessing import StandardScaler
+
+def normalize_stock(X_train, X_test):
+    target = "Close"
+    tot_mean = X_train[target].mean()
+    tot_std = X_train[target].std()
+
+    for c in X_train.columns:
+        mean = X_train[c].mean()
+        std = X_train[c].std()
+
+        X_train[c] = (X_train[c] - mean) / std
+        X_test[c] = (X_test[c] - mean) / std
+
+    return tot_mean, tot_std
 
 class StockDataset(torch.utils.data.Dataset):
     def __init__(self, 
                 dataframe, 
-                isValSet_bool=None, 
-                sequence_length=30,
-                test_size=0.2,
+                sequence_length=5
                 ):
-
-        len_test = len(dataframe) - int(len(dataframe) * test_size)
-
+        
+        self.scaler = StandardScaler()
         self.dataframe = dataframe
-        self.target= "Close"
-        self.features = ['High', 'Low', 'Open', 'Volume']
 
         self.sequence_length = sequence_length
-        self.mean, self.std = self.__normalize_mean_std()
-        
-        if isValSet_bool:
-            dataframe = dataframe[len_test:]
-            self.y = torch.tensor(dataframe[self.target].values).float()
-            self.X = torch.tensor(dataframe[self.features].values).float()
-
-        else:
-            dataframe = dataframe[:len_test]
-            self.y = torch.tensor(dataframe[self.target].values).float()
-            self.X = torch.tensor(dataframe[self.features].values).float()
-
-
-    def __normalize_mean_std(self):
-        target_mean = self.dataframe[self.target].mean()
-        target_stdev = self.dataframe[self.target].std()
-
-        for i in self.dataframe.columns:
-            mean = self.dataframe[i].mean()
-            stdev = self.dataframe[i].std()
-
-            self.dataframe[i] = np.divide((self.dataframe[i] - mean), stdev)
-            self.dataframe[i] = np.divide((self.dataframe[i] - mean), stdev)
-
-        return target_mean, target_stdev
+        self.target= "Close"
+        self.features = ['High', 'Low', 'Open', 'Volume']
+        self.mean, self.std = self.target_mean_std(self.dataframe, self.target)
+     
+        self.y = torch.tensor(dataframe[self.target].values).float()
+        self.X = torch.tensor(dataframe[self.features].values).float()
 
     def __len__(self):
         return self.X.shape[0]
@@ -58,3 +50,7 @@ class StockDataset(torch.utils.data.Dataset):
             x = torch.cat((padding, x), 0)
 
         return x, self.y[i] 
+
+    @staticmethod
+    def target_mean_std(dataframe,target):
+        return dataframe[target].mean(), dataframe[target].std()

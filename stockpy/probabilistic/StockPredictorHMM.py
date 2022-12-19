@@ -38,21 +38,12 @@ class StockRegressorHMM():
         self.__compute_all_possible_outcomes()
 
     def __compute_all_possible_outcomes(self):
-        # frac_change_range = np.linspace(-0.1, 0.1, self.frac_change, dtype=np.float32)
-        # frac_high_range = np.linspace(0, 0.1, self.frac_high, dtype=np.float32)
-        # frac_low_range = np.linspace(0, 0.1, self.frac_low, dtype=np.float32)
+        frac_change_range = np.linspace(-0.1, 0.1, self.frac_change, dtype=np.float32)
+        frac_high_range = np.linspace(0, 0.1, self.frac_high, dtype=np.float32)
+        frac_low_range = np.linspace(0, 0.1, self.frac_low, dtype=np.float32)
  
-        # self._possible_outcomes = np.array(list(itertools.product(
-        #     frac_change_range, frac_high_range, frac_low_range)))
-
-        open = np.linspace(-0.1, 0.1, 10, dtype=np.float32)
-        high = np.linspace(-0.1, 0.1, 10, dtype=np.float32)
-        low = np.linspace(-0.1, 0.1, 10, dtype=np.float32)
-        close = np.linspace(-0.1, 0.1, 10, dtype=np.float32)
-        volume = np.linspace(-0.1, 0.1, 10, dtype=np.float32)
-
         self._possible_outcomes = np.array(list(itertools.product(
-                open, high, low, close, volume)))
+            frac_change_range, frac_high_range, frac_low_range)))
 
     def __get_most_probable_outcome(self, X_test, day_index):
         previous_data_start_index = max(0, day_index - self.latency_days)
@@ -74,7 +65,7 @@ class StockRegressorHMM():
             open_price = X_test
         else:
             open_price = X_test.iloc[day_index]['Open']
-        predicted_frac_change, _, _, _, _ = self.__get_most_probable_outcome(X_test, day_index)
+        predicted_frac_change, _, _ = self.__get_most_probable_outcome(X_test, day_index)
         return np.multiply(open_price, (1 + predicted_frac_change))
 
     def fit(self, X_train):
@@ -90,7 +81,7 @@ class StockRegressorHMM():
 
         if plot:
             test_data = X_test[0: len(X_test)]
-            days = np.array(test_data['Date'], dtype="datetime64[ms]")
+            days = np.array(test_data.index, dtype="datetime64[ms]")
             actual_close_prices = test_data['Close']
  
             fig = plt.figure()
@@ -111,6 +102,7 @@ class StockRegressorHMM():
         """
         Instead of directly using the opening, closing, low, and high prices of a stock, 
         extract the fractional changes in each of them that would be used to train your HMM. 
+        """
         
         open_price = np.array(x_train['Open'], dtype=np.float32)
         close_price = np.array(x_train['Close'], dtype=np.float32)
@@ -123,18 +115,7 @@ class StockRegressorHMM():
         frac_low = np.divide((open_price - low_price), open_price)
     
         return np.column_stack((frac_change, frac_high, frac_low))
-        
-        """
-        open_price = np.array(x_train['Open'].pct_change(), dtype=np.float32)
-        close_price = np.array(x_train['Close'].pct_change(), dtype=np.float32)
-        high_price = np.array(x_train['High'].pct_change(), dtype=np.float32)
-        low_price = np.array(x_train['Low'].pct_change(), dtype=np.float32)
-        volume = np.array(x_train['Volume'].pct_change(), dtype=np.float32)
-            
-        data = np.column_stack((open_price, high_price, low_price, close_price, volume))
-        data = data[~np.isnan(data).any(axis=1)]
-
-        return data
+    
         
         
         

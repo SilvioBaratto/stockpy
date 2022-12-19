@@ -4,6 +4,7 @@ import hashlib
 import os
 import shutil
 import sys
+sys.path.append("..")
 
 import numpy as np
 import pandas as pd
@@ -13,11 +14,18 @@ import torch.nn as nn
 from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 
-from StockPredictorLSTM import StockPredictorLSTM
-from dataset import StockDataset
+from util.LSTM import LSTM
+from dataset import StockDataset, normalize_stock
 
 from util.util import enumerateWithEstimate
 from util.logconf import logging
+from sklearn.model_selection import train_test_split
+
+import matplotlib.pyplot as plt
+# set style of graphs
+plt.style.use('seaborn')
+from pylab import rcParams
+plt.rcParams['figure.dpi'] = 100
 
 
 log = logging.getLogger(__name__)
@@ -41,10 +49,29 @@ class Training():
                             help="Validation test size",
                             action="store",
                             default=0.2,
+                            type=float,
+                            )
+        parser.add_argument("--hidden-dim",
+                            help="Number of hidden dimension of LSTM",
+                            action="store",
+                            default=32,
+                            type=int,
+                            )
+        parser.add_argument("--num-layers",
+                            help="Number of hidden layers of LSTM",
+                            action="store",
+                            default=2,
+                            type=int,
+                            )
+        parser.add_argument("--dropout",
+                            help="Dropout coefficient",
+                            action="store",
+                            default=0.2,
+                            type=int,
                             )
         parser.add_argument('--batch-size',
                             help='Batch size to use for training',
-                            default=24,
+                            default=4,
                             type=int,
                             )
         parser.add_argument('--num-workers',
@@ -87,13 +114,22 @@ class Training():
                                 parse_dates=True, 
                                 index_col='Date')
 
+        self.X_train, self.X_test = train_test_split(self.cli_args.stock, 
+                                            test_size=self.cli_args.test_size,
+                                            shuffle=False
+                                            )
+        self.mean, self.std = normalize_stock(self.X_train, self.X_test)
+
         self.model = self.initModel()
         self.optimizer = self.initOptimizer()
 
         self.totalTrainingSamples_count = 0
 
     def initModel(self):
-        model = StockPredictorLSTM()
+        model = LSTM(hidden_dim=self.cli_args.hidden_dim,
+                                    num_layers=self.cli_args.num_layers,
+                                    dropout=self.cli_args.dropout
+                                )
 
         # if self.use_cuda:
         #    log.info("Using CUDA; {} devices.".format(torch.cuda.device_count()))
@@ -104,49 +140,44 @@ class Training():
         return model
 
     def initTrainDl(self):
-
-        batch_size = self.cli_args.batch_size
         # if self.use_cuda:
         #    batch_size *= torch.cuda.device_count()
 
-        train_dl = StockDataset(self.cli_args.stock, 
-                                isValSet_bool=None, 
-                                sequence_length=self.cli_args.sequence_length,
-                                test_size=self.cli_args.test_size,
+        train_dl = StockDataset(self.X_train, 
+                                self.cli_args.sequence_length
                                 )
 
         train_dl = DataLoader(train_dl, 
-                                batch_size=batch_size, 
-                                num_workers=self.cli_args.num_workers,
-                                # pin_memory=self.use_cuda,
-                                shuffle=True
-                                )
+                                    batch_size=self.cli_args.batch_size, 
+                                    num_workers=self.cli_args.num_workers,
+                                    # pin_memory=self.use_cuda,
+                                    shuffle=True
+                                    )
 
         return train_dl
 
     def initValDl(self):
-
-        batch_size = self.cli_args.batch_size
         # if self.use_cuda:
         #    batch_size *= torch.cuda.device_count()
 
-        val_dl = StockDataset(self.cli_args.stock, 
-                                isValSet_bool=True, 
-                                sequence_length=self.cli_args.sequence_length,
-                                test_size=self.cli_args.test_size,
-                            )
+        val_dl = StockDataset(self.X_test, 
+                                self.cli_args.sequence_length
+                                )
 
         val_dl = DataLoader(val_dl, 
-                                batch_size=batch_size, 
-                                num_workers=self.cli_args.num_workers,
-                                # pin_memory=self.use_cuda,
-                                shuffle=True
-                            )
+                                    batch_size=self.cli_args.batch_size, 
+                                    num_workers=self.cli_args.num_workers,
+                                    # pin_memory=self.use_cuda,
+                                    shuffle=False
+                                    )
 
         return val_dl
 
     def initOptimizer(self):
         return Adam(self.model.parameters(), lr=0.01)
+
+    def initLoss(self):
+        return nn.MSELoss()
 
     def doTraining(self, epoch_ndx, train_dl):
         self.model.train()
@@ -169,6 +200,16 @@ class Training():
 
         return total_loss / len(train_dl)
 
+    def computeBatchLoss(self, batch_tup):
+            
+        x = batch_tup[0]
+        y = batch_tup[1]
+
+        output = self.model(x)
+        loss_function = nn.MSELoss()
+        loss = loss_function(output, y)
+
+        return loss.mean()    # This is the loss over the entire batch
 
     def doValidation(self, epoch_ndx, val_dl):
         total_loss = 0
@@ -185,17 +226,35 @@ class Training():
                 total_loss += loss_var
         return total_loss / len(val_dl)
 
+    def doPredict(self, val_dl):
 
-    def computeBatchLoss(self, batch_tup):
+        output = torch.tensor([])
+        self.model.eval()
+        with torch.no_grad():
+            for X, _ in val_dl:
+                y_star = self.model(X)
+                output = torch.cat((output, y_star), 0)
+            
+        return output
+
+    def doPlot(self, val_dl):
+        y_pred = self.doPredict(val_dl)
+        y_pred = y_pred * self.std + self.mean
+        y_test = (self.X_test['Close'] * self.std + self.mean).values
+        test_data = self.X_test[0: len(self.X_test)]
+        days = np.array(test_data.index, dtype="datetime64[ms]")
+        actual_close_prices = test_data['Close']
         
-        x = batch_tup[0]
-        y = batch_tup[1]
-
-        output = self.model(x)
-        loss_function = nn.MSELoss()
-        loss = loss_function(output, y)
-
-        return loss.mean()    # This is the loss over the entire batch
+        fig = plt.figure()
+        
+        axes = fig.add_subplot(111)
+        axes.plot(days, y_test, label="actual") 
+        axes.plot(days, y_pred, label="predicted")
+        
+        fig.autofmt_xdate()
+        
+        plt.legend()
+        plt.show()
 
     def main(self):
         # log.info("Starting {}, {}".format(type(self).__name__, self.cli_args))
@@ -203,6 +262,7 @@ class Training():
         train_dl = self.initTrainDl()
         val_dl = self.initValDl()   # The validation data loader is very similar to training
 
+        
         best_score = 0.0
         validation_cadence = 5 
         for epoch_ndx in range(1, self.cli_args.epochs + 1):
@@ -223,8 +283,10 @@ class Training():
                 loss_val = self.doValidation(epoch_ndx, val_dl)
                 best_score = max(loss_val, best_score)
 
-                self.saveModel('LSTM', epoch_ndx, loss_val == best_score)
+                # self.saveModel('LSTM', epoch_ndx, loss_val == best_score)
 
+        self.doPlot(val_dl)
+    
     def saveModel(self, type_str, epoch_ndx, isBest=False):
         file_path = os.path.join(
             '..',
@@ -275,6 +337,8 @@ class Training():
 
         with open(file_path, 'rb') as f:
             log.info("SHA1: " + hashlib.sha1(f.read()).hexdigest())
+
+    
 
 if __name__ == '__main__':
     Training().main()
