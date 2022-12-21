@@ -33,9 +33,10 @@ class StockDataset(torch.utils.data.Dataset):
         self.target= "Close"
         self.features = ['High', 'Low', 'Open', 'Volume']
         self.mean, self.std = self.target_mean_std(self.dataframe, self.target)
-     
+        
         self.y = torch.tensor(dataframe[self.target].values).float()
         self.X = torch.tensor(dataframe[self.features].values).float()
+
 
     def __len__(self):
         return self.X.shape[0]
