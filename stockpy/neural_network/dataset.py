@@ -32,10 +32,9 @@ class StockDataset(torch.utils.data.Dataset):
         self.sequence_length = sequence_length
         self.target= "Close"
         self.features = ['High', 'Low', 'Open', 'Volume']
-        self.mean, self.std = self.target_mean_std(self.dataframe, self.target)
         
-        self.y = torch.tensor(dataframe[self.target].values).float()
-        self.X = torch.tensor(dataframe[self.features].values).float()
+        self.y = torch.tensor(dataframe[self.target].values).reshape(-1,1).float()
+        self.X = torch.tensor((dataframe[self.features].values)).float()
 
 
     def __len__(self):
@@ -51,7 +50,3 @@ class StockDataset(torch.utils.data.Dataset):
             x = torch.cat((padding, x), 0)
 
         return x, self.y[i] 
-
-    @staticmethod
-    def target_mean_std(dataframe,target):
-        return dataframe[target].mean(), dataframe[target].std()

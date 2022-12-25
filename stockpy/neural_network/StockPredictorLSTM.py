@@ -79,21 +79,24 @@ class normalize():
 class StockPredictorLSTM():
 
     def __init__(self,
-                hidden_dim=32, 
+                input_size=4,
+                hidden_size=32, 
                 num_layers=2,
                 dropout=0.2,
                 pretrained=False
                 ):
         
-        self.hidden_dim = hidden_dim
+        self.input_size = input_size
+        self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.dropout = dropout
         self.pretrained = pretrained
-
+        
         self.time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
         
         self.model_path = self.__initModelPath()
         self.model = self.__initModel()
+        print(self.model.eval())
         self.optimizer = self.__initOptimizer()
 
     def __initModelPath(self):
@@ -131,7 +134,8 @@ class StockPredictorLSTM():
         if self.pretrained:
             model_dict = torch.load(self.model_path)
 
-            model = LSTM(hidden_dim=self.hidden_dim, 
+            model = LSTM(input_size=self.input_size,
+                        hidden_size=self.hidden_size, 
                         num_layers=self.num_layers,
                         dropout=self.dropout
                         )
@@ -139,7 +143,8 @@ class StockPredictorLSTM():
             model.load_state_dict(model_dict['model_state'])
         
         else: 
-            model = LSTM(hidden_dim=self.hidden_dim, 
+            model = LSTM(input_size=self.input_size,
+                        hidden_size=self.hidden_size, 
                         num_layers=self.num_layers,
                         dropout=self.dropout
                         )
@@ -185,6 +190,7 @@ class StockPredictorLSTM():
         y = batch_tup[1]
 
         output = self.model(x)
+
         loss_function = nn.MSELoss()
         loss = loss_function(output, y)
 
@@ -199,9 +205,6 @@ class StockPredictorLSTM():
             validation_sequence=30,
             ):
 
-        # self.mean_train, self.std_train = self.__mean_std(x_train)
-
-        # self.__fit_transform(x_train)
         scaler = normalize(x_train)
 
         x_train = scaler.fit_transform()
@@ -236,7 +239,6 @@ class StockPredictorLSTM():
         
             if epoch_ndx == 1 or epoch_ndx % validation_cadence == 0:
                 loss_val = self.doValidation(epoch_ndx, val_dl)
-                # print("loss_val {}".format(loss_val))
                 best_score = max(loss_val, best_score)
                 # self.saveModel('LSTM', epoch_ndx, loss_val == best_score)
 
@@ -258,12 +260,8 @@ class StockPredictorLSTM():
                 plot=False
                 ):
 
-        # self.mean_test, self.std_test = self.__mean_std(x_test)
-        # self.mean = self.mean_train + self.mean_test / 2
-        # self.std = self.std_train + self.std_test / 2
         scaler = normalize(x_test)
         x_test = scaler.fit_transform()
-        # self.__fit_transform(x_test)
         val_dl = self.__initValDl(x_test)
         batch_iter = enumerate(val_dl)
 
@@ -293,15 +291,19 @@ class StockPredictorLSTM():
             
         return output * scaler.std() + scaler.mean()# * self.std_test + self.mean_test 
 
+    def forecast(forecast, look_back, plot=False):
+        pass
+
     def saveModel(self, type_str, epoch_ndx, isBest=False):
         file_path = os.path.join(
             '..',
             '..',
             'models',
             'LSTM',
-            '{}_{}.state'.format(
-                type_str,
-                self.time_str,
+            '{}_{}_{}.state'.format(
+                    type_str,
+                    self.hidden_dim,
+                    self.num_layers
             )
         )
 
@@ -328,9 +330,10 @@ class StockPredictorLSTM():
                 '..',
                 'models',
                 'LSTM',
-                '{}_{}_{}.state'.format(
+                '{}_{}_{}.{}.state'.format(
                     type_str,
-                    self.time_str,
+                    self.hidden_dim,
+                    self.num_layers,
                     'best',
                 )
             )

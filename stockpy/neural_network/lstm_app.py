@@ -38,7 +38,7 @@ def main():
                         type=float,
                     )
 
-    parser.add_argument('--hidden-dim',
+    parser.add_argument('--hidden-size',
                         help="Number of neural network ",
                         action="store",
                         default=32,
@@ -48,7 +48,7 @@ def main():
     parser.add_argument('--num-layers',
                         help="Number of layers",
                         action="store",
-                        default=2,
+                        default=1,
                         type=int,
                     )
     parser.add_argument('--batch-size',
@@ -76,7 +76,7 @@ def main():
                     )     
 
     cli_args = parser.parse_args()
-    stock_predictor = StockPredictorLSTM(hidden_dim=cli_args.hidden_dim,
+    stock_predictor = StockPredictorLSTM(hidden_size=cli_args.hidden_size,
                                         num_layers=cli_args.num_layers)
 
     data = pd.read_csv(cli_args.folder + cli_args.stock.upper() + '.csv',
