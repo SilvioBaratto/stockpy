@@ -1,2 +1,0 @@
-Namespace(num_epochs=5000, learning_rate=0.0003, beta1=0.96, beta2=0.999, clip_norm=10.0, lr_decay=0.99996, weight_decay=2.0, mini_batch_size=20, annealing_epochs=1000, minimum_annealing_factor=0.2, rnn_dropout_rate=0.1, num_iafs=0, iaf_dim=100, checkpoint_freq=0, load_opt='', load_model='', save_opt='', save_model='', cuda=False, jit=False, tmc=False, tmcelbo=False, tmc_num_samples=10, log='dmm.log')
-N_train_data: 1195 N_mini_batches: 60
