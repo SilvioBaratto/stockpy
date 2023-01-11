@@ -203,7 +203,8 @@ class LSTM():
 
         return loss.mean()    # This is the loss over the entire batch
 
-    def fit(self, x_train, 
+    def fit(self, 
+            x_train, 
             epochs=10, 
             batch_size=8, 
             num_workers=4,
@@ -249,7 +250,9 @@ class LSTM():
                 best_score = max(loss_val, best_score)
                 # self.saveModel('LSTM', epoch_ndx, loss_val == best_score)
 
-    def doValidation(self, epoch_ndx, val_dl):
+    def doValidation(self, 
+                    epoch_ndx, 
+                    val_dl):
         total_loss = 0
         with torch.no_grad():
             self.model.eval()   # Turns off training-time behaviour

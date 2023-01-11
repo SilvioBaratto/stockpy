@@ -96,7 +96,7 @@ class GRU():
         
         self.time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
         
-        self.model_path = self.__initModelPath()
+        # self.model_path = self.__initModelPath()
         self.model = self.__initModel()
         self.optimizer = self.__initOptimizer()
 
