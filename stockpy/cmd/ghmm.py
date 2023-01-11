@@ -31,7 +31,7 @@ def main():
                         action="store",
                         default=None,
                     )
-    parser.add_argument('--test-size',
+    parser.add_argument('--forecast',
                         help="Test size training",
                         action="store",
                         default=0.3,
@@ -96,12 +96,12 @@ def main():
                                         fh=cli_args.frac_high,
                                         fl=cli_args.frac_low)
 
-    data = pd.read_csv(cli_args.folder + cli_args.stock.upper() + '.csv')
-    train_data, test_data = train_test_split(
-    data, test_size=cli_args.test_size, shuffle=False)
-    stock_predictor.fit(X_train=train_data)
-    y_test = test_data['Close']
-    y_pred = stock_predictor.predict(X_test=test_data, plot=cli_args.plot)
+    df = pd.read_csv(cli_args.folder + cli_args.stock.upper() + '.csv')
+    X_train = df[:len(df)-cli_args.forecast]
+    X_test = df[-cli_args.forecast:]
+    stock_predictor.fit(X_train=X_train)
+    y_test = X_test['Close']
+    y_pred = stock_predictor.predict(X_test=X_test, plot=cli_args.plot)
     evaluate(y_test, y_pred)
 
 if __name__ == "__main__":

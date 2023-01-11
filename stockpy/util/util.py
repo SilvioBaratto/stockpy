@@ -6,12 +6,27 @@ import time
 
 # import torch
 import numpy as np
+from sklearn.metrics import mean_absolute_error, mean_squared_error, mean_absolute_percentage_error
 
 from util.logconf import logging
 log = logging.getLogger(__name__)
 # log.setLevel(logging.WARN)
 # log.setLevel(logging.INFO)
 log.setLevel(logging.DEBUG)
+
+def evaluate(y_test, y_pred, show=False):
+    mse = mean_squared_error(y_test, y_pred, squared=True)
+    rmse = mean_squared_error(y_test, y_pred, squared=False)
+    mape = mean_absolute_percentage_error(y_test, y_pred) * 100
+    # dtw_distance = fastdtw(y_test, y_pred, dist=euclidean)[0] 
+    if show:
+        print('Model Performance')
+        print("Mean squared error = {:0.3f}".format(mse))
+        print("Root mean squared error = {:0.3f}".format(rmse))
+        print('Mean absolute percentage error = {:0.3f}%.'.format(mape))
+        # print('DTW distance = {:0.3f} '.format(dtw_distance))
+    else:
+        return mse, rmse, mape
 
 
 def importstr(module_str, from_=None):

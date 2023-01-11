@@ -283,13 +283,12 @@ def normalize_stock(X_train, X_test):
 
     return tot_mean, tot_std
 
-class StockDataset(torch.utils.data.Dataset):
+class StockDatasetSequence(torch.utils.data.Dataset):
     def __init__(self, 
                 dataframe, 
                 sequence_length=5
                 ):
-        
-        self.scaler = StandardScaler()
+
         self.dataframe = dataframe
 
         self.sequence_length = sequence_length
@@ -313,3 +312,23 @@ class StockDataset(torch.utils.data.Dataset):
             x = torch.cat((padding, x), 0)
 
         return x, self.y[i] 
+
+class StockDataset(torch.utils.data.Dataset):
+    def __init__(self, 
+                dataframe, 
+                ):
+
+        self.dataframe = dataframe
+
+        self.target= "Close"
+        self.features = ['High', 'Low', 'Open', 'Volume']
+        
+        self.y = torch.tensor(dataframe[self.target].values).reshape(-1,1).float()
+        self.X = torch.tensor((dataframe[self.features].values)).float()
+
+
+    def __len__(self):
+        return self.X.shape[0]
+
+    def __getitem__(self, i): 
+        return self.X[i], self.y[i] 
