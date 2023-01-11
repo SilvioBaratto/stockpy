@@ -15,7 +15,7 @@ from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
-from util.StockDataset import StockDataset, normalize
+from util.StockDataset import StockDatasetSequence, normalize
 
 from util.logconf import logging
 from sklearn.model_selection import train_test_split
@@ -36,44 +36,67 @@ log.setLevel(logging.INFO)
 log.setLevel(logging.DEBUG)
 from util.StockDataset import StockDataset, normalize
 
-# TODO Implement forecasting function and plotting
-# TODO Implement interface 
-
-      
 class Net(nn.Module):
-  '''
-    Multilayer Perceptron for regression.
-  '''
-  def __init__(self, 
-              input_size=4, 
-              hidden_size=32, 
-              output_dim=1,
-              dropout=0.2
-              ):
+    def __init__(self, 
+                input_size=4,  
+                hidden_size=32, 
+                num_layers=2, 
+                output_dim=1, 
+                dropout=0.2,
+                seq_length=30
+                ):
 
-    super().__init__()
-    self.layers = nn.Sequential(
-      nn.Linear(input_size, hidden_size),
-      nn.ReLU(),
-      nn.Dropout(dropout),
-      nn.Linear(hidden_size, 16),
-      nn.ReLU(),
-      nn.Dropout(dropout),
-      nn.Linear(16, output_dim)
-    )
+        super().__init__()
+        self.input_size = input_size # this is the number of features
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.sequence_length = seq_length
 
-  def forward(self, x):
-    return self.layers(x)
+        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
+        # self.dropout = nn.Dropout(dropout)
+        self.fc_1 = nn.Linear(hidden_size, 128)
+        self.fc = nn.Linear(128, output_dim)
+        # self.dropout = nn.Dropout(dropout)
+        self.relu = nn.ReLU()
 
-class MLP():
+    def forward(self, x):
+        batch_size = x.size(0)
+        h0 = Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size))
+        
+        _, (hn) = self.gru(x, (h0))
+        # hn = hn.view(-1, self.hidden_size)
+        # x = self.dropout(x)
+        # out = self.relu(hn[0]).flatten()
+        # out = self.fc(hn[0]).flatten() #first Dense
+        out = self.relu(hn[0])
+        out = self.fc_1(out) #first Dense
+        out = self.relu(out) #relu
+        out = self.fc(out) #Final Output
+       
+        out = out.view(-1,1)
+
+        return out
+
+
+class GRU():
+
     def __init__(self,
+                input_size=4,
+                hidden_size=32, 
+                num_layers=2,
+                dropout=0.2,
                 pretrained=False
                 ):
         
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.dropout = dropout
         self.pretrained = pretrained
+        
         self.time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
         
-        # self.model_path = self.__initModelPath()
+        self.model_path = self.__initModelPath()
         self.model = self.__initModel()
         self.optimizer = self.__initOptimizer()
 
@@ -82,8 +105,8 @@ class MLP():
                 '..',
                 '..',
                 'models',
-                'MLP',
-                'MLP{}.state'.format('*', 'best'),
+                'GRU',
+                'GRU{}.state'.format('*', 'best'),
         )
 
         file_list = glob.glob(local_path)
@@ -92,8 +115,8 @@ class MLP():
                     '..',
                     '..',
                     'models',
-                    'MLP',
-                    'MLP{}.state'.format('*'),
+                    'GRU',
+                    'GRU{}.state'.format('*'),
                 )
             file_list = glob.glob(pretrained_path)
 
@@ -112,42 +135,53 @@ class MLP():
         if self.pretrained:
             model_dict = torch.load(self.model_path)
 
-            model = Net()
+            model = Net(input_size=self.input_size,
+                        hidden_size=self.hidden_size, 
+                        num_layers=self.num_layers,
+                        dropout=self.dropout
+                        )
 
             model.load_state_dict(model_dict['model_state'])
         
         else: 
-            model = Net()
+            model = Net(input_size=self.input_size,
+                        hidden_size=self.hidden_size, 
+                        num_layers=self.num_layers,
+                        dropout=self.dropout
+                        )
 
         return model
 
     def __initOptimizer(self):
         return torch.optim.Adam(self.model.parameters(), lr=0.01)
 
-    def __initTrainDl(self, x_train, batch_size, num_workers):
-        train_dl = StockDataset(x_train)
+    def __initTrainDl(self, x_train, batch_size, num_workers, sequence_length):
+        train_dl = StockDatasetSequence(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
-                              batch_size=batch_size, 
-                              num_workers=num_workers,
-                              # pin_memory=self.use_cuda,
-                              shuffle=True
-                              )
+                                    batch_size=batch_size, 
+                                    num_workers=num_workers,
+                                    # pin_memory=self.use_cuda,
+                                    shuffle=True
+                                    )
 
         self.__batch_size = batch_size
         self.__num_workers = num_workers
+        self.__sequence_length = sequence_length
 
         return train_dl
 
     def __initValDl(self, x_test):
-        val_dl = StockDataset(x_test)
+        val_dl = StockDatasetSequence(x_test, 
+                                sequence_length=self.__sequence_length
+                                )
 
         val_dl = DataLoader(val_dl, 
-                            batch_size=self.__batch_size, 
-                            num_workers=self.__num_workers,
-                            # pin_memory=self.use_cuda,
-                            shuffle=False
-                            )
+                                    batch_size=self.__batch_size, 
+                                    num_workers=self.__num_workers,
+                                    # pin_memory=self.use_cuda,
+                                    shuffle=False
+                                    )
         
         return val_dl
 
@@ -159,6 +193,7 @@ class MLP():
         output = self.model(x)
 
         loss_function = nn.MSELoss()
+        # print(output.shape, y.shape)
         loss = loss_function(output, y)
 
         return loss.mean()    # This is the loss over the entire batch
@@ -167,6 +202,7 @@ class MLP():
             epochs=10, 
             batch_size=8, 
             num_workers=4,
+            sequence_length=30,
             save_model=True,
             validation_sequence=30,
             ):
@@ -180,6 +216,7 @@ class MLP():
         train_dl = self.__initTrainDl(x_train, 
                                         batch_size=batch_size,
                                         num_workers=num_workers,
+                                        sequence_length=sequence_length
                                         )
 
         val_dl = self.__initValDl(val_dl)
@@ -264,7 +301,7 @@ class MLP():
             '..',
             '..',
             'models',
-            'MLP',
+            'GRU',
             '{}_{}_{}.state'.format(
                     type_str,
                     self.hidden_dim,
@@ -294,7 +331,7 @@ class MLP():
                 '..',
                 '..',
                 'models',
-                'MLP',
+                'GRU',
                 '{}_{}_{}.{}.state'.format(
                     type_str,
                     self.hidden_dim,

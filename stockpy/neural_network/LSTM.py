@@ -56,7 +56,7 @@ class Net(nn.Module):
         self.sequence_length = seq_length
 
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        # self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout(dropout)
         self.fc_1 = nn.Linear(hidden_size, 128)
         self.fc = nn.Linear(128, output_dim)
         # self.dropout = nn.Dropout(dropout)
@@ -73,8 +73,10 @@ class Net(nn.Module):
         # out = self.relu(hn[0]).flatten()
         # out = self.fc(hn[0]).flatten() #first Dense
         out = self.relu(hn[0])
+        out = self.dropout(out)
         out = self.fc_1(out) #first Dense
         out = self.relu(out) #relu
+        out = self.dropout(out)
         out = self.fc(out) #Final Output
        
         out = out.view(-1,1)
