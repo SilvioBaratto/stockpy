@@ -1,7 +1,3 @@
-"""
-The :mod:`sklearn.linear_model` module implements a variety of linear models.
-"""
-
 from _lasso import LASSO as Lasso
 from _quantile import QUANTILE as Quantile
 from _sgd import SGD as SGD
