@@ -48,7 +48,7 @@ class Net(PyroModule):
                 hidden_size=32,
                 output_dim=1,
                 ):
-        super().__init__()
+        super(Net, self).__init__()
         self.name = "deterministic_network"
 
         self.model = PyroModule[nn.Sequential](
@@ -66,18 +66,25 @@ class Net(PyroModule):
         mu = x.squeeze()
         sigma = pyro.sample("sigma", dist.Uniform(0., 1.))
         with pyro.plate("data", x_data.shape[0]):
-            obs = pyro.sample("obs", dist.Normal(mu, sigma), obs=y_data)
+            obs = pyro.sample("obs", dist.Normal(mu, sigma).to_event(1), 
+                                        obs=y_data)
         return mu
 
 class BNN(PyroModule):
 
     def __init__(self, 
+                input_size=4, 
+                hidden_size=32, 
+                output_size=1,
                 pretrained=False
                 ):
         # initialize PyroModule
         super(BNN, self).__init__()
 
-        self.pretrained = pretrained
+        self.pretrained = pretrained  
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.output_size = output_size  
         self.time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
 
         # self.model_path = self.__initModelPath()
@@ -92,12 +99,18 @@ class BNN(PyroModule):
         if self.pretrained:
             model_dict = torch.load(self.model_path)
 
-            model = Net()
+            model = Net(input_size=self.input_size, 
+                        hidden_size=self.hidden_size, 
+                        output_dim=self.output_size
+                        )
 
             model.load_state_dict(model_dict['model_state'])
         
         else: 
-            model = Net()
+            model = Net(input_size=self.input_size, 
+                        hidden_size=self.hidden_size, 
+                        output_dim=self.output_size
+                        )
 
         return model
     
@@ -156,7 +169,7 @@ class BNN(PyroModule):
         pyro.clear_param_store()
         for epoch_ndx in tqdm((range(1, epochs + 1)),position=0, leave=True):
             loss = 0.0
-            for x_batch, y_batch in train_loader:          
+            for x_batch, y_batch in train_loader:         
                 loss = svi.step(x_data=x_batch, y_data=y_batch)
 
     def predict(self, 
@@ -169,9 +182,8 @@ class BNN(PyroModule):
         test_loader = self.__initValDl(x_test)
 
         output = torch.tensor([])
-        with torch.no_grad():
-            for x_batch, y_batch in test_loader:
-                predictive = Predictive(model=self.model, 
+        for x_batch, y_batch in test_loader:
+            predictive = Predictive(model=self.model, 
                                             guide=self.guide, 
                                             num_samples=self.__batch_size,
                                             return_sites=("linear.weight", 
@@ -179,15 +191,15 @@ class BNN(PyroModule):
                                                         "_RETURN")
                                             )
 
-                samples = predictive(x_batch)
-                site_stats = {}
-                for k, v in samples.items():
-                    site_stats[k] = {
-                        "mean": torch.mean(v, 0)
-                    }
+            samples = predictive(x_batch)
+            site_stats = {}
+            for k, v in samples.items():
+                site_stats[k] = {
+                    "mean": torch.mean(v, 0)
+                }
 
-                y_pred = site_stats['_RETURN']['mean']
-                output = torch.cat((output, y_pred), 0)
+            y_pred = site_stats['_RETURN']['mean']
+            output = torch.cat((output, y_pred), 0)
 
         if plot is True:
             y_pred = output.detach().numpy() * scaler.std() + scaler.mean() # * self.std_test + self.mean_test 
@@ -205,8 +217,10 @@ class BNN(PyroModule):
             
             plt.legend()
             plt.show()
+
+        output = output.detach().numpy() * scaler.std() + scaler.mean()
         
-        return output.detach().numpy() * scaler.std() + scaler.mean()
+        return output
     
     def saveModel(self, type_str, epoch_ndx, isBest=False):
         file_path = os.path.join(
