@@ -2,8 +2,6 @@
 * [Description](#description)
 * [Documentation](#documentation)
 * [Data Downloader](#data-downloader)
-* [Testing](#testing)
-* [How to contribute](#how-to-contribute)
 * [License](#license)
 
 ## Description
