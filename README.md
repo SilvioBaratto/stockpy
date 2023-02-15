@@ -49,15 +49,9 @@ This is a terminal application located on the cmd folder under the name of data.
 | Parameter | Explanation
 |-----------|----------------------------------|
 | `--download`| This command download all the S&P 500 stocks. If no start and end dates are specified, the default range is between ”2017-01-01” and today’s date. from ”2017-01-01” to the actual day.                |
-| `--stock`| This command download a specific stock specified by the user. If no start
-and end dates are specified, the default range is between ”2017-01-01” and today’s
-date. from ”2017-01-01” to the actual day.                |
-| `--update`| This command update all the stocks presents in the folder containing the
-files. It is possible to update the files to any range of dates. If the stocks wasn’t
-listed before a specific date for default it will downloaded from the day it enters in
-the public market. |
-|`--update.stock`| This command update a specific stock specified by the user. It is
-possible to update the files to any range of dates specifying the start and end. |
+| `--stock`| This command download a specific stock specified by the user. If no start and end dates are specified, the default range is between ”2017-01-01” and today’s date. from ”2017-01-01” to the actual day.                |
+| `--update`| This command update all the stocks presents in the folder containing the files. It is possible to update the files to any range of dates. If the stocks wasn’t listed before a specific date for default it will downloaded from the day it enters in the public market. |
+|`--update.stock`| This command update a specific stock specified by the user. It is possible to update the files to any range of dates specifying the start and end. |
 |`--start`| This command specify the start date. |
 |`--end`| This command specify the end date. |
 |`--delete`| Delete all files present in the files folder. | 
