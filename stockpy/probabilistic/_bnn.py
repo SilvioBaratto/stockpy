@@ -13,7 +13,16 @@ from torch import nn
 import pyro.distributions as dist
 from pyro.optim import Adam
 from pyro.nn import PyroModule
-from pyro.infer import SVI, Trace_ELBO, Predictive
+from pyro.infer import (
+    SVI,
+    JitTrace_ELBO,
+    Trace_ELBO,
+    TraceEnum_ELBO,
+    TraceTMC_ELBO,
+    config_enumerate,
+    TraceMeanField_ELBO,
+    Predictive
+)
 from tqdm.auto import trange, tqdm
 
 from util.StockDataset import normalize, StockDataset
@@ -151,26 +160,59 @@ class BNN(PyroModule):
             x_train,
             epochs=10,
             batch_size=8, 
-            num_workers=4 
+            num_workers=4,
+            validation_sequence=30 
             ):
 
         scaler = normalize(x_train)
+
         x_train = scaler.fit_transform()
-        train_loader = self.__initTrainDl(x_train, 
+        val_dl = x_train[-validation_sequence:]
+        x_train = x_train[:len(x_train)-len(val_dl)]
+
+        train_dl = self.__initTrainDl(x_train, 
                                         batch_size=batch_size,
-                                        num_workers=num_workers,
+                                        num_workers=num_workers
                                         )
 
-        svi = SVI(self.model, 
+        val_dl = self.__initValDl(val_dl)
+
+        self.svi = SVI(self.model, 
                   self.guide, 
                   self.optimizer, 
-                  loss=Trace_ELBO())
+                  loss=Trace_ELBO()
+                )
 
         pyro.clear_param_store()
         for epoch_ndx in tqdm((range(1, epochs + 1)),position=0, leave=True):
             loss = 0.0
-            for x_batch, y_batch in train_loader:         
-                loss = svi.step(x_data=x_batch, y_data=y_batch)
+            for x_batch, y_batch in train_dl:         
+                loss = self.computeBatchLoss(x_batch, y_batch)
+
+            loss_val = self.doValidation(val_dl)
+            print("[epoch %04d]  %.4f" % (epoch_ndx, loss_val))
+
+    def doValidation(self, val_dl):
+        total_loss = 0
+
+        with torch.no_grad():            
+            for x_batch, y_batch in val_dl:
+                loss_var = self.svi.evaluate_loss(x_batch, y_batch) 
+                total_loss += loss_var / val_dl.batch_size
+
+        return total_loss 
+    
+    def computeBatchLoss(self, 
+                         x_batch, 
+                         y_batch
+                         ):     
+
+        loss = self.svi.step(
+            x_data=x_batch,
+            y_data=y_batch
+        )
+        # keep track of the training loss
+        return loss  # This is the loss over the entire batch
 
     def predict(self, 
                 x_test, 

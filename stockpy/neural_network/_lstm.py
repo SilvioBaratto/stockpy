@@ -101,7 +101,7 @@ class LSTM():
         
         self.time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
         
-        self.model_path = self.__initModelPath()
+        # self.model_path = self.__initModelPath()
         self.model = self.__initModel()
         self.optimizer = self.__initOptimizer()
 
@@ -110,8 +110,8 @@ class LSTM():
                 '..',
                 '..',
                 'models',
-                'LSTM',
-                'LSTM_{}.state'.format('*', 'best'),
+                'GRU',
+                'GRU{}.state'.format('*', 'best'),
         )
 
         file_list = glob.glob(local_path)
@@ -120,8 +120,8 @@ class LSTM():
                     '..',
                     '..',
                     'models',
-                    'LSTM',
-                    'LSTM_{}.state'.format('*'),
+                    'GRU',
+                    'GRU{}.state'.format('*'),
                 )
             file_list = glob.glob(pretrained_path)
 
@@ -190,21 +190,18 @@ class LSTM():
         
         return val_dl
 
-    def computeBatchLoss(self, batch_tup):
-            
-        x = batch_tup[0]
-        y = batch_tup[1]
-
-        output = self.model(x)
-
+    def computeBatchLoss(self, 
+                         x_batch, 
+                         y_batch
+                         ):     
+              
+        output = self.model(x_batch)
         loss_function = nn.MSELoss()
-        # print(output.shape, y.shape)
-        loss = loss_function(output, y)
+        loss = loss_function(output, y_batch)
 
         return loss.mean()    # This is the loss over the entire batch
 
-    def fit(self, 
-            x_train, 
+    def fit(self, x_train, 
             epochs=10, 
             batch_size=8, 
             num_workers=4,
@@ -230,16 +227,15 @@ class LSTM():
         best_score = 0.0
         total_loss = 0
         validation_cadence = 5
+        loss_function = nn.MSELoss()
         
         for epoch_ndx in tqdm((range(1, epochs + 1)),position=0, leave=True):
             self.model.train()
 
-            batch_iter = enumerate(train_dl)
-
-            for batch_ndx, batch_tup in batch_iter:
+            for x_batch, y_batch in train_dl:
                 self.optimizer.zero_grad()  # Frees any leftover gradient tensors
 
-                loss_var = self.computeBatchLoss(batch_tup)
+                loss_var = self.computeBatchLoss(x_batch, y_batch)
 
                 loss_var.backward()     # Actually updates the model weights
                 self.optimizer.step()
@@ -250,17 +246,14 @@ class LSTM():
                 best_score = max(loss_val, best_score)
                 # self.saveModel('LSTM', epoch_ndx, loss_val == best_score)
 
-    def doValidation(self, 
-                    epoch_ndx, 
-                    val_dl):
+    def doValidation(self, epoch_ndx, val_dl):
         total_loss = 0
+        loss_function = nn.MSELoss()
         with torch.no_grad():
             self.model.eval()   # Turns off training-time behaviour
 
-            batch_iter = enumerate(val_dl)
-
-            for batch_ndx, batch_tup in batch_iter:
-                loss_var = self.computeBatchLoss(batch_tup)
+            for x_batch, y_batch in val_dl:
+                loss_var = self.computeBatchLoss(x_batch, y_batch)
                 total_loss += loss_var
 
         return total_loss / len(val_dl)
@@ -309,7 +302,7 @@ class LSTM():
             '..',
             '..',
             'models',
-            'LSTM',
+            'GRU',
             '{}_{}_{}.state'.format(
                     type_str,
                     self.hidden_dim,
@@ -339,7 +332,7 @@ class LSTM():
                 '..',
                 '..',
                 'models',
-                'LSTM',
+                'GRU',
                 '{}_{}_{}.{}.state'.format(
                     type_str,
                     self.hidden_dim,

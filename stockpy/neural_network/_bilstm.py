@@ -36,6 +36,9 @@ log.setLevel(logging.INFO)
 log.setLevel(logging.DEBUG)
 from util.StockDataset import StockDataset, normalize
 
+# TODO Implement forecasting function and plotting
+# TODO Implement interface 
+
 class Net(nn.Module):
     def __init__(self, 
                 input_size=4,  
@@ -52,33 +55,30 @@ class Net(nn.Module):
         self.num_layers = num_layers
         self.sequence_length = seq_length
 
-        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
-        # self.dropout = nn.Dropout(dropout)
-        self.fc_1 = nn.Linear(hidden_size, 128)
-        self.fc = nn.Linear(128, output_dim)
-        self.linear = nn.Linear(hidden_size, output_dim)
+        self.lstm = nn.LSTM(input_size, 
+                            hidden_size, 
+                            num_layers, 
+                            bidirectional=True,
+                            batch_first=True
+                            )
+        self.dropout = nn.Dropout(dropout)
+        self.fc = nn.Linear(hidden_size*2, output_dim)
         # self.dropout = nn.Dropout(dropout)
         self.relu = nn.ReLU()
 
     def forward(self, x):
         batch_size = x.size(0)
-        h0 = Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size))
+        h0 = Variable(torch.zeros(self.num_layers*2, batch_size, self.hidden_size))
+        c0 = Variable(torch.zeros(self.num_layers*2, batch_size, self.hidden_size))
         
-        _, (hn) = self.gru(x, (h0))
-        # hn = hn.view(-1, self.hidden_size)
-        # x = self.dropout(x)
-        # out = self.relu(hn[0]).flatten()
-        # out = self.fc(hn[0]).flatten() #first Dense
-        out = self.relu(hn[0])
-        out = self.fc_1(out) #first Dense
-        out = self.relu(out) #relu
-        out = self.fc(out) #Final Output
+        out, _ = self.lstm(x, (h0, c0))
+        out = self.fc(out[:, -1, :]) #Final Output
        
         out = out.view(-1,1)
+
         return out
 
-
-class GRU():
+class BiLSTM():
 
     def __init__(self,
                 input_size=4,
@@ -261,14 +261,13 @@ class GRU():
         scaler = normalize(x_test)
         x_test = scaler.fit_transform()
         val_dl = self.__initValDl(x_test)
-        batch_iter = enumerate(val_dl)
 
         output = torch.tensor([])
         self.model.eval()
         with torch.no_grad():
-            for batch_ndx, batch_tup in batch_iter:
-                y_star = self.model(batch_tup[0])
-                output = torch.cat((output, y_star), 0)
+            for x_batch, y_batch in val_dl:
+                y_pred = self.model(x_batch)
+                output = torch.cat((output, y_pred), 0)
         
         if plot is True:
             y_pred = output * scaler.std() + scaler.mean() # * self.std_test + self.mean_test 
@@ -369,3 +368,4 @@ class GRU():
         except IndexError:
             log.debug([local_path, pretrained_path, file_list])
             raise
+
