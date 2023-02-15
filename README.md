@@ -77,3 +77,5 @@ python3 data.py --download --folder="../../example"
 ## How to contribute
 
 ## License
+
+See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
