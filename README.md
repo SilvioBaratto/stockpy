@@ -72,10 +72,6 @@ python3 data.py --update-stock --start="2014-01-01"
 # start and end default values are "2017-01-01" and today
 python3 data.py --download --folder="../../example"
 ```
-## Testing
-
-## How to contribute
-
 ## License
 
 See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
