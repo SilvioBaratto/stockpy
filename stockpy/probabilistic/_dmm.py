@@ -36,194 +36,134 @@ from pyro.infer import (
     Predictive
 )
 from pyro.optim import ClippedAdam
+import torch.nn.functional as F
 
-from util.StockDataset import StockDatasetSequence, normalize
+from utils import StockDataset, normalize
 import pandas as pd
 import matplotlib.pyplot as plt
-        
-class Net(nn.Module):
-  '''
-    Multilayer Perceptron for regression.
-  '''
-  def __init__(self, 
-              batch_size=24, 
-              hidden_size=32, 
-              output_dim=1,
-              dropout=0.2
-              ):
 
-    super().__init__()
-    self.layers = nn.Sequential(
-      nn.Linear(hidden_size, batch_size),
-      nn.ReLU(),
-      nn.Dropout(dropout),
-      nn.Linear(batch_size, 16),
-      nn.ReLU(),
-      nn.Dropout(dropout),
-      nn.Linear(16, output_dim)
-    )
-
-  def forward(self, x):
-    return self.layers(x)
-
-class Emitter(PyroModule):
+class Emitter(nn.Module):
     """
-    Parameterizes the normal observation likelihood p(x_t | z_t)
+    Parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t)
     """
-    def __init__(self, 
-                 hidden_size=32,
-                 output_dim=1
-                 ):
+    def __init__(self, z_dim, x_dim, emission_dim, variance):
         super().__init__()
         # initialize the three linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(hidden_size, hidden_size)
-        self.lin_hidden_to_hidden = nn.Linear(hidden_size, hidden_size)
-        self.lin_hidden_to_loc = nn.Linear(hidden_size, output_dim)
-        self.lin_hidden_to_scale = nn.Linear(hidden_size, output_dim)
-        # initialize the two non-linearities used in the neural network
+        self.lin_z_to_hidden = nn.Linear(z_dim, emission_dim)
+        self.lin_x_to_hidden = nn.Linear(x_dim, emission_dim)
+        self.lin_hidden_to_mean = nn.Linear(emission_dim, 1)
+        # initialize the fixed variance hyperparameter
+        self.variance = nn.Parameter(torch.tensor(variance))
+        # initialize the non-linearities used in the neural network
         self.relu = nn.ReLU()
-        self.softplus = nn.Softplus()
 
-    def forward(self, z_t):
+    def forward(self, z_t, x_t):
         """
-        Given the latent z at a particular time step t we return the mean and
-        variance of the normal distribution p(x_t|z_t)
+        Given the latent z at a particular time step t and the input x at time step t,
+        we return the mean and variance of the Gaussian distribution p(y_t|z_t, x_t)
         """
         h1 = self.relu(self.lin_z_to_hidden(z_t))
-        h2 = self.relu(self.lin_hidden_to_hidden(h1))
-        loc = self.lin_hidden_to_loc(h1)
-        scale = self.softplus(self.lin_hidden_to_scale(h2))
-
-        return loc, scale
+        h2 = self.relu(self.lin_x_to_hidden(x_t))
+        h3 = h1 + h2  # element-wise sum of the two hidden states
+        mean = self.lin_hidden_to_mean(h3)
+        return mean, self.variance
     
 
-class GatedTransition(PyroModule):
+class GatedTransition(nn.Module):
     """
-    Parameterizes the gaussian latent transition probability `p(z_t | z_{t-1})`
-    See section 5 in the reference for comparison.
+    Parameterizes the dynamics of the latent variables z_t
     """
-
-    def __init__(self, 
-                hidden_size=32,
-                output_dim=1
-                 ):
+    def __init__(self, z_dim, x_dim, transition_dim):
         super().__init__()
-        # initialize the six linear transformations used in the neural network
-        self.lin_gate_z_to_hidden = nn.Linear(hidden_size, hidden_size)
-        self.lin_gate_hidden_to_z = nn.Linear(hidden_size, hidden_size)
-        self.lin_proposed_mean_z_to_hidden = nn.Linear(hidden_size, hidden_size)
-        self.lin_proposed_mean_hidden_to_z = nn.Linear(hidden_size, hidden_size)
-        self.lin_sig = nn.Linear(hidden_size, output_dim)
-        self.lin_z_to_loc = nn.Linear(hidden_size, output_dim)
-        # modify the default initialization of lin_z_to_loc
-        # so that it's starts out as the identity function
-        self.lin_z_to_loc.weight.data = torch.eye(hidden_size)
-        self.lin_z_to_loc.bias.data = torch.zeros(hidden_size)
-        # initialize the three non-linearities used in the neural network
+        # initialize the two linear transformations used in the neural network
+        self.lin_z_to_hidden = nn.Linear(z_dim, transition_dim)
+        self.lin_x_to_hidden = nn.Linear(x_dim, transition_dim)
+        # initialize the two gated transformations used in the neural network
+        self.lin_hidden_to_hidden1 = nn.Linear(transition_dim, transition_dim)
+        self.lin_hidden_to_hidden2 = nn.Linear(transition_dim, transition_dim)
+        # initialize the non-linearities used in the neural network
         self.relu = nn.ReLU()
-        self.softplus = nn.Softplus()
+        self.sigmoid = nn.Sigmoid()
 
-    def forward(self, z_t_1):
+    def forward(self, z_t, x_t):
         """
-        Given the latent `z_{t-1}` corresponding to the time step t-1
-        we return the mean and scale vectors that parameterize the
-        (diagonal) gaussian distribution `p(z_t | z_{t-1})`
+        Given the latent z at a particular time step t and the input x at time step t,
+        we return the parameters for the Gaussian distribution p(z_t | z_{t-1}, x_t)
         """
-        # compute the gating function
-        _gate = self.relu(self.lin_gate_z_to_hidden(z_t_1))
-        gate = torch.sigmoid(self.lin_gate_hidden_to_z(_gate))
-        # compute the 'proposed mean'
-        _proposed_mean = self.relu(self.lin_proposed_mean_z_to_hidden(z_t_1))
-        proposed_mean = self.lin_proposed_mean_hidden_to_z(_proposed_mean)
-        # assemble the actual mean used to sample z_t, which mixes a linear transformation
-        # of z_{t-1} with the proposed mean modulated by the gating function
-        loc = (1 - gate) * self.lin_z_to_loc(z_t_1) + gate * proposed_mean
-        # compute the scale used to sample z_t, using the proposed mean from
-        # above as input the softplus ensures that scale is positive
-        scale = self.softplus(self.lin_sig(self.relu(proposed_mean)))
-        # return loc, scale which can be fed into Normal
-        return loc, scale
+        h1 = self.relu(self.lin_z_to_hidden(z_t))
+        h2 = self.relu(self.lin_x_to_hidden(x_t))
+        gated1 = self.sigmoid(self.lin_hidden_to_hidden1(h1))
+        gated2 = self.sigmoid(self.lin_hidden_to_hidden2(h2))
+        h3 = gated1 * h1 + gated2 * h2
+        mu_t = h3
+        return mu_t, 1.0
     
-class Combiner(PyroModule):
+class Combiner(nn.Module):
     """
-    Parameterizes `q(z_t | z_{t-1}, x_{t:T})`, which is the basic building block
-    of the guide (i.e. the variational distribution). The dependence on `x_{t:T}` is
-    through the hidden state of the RNN (see the PyTorch module `rnn` below)
+    Combines the previous hidden state z_{t-1} and the current input x_t
+    to produce the hidden state h_t, which is used by the emitter and
+    transition networks.
     """
-
-    def __init__(self, 
-                 hidden_size=32,
-                 output_dim=1
-                 ):
+    def __init__(self, z_dim, rnn_dim, hidden_dim):
         super().__init__()
-        # initialize the three linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(hidden_size, output_dim)
-        self.lin_hidden_to_loc = nn.Linear(hidden_size, output_dim)
-        self.lin_hidden_to_scale = nn.Linear(hidden_size, output_dim)
-        # initialize the two non-linearities used in the neural network
+        self.lin_z_to_hidden = nn.Linear(z_dim, hidden_dim)
+        self.lin_rnn_to_hidden = nn.Linear(rnn_dim, hidden_dim)
+        self.hidden_to_loc = nn.Linear(hidden_dim, z_dim)
+        self.hidden_to_scale = nn.Linear(hidden_dim, z_dim)
         self.relu = nn.ReLU()
-        self.softplus = nn.Softplus()
 
-    def forward(self, z_t_1, h_rnn):
-        """
-        Given the latent z at at a particular time step t-1 as well as the hidden
-        state of the RNN `h(x_{t:T})` we return the mean and scale vectors that
-        parameterize the (diagonal) gaussian distribution `q(z_t | z_{t-1}, x_{t:T})`
-        """
-        # combine the rnn hidden state with a transformed version of z_t_1
-        h_combined = 0.5 * (self.relu(self.lin_z_to_hidden(z_t_1)) + h_rnn)
-        # use the combined hidden state to compute the mean used to sample z_t
-        loc = self.lin_hidden_to_loc(h_combined)
-        # use the combined hidden state to compute the scale used to sample z_t
-        scale = self.softplus(self.lin_hidden_to_scale(h_combined))
-        # return loc, scale which can be fed into Normal
+    def forward(self, z_prev, rnn_input):
+        hidden = self.relu(self.lin_z_to_hidden(z_prev) + self.lin_rnn_to_hidden(rnn_input))
+        loc = self.hidden_to_loc(hidden)
+        scale = F.softplus(self.hidden_to_scale(hidden))
         return loc, scale
     
-class DeepMarkovModel(PyroModule):
+class DeepMarkovModel(nn.Module):
     """
     This PyTorch Module encapsulates the model as well as the
     variational distribution (the guide) for the Deep Markov Model
     """
-
-    def __init__(
-        self,
-        input_size=4,
-        hidden_size=32,
-        num_layers=2,
-        output_dim=1
-    ):
-        super().__init__()
-        # instantiate PyTorch modules used in the model and guide below
-        # dropout just takes effect on inner layers of rnn
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.output_dim = output_dim
-
-        self.gru = nn.GRU(input_size=input_size, 
-                       hidden_size=hidden_size,
-                       num_layers=num_layers,
-                       bidirectional=True
-                       )
-        self.emitter = Emitter(hidden_size*2, output_dim)
-        self.trans = GatedTransition(hidden_size*2, output_dim)
-        self.combiner = Combiner(hidden_size*2, hidden_size*2)
-        # define a (trainable) parameters z_0 and z_q_0 that help define the probability
-        # distributions p(z_1) and q(z_1)
-        # (since for t = 1 there are no previous latents to condition on)
-        self.z_0 = nn.Parameter(torch.zeros(hidden_size*2))
-        self.z_q_0 = nn.Parameter(torch.zeros(hidden_size*2))
-        # define a (trainable) parameter for the initial hidden state of the rnn
-
-    def model(self, 
-              x_data, 
-              y_data=None, 
-              annealing_factor=1.0
-              ):
+    def __init__(self, 
+                input_dim=4, 
+                z_dim=64, 
+                emission_dim=64,
+                transition_dim=64, 
+                rnn_dim=32, 
+                rnn_dropout_rate=0.1,
+                variance=0.1
+                ):
         
-        # this is the number of time steps we need to process in the mini-batch
-        # T_max = x_data.size(1)
-        T_max = 1
+        super().__init__()
+        self._z_dim = z_dim
+        self._emission_dim = emission_dim
+        self._transition_dim = transition_dim
+        self._rnn_dim = rnn_dim
+
+        # instantiate PyTorch modules used in the model and guide below
+        self.emitter = Emitter(z_dim, input_dim, emission_dim, variance)
+        self.transition = GatedTransition(z_dim, input_dim, transition_dim)
+        self.combiner = Combiner(z_dim, rnn_dim, emission_dim)
+        self.rnn = nn.GRU(input_size=input_dim, 
+                          hidden_size=rnn_dim,
+                          # nonlinearity='relu', 
+                          batch_first=True,
+                          bidirectional=False, 
+                          num_layers=2, 
+                          dropout=rnn_dropout_rate
+                          )
+
+        # define a (trainable) parameters z_0 and z_q_0 that help define
+        # the probability distributions p(z_1) and q(z_1)
+        # (since for t = 1 there are no previous latents to condition on)
+        self.z_0 = nn.Parameter(torch.zeros(z_dim))
+        self.z_q_0 = nn.Parameter(torch.zeros(1, z_dim))
+        # define a (trainable) parameter for the initial hidden state of the RNN
+        self.h_0 = nn.Parameter(torch.zeros(1, 1, rnn_dim))
+
+    def model(self, x_data, y_data=None, annealing_factor=1.0):
+
+        # this is the number of time steps we need to process in the data
+        T_max = x_data.size(1)
 
         # register all PyTorch (sub)modules with pyro
         # this needs to happen in both the model and guide
@@ -234,81 +174,77 @@ class DeepMarkovModel(PyroModule):
 
         # we enclose all the sample statements in the model in a plate.
         # this marks that each datapoint is conditionally independent of the others
-        with pyro.plate("z_minibatch", x_data.shape[0]):
-            # sample the latents z and observed x's one time step at a time
+        with pyro.plate("z_minibatch", len(x_data)):
+            # sample the latents z and observed y's one time step at a time
             for t in range(1, T_max + 1):
                 # the next chunk of code samples z_t ~ p(z_t | z_{t-1})
                 # note that (both here and elsewhere) we use poutine.scale to take care
-                # of KL annealing. we use the mask() method to deal with raggedness
-                # in the observed data (i.e. different sequences in the mini-batch
-                # have different lengths)
+                # of KL annealing.
 
                 # first compute the parameters of the diagonal gaussian
                 # distribution p(z_t | z_{t-1})
-                z_loc, z_scale = self.trans(z_prev)
+                z_loc, z_scale = self.transition(z_prev, x_data[:, t - 1, :])
+
                 # then sample z_t according to dist.Normal(z_loc, z_scale).
                 # note that we use the reshape method so that the univariate
                 # Normal distribution is treated as a multivariate Normal
                 # distribution with a diagonal covariance.
-                
                 with poutine.scale(None, annealing_factor):
                     z_t = pyro.sample("z_%d" % t,
                                     dist.Normal(z_loc, z_scale)
                                                 .to_event(1))
 
-                # compute the probabilities that parameterize the Normal likelihood
-                # emission_probs_t = self.emitter(z_t)
-                loc, scale = self.emitter(z_t)
-                # the next statement instructs pyro to observe x_t according to the
-                # Normal distribution p(x_t|z_t)
-                obs = pyro.sample("obs_x_%d" % t,
-                            dist.Normal(loc, scale).to_event(1),
-                                         obs=y_data)                                   
+                # compute the mean of the Gaussian distribution p(y_t | z_t)
+                mean_t, variance = self.emitter(z_t, x_data[:, t - 1, :])
+
+                # the next statement instructs pyro to observe y_t according to the
+                # Gaussian distribution p(y_t | z_t)
+                pyro.sample("obs_y_%d" % t,
+                            dist.Normal(mean_t, variance).to_event(1),
+                            obs=y_data)
+                
+                # print(f"model z_prev shape: {z_prev.shape}")
+                # print(f"model x_data[:, t - 1, :] shape: {x_data[:, t - 1, :].shape}")   
                 # the latent sampled at this time step will be conditioned upon
                 # in the next time step so keep track of it
                 z_prev = z_t
-
+            
             return z_t
             
-    def guide(self, 
-              x_data, 
-              y_data=None, 
-              annealing_factor=1.0
-              ):
-
+    def guide(self, x_data, y_data=None, annealing_factor=1.0):
         # this is the number of time steps we need to process in the mini-batch
-        # T_max = x_data.size(1)
-        T_max = 1
+        T_max = x_data.size(1)
         # register all PyTorch (sub)modules with pyro
         pyro.module("dmm", self)
-
+        
         # if on gpu we need the fully broadcast view of the rnn initial state
         # to be in contiguous gpu memory
-        h0 = Variable(torch.zeros(self.num_layers*2, 
-                                  x_data.size(1), 
-                                  self.hidden_size)
-                                  )
+        h_0_contig = self.h_0.expand(2, x_data.size(0), self.rnn.hidden_size).contiguous()
+        
         # push the observed x's through the rnn;
         # rnn_output contains the hidden state at each time step
-        # rnn_output, _ = self.rnn(x_data, h_0_contig)
-        rnn_output, _ = self.gru(x_data, (h0))
-        # reverse the time-ordering in the hidden state and un-pack it
-        # set z_prev = z_q_0 to setup the recursive conditioning in q(z_t |...)
-        z_prev = self.z_q_0.expand(x_data.size(0), self.z_q_0.size(0))
-
+        rnn_output, _ = self.rnn(x_data, h_0_contig)
+        
+        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), self._z_dim)
+        z_prev = z_q_0_expanded
+        
         # we enclose all the sample statements in the guide in a plate.
         # this marks that each datapoint is conditionally independent of the others.
-        with pyro.plate("z_minibatch", x_data.shape[0]):
+        with pyro.plate("z_minibatch", len(x_data)):
             # sample the latents z one time step at a time
             for t in range(1, T_max + 1):
                 # the next two lines assemble the distribution q(z_t | z_{t-1}, x_{t:T})
-                z_loc, z_scale = self.combiner(z_prev, rnn_output[:,-1,:])
-                # z_dist = dist.Normal(z_loc, z_scale)
+
+                z_loc, z_scale = self.combiner(z_prev, rnn_output[:, t - 1, :])
+                z_dist = dist.Normal(z_loc, z_scale).to_event(1)
+
                 # sample z_t from the distribution z_dist
                 with pyro.poutine.scale(None, annealing_factor):
                     z_t = pyro.sample("z_%d" % t, 
-                                      dist.Normal(z_loc, z_scale)
-                                        .to_event(1))
+                                      z_dist)
+
+                # print(f"guide z_prev shape: {z_prev.shape}")
+                # print(f"guide rnn_output[:, t - 1, :] shape: {rnn_output[:, t - 1, :].shape}")            
                 # the latent sampled at this time step will be conditioned
                 # upon in the next time step so keep track of it
                 z_prev = z_t
@@ -318,12 +254,26 @@ class DeepMarkovModel(PyroModule):
 class DMM(PyroModule):
 
     def __init__(self, 
+                input_dim=4, 
+                z_dim=64, 
+                emission_dim=64,
+                transition_dim=64, 
+                rnn_dim=32, 
+                rnn_dropout_rate=0.0,
+                variance=0.1,
                 pretrained=False
                 ):
         # initialize PyroModule
         super(DMM, self).__init__()
 
-        self.pretrained = pretrained
+        self._input_dim = input_dim
+        self._z_dim = z_dim
+        self._emission_dim = emission_dim
+        self._transition_dim = transition_dim
+        self._rnn_dim = rnn_dim
+        self._rnn_dropout_rate = rnn_dropout_rate
+        self._variance = variance
+        self._pretrained = pretrained
         self.time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
 
         # self.model_path = self.__initModelPath()
@@ -332,24 +282,40 @@ class DMM(PyroModule):
         self.step_model = self.__initStepModel()
         self.step_guide = self.__initGuide()
 
-        self.name = "bayesian_network"
+        self.name = "deep_markov_network"
 
     def __initModel(self):
 
-        if self.pretrained:
+        if self._pretrained:
             model_dict = torch.load(self.model_path)
 
-            dmm = DeepMarkovModel()
+            dmm = DeepMarkovModel(
+                input_dim=self._input_dim, 
+                z_dim=self._z_dim, 
+                emission_dim=self._emission_dim,
+                transition_dim=self._transition_dim, 
+                rnn_dim=self._rnn_dim, 
+                rnn_dropout_rate=self._rnn_dropout_rate,
+                variance=self._variance
+            )
 
             dmm.load_state_dict(model_dict['model_state'])
         
         else: 
-            dmm = DeepMarkovModel()
+            dmm = DeepMarkovModel(
+                input_dim=self._input_dim, 
+                z_dim=self._z_dim, 
+                emission_dim=self._emission_dim,
+                transition_dim=self._transition_dim, 
+                rnn_dim=self._rnn_dim, 
+                rnn_dropout_rate=self._rnn_dropout_rate,
+                variance=self._variance
+            )
 
         return dmm
     
     def __initOptimizer(self):
-        return pyro.optim.Adam({"lr": 0.01})
+        return pyro.optim.Adam({"lr": 1e-3})
     
     def __initStepModel(self):
         return self.dmm.model
@@ -358,7 +324,7 @@ class DMM(PyroModule):
         return self.dmm.guide
 
     def __initTrainDl(self, x_train, batch_size, num_workers, sequence_length):
-        train_dl = StockDatasetSequence(x_train, sequence_length=sequence_length)
+        train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
                                     batch_size=batch_size, 
@@ -374,7 +340,7 @@ class DMM(PyroModule):
         return train_dl
 
     def __initValDl(self, x_test):
-        val_dl = StockDatasetSequence(x_test, 
+        val_dl = StockDataset(x_test, 
                                 sequence_length=self.__sequence_length
                                 )
 
@@ -419,151 +385,105 @@ class DMM(PyroModule):
         validation_cadence = 5
 
         for epoch_ndx in tqdm((range(1, epochs + 1)),position=0, leave=True):
-            which_batch = 0
-            self.dmm.gru.train()
+            epoch_loss = 0.0
             for x_batch, y_batch in train_dl:  
-                which_batch = which_batch + 1
-                loss_train = self.computeBatchLoss(epoch_ndx, 
-                                             epochs,
-                                             which_batch,
-                                             x_batch,
-                                             y_batch,
-                                             train_dl
-                                             )
+                loss  = self.svi.step(
+                    x_data = x_batch,
+                    y_data = y_batch
+                )
+                epoch_loss += loss
                 
-            print("[train loss: ]  %.4f" % (loss_train))
+            print(f"Epoch {epoch_ndx}, Loss: {epoch_loss / len(train_dl)}")
                 
             if epoch_ndx % validation_cadence == 0:
 
-                loss_val = self.doValidation(val_dl)
-                print("[val loss: ]  %.4f" % (loss_val))
- 
+                total_loss = 0 
+                self.dmm.rnn.eval()   # Turns off training-time behaviour
+                    
+                for x_batch, y_batch in val_dl:
+                        loss_var = self.svi.evaluate_loss(x_batch, y_batch) 
+                        total_loss += loss_var / val_dl.batch_size
+                print(f"Epoch {epoch_ndx}, Val Loss {total_loss}")
+    
+    def predict(self, x_test):
+        # set the model to evaluation mode
+        self.dmm.eval()
 
-    def doValidation(self, val_dl):
-        total_loss = 0 
-        self.dmm.gru.eval()   # Turns off training-time behaviour
-            
+        # transform x_test in data loader
+        scaler = normalize(x_test)
+        x_test = scaler.fit_transform()
+        self.std = scaler.std()
+        self.mean = scaler.mean()
+
+        val_dl = self.__initValDl(x_test)
+
+        # create a list to hold the predicted y values
+        predicted_y = []
+
+        # iterate over the test data in batches
         for x_batch, y_batch in val_dl:
-                loss_var = self.svi.evaluate_loss(x_batch, y_batch) 
-                total_loss += loss_var / val_dl.batch_size
+            # make predictions for the current batch
+            with torch.no_grad():
+                # compute the mean of the emission distribution for each time step
+                *_, z_loc, z_scale = self.dmm.guide(x_batch)
+                z_scale = F.softplus(z_scale)
+                z_t = dist.Normal(z_loc, z_scale).rsample()
+                mean_t, _ = self.dmm.emitter(z_t, x_batch)
+                
+                # get the mean for the last time step
+                mean_last = mean_t[:, -1, :]
 
-        return total_loss 
-    
-    def computeBatchLoss(self, 
-                         epoch_ndx,
-                         epochs,
-                         counter,
-                         x_batch, 
-                         y_batch,
-                         loader
-                         ):     
-              
-        min_af = 0.2
-        annealing_factor = min_af + (1.0 - min_af) * (
-                float(counter + epoch_ndx * len(loader) + 1)
-                / float(epochs * len(loader))
-        )
+            # add the predicted y values for the current batch to the list
+            predicted_y.append(mean_last * self.std + self.mean)
 
-        loss = self.svi.step(
-            x_data=x_batch,
-            y_data=y_batch,
-            annealing_factor=annealing_factor
-        ) / loader.batch_size
-        # keep track of the training loss
-        return loss  # This is the loss over the entire batch
+        # concatenate the predicted y values for all batches into a single tensor
+        predicted_y = torch.cat(predicted_y)
 
-    def predict(self, 
-                x_test, 
-                plot=False
-                ):
+        # reshape the tensor to get an array of shape [151,1]
+        predicted_y = predicted_y.reshape(-1, 1)
 
-        scaler = normalize(x_test)
-        x_test = scaler.fit_transform()
-        test_loader = self.__initValDl(x_test)
+        # return the predicted y values as a numpy array
+        return predicted_y.numpy()
 
-        output = torch.tensor([])
-        for x_batch, y_batch in test_loader:
-            predictive = Predictive(self.step_model, 
-                                    guide=self.step_guide, 
-                                    num_samples=self.__batch_size,
-                                    # return_sites = ("_RETURN", )
-                                    )
 
-            samples = predictive(x_batch)
-            # print(samples)
-            site_stats = {}
-            for k, v in samples.items():
-                 site_stats[k] = {
-                     "mean": torch.mean(v, 0)
-                }
+    def sample(self, num_samples):
+        # set the model to evaluation mode
+        self.dmm.eval()
 
-            # y_pred = samples['z_30']
-            # output = torch.cat((output, y_pred), 0)
+        # generate the latent z's
+        with torch.no_grad():
+            # initialize z_prev to the prior distribution
+            z_prev = dist.Normal(self.dmm.z_0, 1).rsample((num_samples,))
 
-        if plot is True:
-            y_pred = output.detach().numpy() * scaler.std() + scaler.mean() # * self.std_test + self.mean_test 
-            y_test = (x_test['Close']).values * scaler.std() + scaler.mean() # * self.std_test + self.mean_test
-            test_data = x_test[0: len(x_test)]
-            days = np.array(test_data.index, dtype="datetime64[ms]")
-            
-            fig = plt.figure()
-            
-            axes = fig.add_subplot(111)
-            axes.plot(days, y_test, 'bo-', label="actual") 
-            axes.plot(days, y_pred, 'r+-', label="predicted")
-            
-            fig.autofmt_xdate()
-            
-            plt.legend()
-            plt.show()
+            # initialize the list of sampled z's
+            z_list = [z_prev]
 
-        # output = output.detach().numpy() * scaler.std() + scaler.mean()
-        
-        # return output
+            # iterate over the time steps
+            for t in range(1, self.__sequence_length + 1):
+                # sample the next z from the prior distribution
+                z_loc, z_scale = self.dmm.transition(z_prev, 
+                                                     torch.zeros(num_samples, 
+                                                                 self._input_dim)
+                                                                 )
+                z_t = dist.Normal(z_loc, z_scale).rsample()
+                z_list.append(z_t)
 
-        return samples, scaler.std(), scaler.mean()
+                # set z_prev to the sampled z for the next time step
+                z_prev = z_t
 
-    def forward(self, x_batch, n_samples=10):
-        """ Compute predictions on `inputs`. 
-        `n_samples` is the number of samples from the posterior distribution.
-        If `sample_idx` is provided, it is used as a seed for sampling a single
-        model from the Variational family.
-        If `avg_prediction` is True, it returns the average prediction on 
-        `inputs`, otherwise it returns all predictions 
-        """
-        preds = []
-        # take multiple samples
-        for _ in range(n_samples):         
-            guide_trace = poutine.trace(self.step_guide).get_trace(x_batch)
-            preds.append(guide_trace.nodes['_RETURN']['value'])
-        
-        # list of tensors to tensor
-        # preds.shape = (n_samples, batch_size, n_classes)
-        preds = torch.stack(preds)
+        # generate the observations y's
+        with torch.no_grad():
+            # initialize the list of sampled y's
+            y_list = []
 
-        # return predictions 
-        return preds
-    
-    def _predict(self, x_test):
-        scaler = normalize(x_test)
-        x_test = scaler.fit_transform()
-        test_loader = self.__initValDl(x_test)
+            # iterate over the time steps
+            for t in range(1, self.__sequence_length + 1):
+                # sample the y from the emission distribution
+                y_t, _ = self.dmm.emitter(z_list[t], torch.zeros(num_samples, self._input_dim))
+                y_list.append(y_t * self.std + self.mean)
 
-        output = torch.tensor([])
-        for x_batch, y_batch in test_loader:
+        # concatenate the sampled y's into a single tensor
+        y_samples = torch.stack(y_list, dim=1)
 
-            samples = self.forward(x_batch, n_samples=self.__batch_size)
-
-            y_pred = torch.mean(samples, 1)
-            output = torch.cat((output, y_pred), 0)
-        
-        return output.detach().numpy() * scaler.std() + scaler.mean()
-
-    @staticmethod
-    def summary(samples):
-        site_stats = {}
-        for k, v in samples.items():
-            site_stats[k] = {
-                "mean": torch.mean(v, 0)
-            }
-        return site_stats
+        # return the generated samples as a numpy array of shape [num_samples, 1]
+        return y_samples[:, -1].squeeze().numpy().reshape(-1,1)

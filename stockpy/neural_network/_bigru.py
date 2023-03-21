@@ -15,7 +15,7 @@ from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
-from util.StockDataset import StockDatasetSequence, normalize
+from util.StockDataset import StockDataset, normalize
 
 from util.logconf import logging
 from sklearn.model_selection import train_test_split
@@ -167,7 +167,7 @@ class BiGRU():
         return train_dl
 
     def __initValDl(self, x_test):
-        val_dl = StockDatasetSequence(x_test, 
+        val_dl = StockDataset(x_test, 
                                 sequence_length=self.__sequence_length
                                 )
 

@@ -15,7 +15,7 @@ from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 
-from util.StockDataset import StockDatasetSequence, normalize
+from util.StockDataset import StockDataset, normalize
 
 from util.logconf import logging
 from sklearn.model_selection import train_test_split

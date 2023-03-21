@@ -1,18 +1,31 @@
+import sys
 import datetime
 import hashlib
 import os
 import shutil
 import sys
 import glob
-sys.path.append("..")
+sys.path.append("../")
+
+import argparse
+import logging
+import time
 from os.path import exists
 
+import numpy as np
 import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+from tqdm.auto import tqdm, trange
+
 import pyro
-from torch import nn
 import pyro.distributions as dist
-from pyro.optim import Adam
 from pyro.nn import PyroModule
+import pyro.poutine as poutine
+from pyro.distributions import TransformedDistribution
+from pyro.infer.autoguide import AutoDiagonalNormal
+from torch.autograd import Variable
+from pyro.distributions.transforms import affine_autoregressive
 from pyro.infer import (
     SVI,
     JitTrace_ELBO,
@@ -23,16 +36,11 @@ from pyro.infer import (
     TraceMeanField_ELBO,
     Predictive
 )
-from tqdm.auto import trange, tqdm
+from pyro.optim import ClippedAdam
+import torch.nn.functional as F
 
-from util.StockDataset import normalize, StockDataset
-from torch.utils.data import DataLoader
-from pyro.infer.autoguide import AutoDiagonalNormal
-from tqdm.auto import tqdm, trange
-
-from util.logconf import logging
+from utils import StockDataset, normalize
 import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
 
 # set style of graphs
@@ -40,13 +48,6 @@ plt.style.use('ggplot')
 from pylab import rcParams
 plt.rcParams['figure.dpi'] = 100
 
-log = logging.getLogger(__name__)
-# log.setLevel(logging.WARN)
-log.setLevel(logging.INFO)
-log.setLevel(logging.DEBUG)
-
-
-from util.StockDataset import StockDataset, normalize
 
 # TODO Implement forecasting function and plotting
 # TODO Implement interface 
