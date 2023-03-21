@@ -5,12 +5,8 @@ import os
 import shutil
 import sys
 import glob
-sys.path.append("../")
-
-import argparse
-import logging
-import time
 from os.path import exists
+sys.path.append("../")
 
 import numpy as np
 import torch
@@ -22,18 +18,11 @@ import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
 import pyro.poutine as poutine
-from pyro.distributions import TransformedDistribution
-from torch.autograd import Variable
-from pyro.distributions.transforms import affine_autoregressive
 from pyro.infer import (
     SVI,
-    JitTrace_ELBO,
     Trace_ELBO,
     TraceEnum_ELBO,
-    TraceTMC_ELBO,
-    config_enumerate,
-    TraceMeanField_ELBO,
-    Predictive
+    TraceMeanField_ELBO
 )
 from pyro.optim import ClippedAdam
 import torch.nn.functional as F
@@ -242,9 +231,7 @@ class DeepMarkovModel(nn.Module):
                 with pyro.poutine.scale(None, annealing_factor):
                     z_t = pyro.sample("z_%d" % t, 
                                       z_dist)
-
-                # print(f"guide z_prev shape: {z_prev.shape}")
-                # print(f"guide rnn_output[:, t - 1, :] shape: {rnn_output[:, t - 1, :].shape}")            
+           
                 # the latent sampled at this time step will be conditioned
                 # upon in the next time step so keep track of it
                 z_prev = z_t
@@ -277,14 +264,14 @@ class DMM(PyroModule):
         self.time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')
 
         # self.model_path = self.__initModelPath()
-        self.dmm = self.__initModel()
-        self.optimizer = self.__initOptimizer()
-        self.step_model = self.__initStepModel()
-        self.step_guide = self.__initGuide()
+        self.dmm = self._initModel()
+        self.optimizer = self._initOptimizer()
+        self.step_model = self._initStepModel()
+        self.step_guide = self._initGuide()
 
         self.name = "deep_markov_network"
 
-    def __initModel(self):
+    def _initModel(self):
 
         if self._pretrained:
             model_dict = torch.load(self.model_path)
@@ -314,16 +301,16 @@ class DMM(PyroModule):
 
         return dmm
     
-    def __initOptimizer(self):
+    def _initOptimizer(self):
         return pyro.optim.Adam({"lr": 1e-3})
     
-    def __initStepModel(self):
+    def _initStepModel(self):
         return self.dmm.model
     
-    def __initGuide(self):
+    def _initGuide(self):
         return self.dmm.guide
 
-    def __initTrainDl(self, x_train, batch_size, num_workers, sequence_length):
+    def _initTrainDl(self, x_train, batch_size, num_workers, sequence_length):
         train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
@@ -333,20 +320,20 @@ class DMM(PyroModule):
                                     shuffle=False
                                     )
 
-        self.__batch_size = batch_size
-        self.__num_workers = num_workers
-        self.__sequence_length = sequence_length
+        self._batch_size = batch_size
+        self._num_workers = num_workers
+        self._sequence_length = sequence_length
 
         return train_dl
 
-    def __initValDl(self, x_test):
+    def _initValDl(self, x_test):
         val_dl = StockDataset(x_test, 
-                                sequence_length=self.__sequence_length
+                                sequence_length=self._sequence_length
                                 )
 
         val_dl = DataLoader(val_dl, 
-                                    batch_size=self.__batch_size, 
-                                    num_workers=self.__num_workers,
+                                    batch_size=self._batch_size, 
+                                    num_workers=self._num_workers,
                                     # pin_memory=self.use_cuda,
                                     shuffle=False
                                     )
@@ -360,6 +347,7 @@ class DMM(PyroModule):
             batch_size=8, 
             num_workers=4,
             validation_sequence=30, 
+            patience=5
             ):
         
         scaler = normalize(x_train)
@@ -368,42 +356,70 @@ class DMM(PyroModule):
         val_dl = x_train[-validation_sequence:]
         x_train = x_train[:len(x_train)-len(val_dl)]
 
-        train_dl = self.__initTrainDl(x_train, 
+        train_dl = self._initTrainDl(x_train, 
                                         batch_size=batch_size,
                                         num_workers=num_workers,
                                         sequence_length=sequence_length
                                         )
 
-        val_dl = self.__initValDl(val_dl)
+        val_dl = self._initValDl(val_dl)
 
         self.svi = SVI(self.step_model, 
                   self.step_guide, 
                   self.optimizer, 
-                  loss=Trace_ELBO()
+                  loss=TraceMeanField_ELBO()
                 )
         
         validation_cadence = 5
+        best_loss = float('inf')
+        counter = 0
 
-        for epoch_ndx in tqdm((range(1, epochs + 1)),position=0, leave=True):
+        for epoch_ndx in tqdm((range(1, epochs + 1)), position=0, leave=True):
             epoch_loss = 0.0
             for x_batch, y_batch in train_dl:  
-                loss  = self.svi.step(
-                    x_data = x_batch,
-                    y_data = y_batch
-                )
-                epoch_loss += loss
-                
-            print(f"Epoch {epoch_ndx}, Loss: {epoch_loss / len(train_dl)}")
-                
-            if epoch_ndx % validation_cadence == 0:
+                epoch_loss += self._computeBatchLoss(x_batch, y_batch)
 
-                total_loss = 0 
-                self.dmm.rnn.eval()   # Turns off training-time behaviour
-                    
-                for x_batch, y_batch in val_dl:
-                        loss_var = self.svi.evaluate_loss(x_batch, y_batch) 
-                        total_loss += loss_var / val_dl.batch_size
+            if epoch_ndx % validation_cadence != 0:                
+                print(f"Epoch {epoch_ndx}, Loss: {epoch_loss / len(train_dl)}")
+
+            else:
+                total_loss = self._doValidation(val_dl)
+
                 print(f"Epoch {epoch_ndx}, Val Loss {total_loss}")
+
+                if total_loss < best_loss:
+                    best_loss = total_loss
+                    counter = 0
+                else:
+                    counter += 1
+
+                if counter >= patience:
+                    print(f"No improvement after {patience} epochs. Stopping early.")
+                    break
+
+                self.dmm.rnn.train()
+
+    def _computeBatchLoss(self,
+                          x_batch,
+                          y_batch
+                          ):
+
+        loss = self.svi.step(
+            x_data=x_batch,
+            y_data=y_batch
+        )
+        # keep track of the training loss
+        return loss  # This is the loss over the entire batch
+    
+    def _doValidation(self, val_dl):
+        total_loss = 0
+        self.dmm.rnn.eval()
+        
+        for x_batch, y_batch in val_dl:
+            loss_var = self.svi.evaluate_loss(x_batch, y_batch) 
+            total_loss += loss_var / val_dl.batch_size
+
+        return total_loss 
     
     def predict(self, x_test):
         # set the model to evaluation mode
@@ -415,13 +431,13 @@ class DMM(PyroModule):
         self.std = scaler.std()
         self.mean = scaler.mean()
 
-        val_dl = self.__initValDl(x_test)
+        val_dl = self._initValDl(x_test)
 
         # create a list to hold the predicted y values
         predicted_y = []
 
         # iterate over the test data in batches
-        for x_batch, y_batch in val_dl:
+        for x_batch, _ in val_dl:
             # make predictions for the current batch
             with torch.no_grad():
                 # compute the mean of the emission distribution for each time step
@@ -444,46 +460,141 @@ class DMM(PyroModule):
 
         # return the predicted y values as a numpy array
         return predicted_y.numpy()
+    
+    def trading(self, 
+                x_data, 
+                shares=0, 
+                stop_loss=0.0,
+                initial_balance=10000, 
+                plot=True
+                ):
+        
+        y_pred = self.predict(x_test=x_data)
 
+        # compute the buy/sell signals
+        buy_signals = (y_pred[1:] > y_pred[:-1]).astype(int)
+        sell_signals = (y_pred[1:] < y_pred[:-1]).astype(int)
 
-    def sample(self, num_samples):
-        # set the model to evaluation mode
-        self.dmm.eval()
+        y_test = x_data['Close'].values
 
-        # generate the latent z's
-        with torch.no_grad():
-            # initialize z_prev to the prior distribution
-            z_prev = dist.Normal(self.dmm.z_0, 1).rsample((num_samples,))
+        # simulate the trades
+        balance = initial_balance
+        for i in range(len(y_test) - 1):
+            if buy_signals[i] == 1:
+                price = y_test[i + 1] * 100  # price is the last feature value scaled by 100
+                num_shares = int(balance / price)
+                shares += num_shares
+                balance -= num_shares * price
+            elif sell_signals[i] == 1:
+                price = y_test[i + 1] * 100  # price is the last feature value scaled by 100
+                balance += shares * price
+                shares = 0
+            # implement stop-loss strategy
+            elif y_test[i + 1] < stop_loss * y_test[0]:
+                balance += shares * y_test[i + 1] * 100
+                shares = 0
 
-            # initialize the list of sampled z's
-            z_list = [z_prev]
+        # compute the final balance
+        final_balance = balance + (shares * y_test[-1] * 100)
 
-            # iterate over the time steps
-            for t in range(1, self.__sequence_length + 1):
-                # sample the next z from the prior distribution
-                z_loc, z_scale = self.dmm.transition(z_prev, 
-                                                     torch.zeros(num_samples, 
-                                                                 self._input_dim)
-                                                                 )
-                z_t = dist.Normal(z_loc, z_scale).rsample()
-                z_list.append(z_t)
+        # plot the predicted values and the buy/sell signals
+        y_pred = y_pred[1:]
 
-                # set z_prev to the sampled z for the next time step
-                z_prev = z_t
+        if plot:
+            fig, ax = plt.subplots(figsize=(12, 6))
+            ax.plot(y_pred)
+            ax.scatter(np.where(buy_signals == 1)[0], y_pred[buy_signals == 1], 
+                       c='g', marker='^', s=100, label='Buy')
+            ax.scatter(np.where(sell_signals == 1)[0], y_pred[sell_signals == 1], 
+                       c='r', marker='v', s=100, label='Sell')
+            ax.set_xlabel('Time')
+            ax.set_ylabel('Price')
+            ax.set_title('Trading Simulation')
+            fig.autofmt_xdate()
+            ax.legend()
+            ax.text(0.05, 0.05, 
+                    f'Final balance: ${initial_balance / final_balance * 100:.2f}%', 
+                    ha='left', va='center',
+                      transform=ax.transAxes, 
+                      bbox=dict(facecolor='white', alpha=0.5)
+                      )
 
-        # generate the observations y's
-        with torch.no_grad():
-            # initialize the list of sampled y's
-            y_list = []
+        return initial_balance / final_balance * 100
+    
+    def saveModel(self, type_str, epoch_ndx, isBest=False):
+        file_path = os.path.join(
+            '..',
+            '..',
+            'models',
+            'MLP',
+            '{}_{}_{}.state'.format(
+                    type_str,
+                    self.hidden_dim,
+                    self.num_layers
+            )
+        )
 
-            # iterate over the time steps
-            for t in range(1, self.__sequence_length + 1):
-                # sample the y from the emission distribution
-                y_t, _ = self.dmm.emitter(z_list[t], torch.zeros(num_samples, self._input_dim))
-                y_list.append(y_t * self.std + self.mean)
+        os.makedirs(os.path.dirname(file_path), mode=0o755, exist_ok=True)
 
-        # concatenate the sampled y's into a single tensor
-        y_samples = torch.stack(y_list, dim=1)
+        model = self.model
+        if isinstance(model, torch.nn.DataParallel):
+            model = model.module
 
-        # return the generated samples as a numpy array of shape [num_samples, 1]
-        return y_samples[:, -1].squeeze().numpy().reshape(-1,1)
+        state = {
+            'model_state': model.state_dict(),
+            'model_name': type(model).__name__,
+            'optimizer_state' : self.optimizer.state_dict(),
+            'optimizer_name': type(self.optimizer).__name__,
+            'epoch': epoch_ndx
+        }
+        torch.save(state, file_path)
+
+        # log.debug("Saved model params to {}".format(file_path))
+
+        if isBest:
+            best_path = os.path.join(
+                '..',
+                '..',
+                'models',
+                'MLP',
+                '{}_{}_{}.{}.state'.format(
+                    type_str,
+                    self.hidden_dim,
+                    self.num_layers,
+                    'best',
+                )
+            )
+            shutil.copyfile(file_path, best_path)
+
+            # log.debug("Saved model params to {}".format(best_path))
+
+        with open(file_path, 'rb') as f:
+            hashlib.sha1(f.read()).hexdigest()
+
+    def initModelPath(self, type_str):
+        local_path = os.path.join(
+            '..',
+            '..',
+            'models',
+            type_str + '_{}.state'.format('*', '*', 'best'),
+        )
+
+        file_list = glob.glob(local_path)
+        if not file_list:
+            pretrained_path = os.path.join(
+                '..',
+                '..',
+                'models',
+                type_str + '_{}_{}.{}.state'.format('*', '*', '*'),
+            )
+            file_list = glob.glob(pretrained_path)
+        else:
+            pretrained_path = None
+
+        file_list.sort()
+
+        try:
+            return file_list[-1]
+        except IndexError:
+            log.debug([local_path, pretrained_path, file_list])
+            raise
