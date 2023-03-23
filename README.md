@@ -37,9 +37,7 @@ This code reads a CSV file 'AAPL.csv' containing stock market data for Apple (AA
 The following structure can be applied to all models in the library, just make sure to import from the correct location.
 ```Python
 from stockpy.neural_network import LSTM, GRU, BiLSTM, BiGRU, MLP
-from stockpy.probabilistic import BNN, DMM
-from stockpy.ensemble import RF, XGB
-from stockpy.linear_model import Lasso, Linear, Quantile, Ridge, SGD, SVR
+from stockpy.probabilistic import GaussianHMM, BNN, DMM
 ```
 ## Data downloader
 This is a terminal application located on the cmd folder under the name of data.py and has been tested and verified using Ubuntu 22.04 LST. Below the documentation to explain the available commands:
