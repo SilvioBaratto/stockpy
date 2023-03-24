@@ -29,7 +29,7 @@ from pyro.infer import (
 from pyro.optim import ClippedAdam
 import torch.nn.functional as F
 
-from utils import StockDataset, normalize
+from ..utils import StockDataset, normalize
 import pandas as pd
 import matplotlib.pyplot as plt
 

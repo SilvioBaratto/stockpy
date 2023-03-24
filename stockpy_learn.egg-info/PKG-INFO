@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: stockpy-learn
-Version: 0.1.2
+Version: 0.1.5
 Summary: Machine Learning library to make stock market prediction
 Home-page: https://github.com/SilvioBaratto/stockpy
 Author: Silvio Baratto
@@ -11,7 +11,7 @@ Classifier: Operating System :: OS Independent
 Classifier: Programming Language :: Python :: 3
 Classifier: Intended Audience :: Science/Research
 Classifier: Topic :: Scientific/Engineering :: Mathematics
-Requires-Python: >=3.7
+Requires-Python: >=3.6
 Description-Content-Type: text/markdown
 License-File: LICENSE
 

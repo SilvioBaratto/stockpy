@@ -5,7 +5,6 @@ import os
 import shutil
 import sys
 import glob
-sys.path.append("../")
 
 from os.path import exists
 
@@ -31,7 +30,7 @@ from pyro.infer import (
 from pyro.optim import ClippedAdam
 import torch.nn.functional as F
 
-from utils import StockDataset, normalize
+from ..utils import StockDataset, normalize
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -46,7 +45,8 @@ class BayesianNeuralNetwork(PyroModule):
                  input_size=4,
                  hidden_size=32,
                  dropout=0.2,
-                 output_dim=1):
+                 output_dim=1
+                 ):
         super().__init__()
 
         self.hidden_layer1 = PyroModule[nn.Linear](input_size, hidden_size)
@@ -56,6 +56,8 @@ class BayesianNeuralNetwork(PyroModule):
         self.output_layer = PyroModule[nn.Linear](16, output_dim)
 
         self.activation = nn.ReLU()
+
+        self.name = "bayesian_neural_network"
 
     def forward(self, x_data, y_data=None):
         x = self.activation(self.hidden_layer1(x_data))
@@ -73,7 +75,7 @@ class BayesianNeuralNetwork(PyroModule):
             
         return x
     
-class BNN(PyroModule):
+class BayesianNN(PyroModule):
 
     def __init__(self, 
                 input_size=4, 
@@ -83,7 +85,7 @@ class BNN(PyroModule):
                 pretrained=False
                 ):
         # initialize PyroModule
-        super(BNN, self).__init__()
+        super(BayesianNN, self).__init__()
 
         self._input_size = input_size
         self._hidden_size = hidden_size
@@ -92,10 +94,16 @@ class BNN(PyroModule):
         self._pretrained = pretrained 
         self.use_cuda = torch.cuda.is_available()
 
-        # self.model_path = self.__initModelPath()
-        self._initModelandGuide()
+        self._initModel()
 
-        self.name = "bayesian_network"
+        self.name = "bayesianNN"
+    
+    def _initSVI(self):
+        return SVI(self._model, 
+                  self._guide, 
+                  self._initOptimizer(), 
+                  loss=Trace_ELBO()
+                )
         
     def _initOptimizer(self):
         adam_params = {"lr": 1e-3, 
@@ -115,25 +123,29 @@ class BNN(PyroModule):
     def _initTrainDl(self, 
                      x_train, 
                      batch_size, 
-                     num_workers
+                     num_workers, 
+                     sequence_length=0
                      ):
-        train_dl = StockDataset(x_train)
+        train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
                             batch_size=batch_size * (torch.cuda.device_count() \
                                                                    if self.use_cuda else 1),  
                             num_workers=num_workers,
                             pin_memory=self.use_cuda,
-                            shuffle=False
+                            shuffle=True
                             )
 
         self._batch_size = batch_size
         self._num_workers = num_workers
+        self._sequence_length = sequence_length
 
         return train_dl
 
     def _initValDl(self, x_test):
-        val_dl = StockDataset(x_test)
+        val_dl = StockDataset(x_test, 
+                                sequence_length=self._sequence_length
+                                )
 
         val_dl = DataLoader(val_dl, 
                             batch_size=self._batch_size * (torch.cuda.device_count() \
@@ -144,6 +156,30 @@ class BNN(PyroModule):
                             )
         
         return val_dl
+    
+    def _initTrainValData(self, 
+                          x_train,
+                          validation_sequence,
+                          batch_size,
+                          num_workers,
+                          sequence_length=0
+                          ):
+        
+        scaler = normalize(x_train)
+
+        x_train = scaler.fit_transform()
+        val_dl = x_train[-validation_sequence:]
+        x_train = x_train[:len(x_train)-len(val_dl)]
+
+        train_dl = self._initTrainDl(x_train, 
+                                        batch_size=batch_size,
+                                        num_workers=num_workers,
+                                        sequence_length=sequence_length
+                                        )
+
+        val_dl = self._initValDl(val_dl)
+
+        return train_dl, val_dl
 
     def fit(self, 
             x_train,
@@ -168,28 +204,6 @@ class BNN(PyroModule):
                     validation_cadence,
                     patience
                     )
-        
-    def _initTrainValData(self, 
-                          x_train,
-                          validation_sequence,
-                          batch_size,
-                          num_workers
-                          ):
-        
-        scaler = normalize(x_train)
-
-        x_train = scaler.fit_transform()
-        val_dl = x_train[-validation_sequence:]
-        x_train = x_train[:len(x_train)-len(val_dl)]
-
-        train_dl = self._initTrainDl(x_train, 
-                                        batch_size=batch_size,
-                                        num_workers=num_workers
-                                        )
-
-        val_dl = self._initValDl(val_dl)
-
-        return train_dl, val_dl
     
     def _train(self, 
                epochs,
@@ -199,6 +213,7 @@ class BNN(PyroModule):
                patience
                ):
 
+        self._model.train()
         best_loss = float('inf')
         counter = 0
 
@@ -227,8 +242,6 @@ class BNN(PyroModule):
                 if stop:
                     break
 
-                self._model.train()
-
     def _computeBatchLoss(self,
                           x_batch,
                           y_batch
@@ -251,7 +264,7 @@ class BNN(PyroModule):
         if total_loss < best_loss:
             best_loss = total_loss
             best_epoch_ndx = epoch_ndx
-            self.saveModel('bnn', best_epoch_ndx)
+            self._saveModel('bnn', best_epoch_ndx)
             counter = 0
         else:
             counter += 1
@@ -268,14 +281,15 @@ class BNN(PyroModule):
         
         with torch.no_grad():
             for x_batch, y_batch in val_dl:
-                loss_var = self._svi.evaluate_loss(x_batch, y_batch) 
-                total_loss += loss_var / val_dl.batch_size
+                loss = self._svi.evaluate_loss(x_batch, y_batch) 
+                total_loss += loss
 
-        return total_loss 
+        self._model.train()
+
+        return total_loss  
 
     def predict(self, 
-                x_test, 
-                plot=False
+                x_test
                 ):
 
         scaler = normalize(x_test)
@@ -301,28 +315,11 @@ class BNN(PyroModule):
             y_pred = site_stats['_RETURN']['mean']
             output = torch.cat((output, y_pred), 0)
 
-        if plot is True:
-            y_pred = output.detach().numpy() * scaler.std() + scaler.mean() # * self.std_test + self.mean_test 
-            y_test = (x_test['Close']).values * scaler.std() + scaler.mean() # * self.std_test + self.mean_test
-            test_data = x_test[0: len(x_test)]
-            days = np.array(test_data.index, dtype="datetime64[ms]")
-            
-            fig = plt.figure()
-            
-            axes = fig.add_subplot(111)
-            axes.plot(days, y_test, 'bo-', label="actual") 
-            axes.plot(days, y_pred, 'r+-', label="predicted")
-            
-            fig.autofmt_xdate()
-            
-            plt.legend()
-            plt.show()
-
         output = output.detach().numpy() * scaler.std() + scaler.mean()
         
         return output
     
-    def saveModel(self, type_str, epoch_ndx):
+    def _saveModel(self, type_str, epoch_ndx):
         file_path = os.path.join(
             '..',
             '..',
@@ -355,7 +352,7 @@ class BNN(PyroModule):
         with open(file_path, 'rb') as f:
             hashlib.sha1(f.read()).hexdigest()
 
-    def _initModelandGuide(self):
+    def _initModel(self):
         
         model = BayesianNeuralNetwork(input_size=self._input_size,
                                       hidden_size=self._hidden_size,
@@ -381,11 +378,7 @@ class BNN(PyroModule):
         
         pyro.clear_param_store()
         self._optimizer = self._initOptimizer()
-        self._svi = SVI(self._model, 
-                        self._guide, 
-                        self._optimizer, 
-                        loss=Trace_ELBO()
-                    )
+        self._svi = self._initSVI()
         # Create learning rate scheduler
         self._scheduler = self._initScheduler()
 

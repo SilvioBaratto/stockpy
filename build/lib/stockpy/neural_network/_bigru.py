@@ -4,7 +4,6 @@ import os
 import shutil
 import sys
 import glob
-sys.path.append("..")
 
 import numpy as np
 import pandas as pd
@@ -16,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import torch.optim.lr_scheduler as lr_scheduler
 
-from utils import StockDataset, normalize
+from ..utils import StockDataset, normalize
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm, trange
@@ -33,7 +32,6 @@ class Net(nn.Module):
                 hidden_size=32, 
                 num_layers=2, 
                 output_dim=1, 
-                dropout=0.2,
                 seq_length=30
                 ):
 
@@ -55,7 +53,10 @@ class Net(nn.Module):
 
     def forward(self, x):
         batch_size = x.size(0)
-        h0 = Variable(torch.zeros(self.num_layers*2, batch_size, self.hidden_size))
+        h0 = Variable(torch.zeros(self.num_layers*2, 
+                                  batch_size, 
+                                  self.hidden_size)
+                                  )
         
         out, _ = self.gru(x, (h0))
         out = self.fc(out[:,-1,:]) #Final Output
@@ -70,53 +71,49 @@ class BiGRU():
                 input_size=4,
                 hidden_size=32, 
                 num_layers=2,
-                dropout=0.2,
+                output_dim=1,
                 pretrained=False
                 ):
         
-        self.input_size = input_size
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.dropout = dropout
-        self.pretrained = pretrained
-        
-        self.time_str = datetime.datetime.now().strftime('%Y-%m-%d_%H.%M.%S')      
-        # self.model_path = self.__initModelPath()
-        self.model = self.__initModel()
-
-        self.name = "bidirectionalGRU neural network"
+        self._input_size = input_size
+        self._hidden_size = hidden_size
+        self._num_layers = num_layers
+        self._pretrained = pretrained
+        self._output_dim = output_dim
+        self.use_cuda = torch.cuda.is_available()
+  
+        self._initModel()
+        self.name = "bidirectional GRU neural network"
 
     def _initOptimizer(self):
-        return torch.optim.Adam(self.model.parameters(), lr=0.01)
-    
-    def _initScheduler(self):
-        return lr_scheduler.StepLR(self._optimizer, 
-                                   step_size=10,
-                                   gamma=0.1
-                                   )
-    
+        return torch.optim.Adam(self._model.parameters(), lr=1e-3)
+        
     def _initTrainDl(self, 
                      x_train, 
                      batch_size, 
-                     num_workers
+                     num_workers, 
+                     sequence_length
                      ):
-        train_dl = StockDataset(x_train)
+        train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
                             batch_size=batch_size * (torch.cuda.device_count() \
                                                                    if self.use_cuda else 1),  
                             num_workers=num_workers,
                             pin_memory=self.use_cuda,
-                            shuffle=False
+                            shuffle=True
                             )
 
         self._batch_size = batch_size
         self._num_workers = num_workers
+        self._sequence_length = sequence_length
 
         return train_dl
 
     def _initValDl(self, x_test):
-        val_dl = StockDataset(x_test)
+        val_dl = StockDataset(x_test, 
+                                sequence_length=self._sequence_length
+                                )
 
         val_dl = DataLoader(val_dl, 
                             batch_size=self._batch_size * (torch.cuda.device_count() \
@@ -132,7 +129,8 @@ class BiGRU():
                           x_train,
                           validation_sequence,
                           batch_size,
-                          num_workers
+                          num_workers,
+                          sequence_length
                           ):
         
         scaler = normalize(x_train)
@@ -143,7 +141,8 @@ class BiGRU():
 
         train_dl = self._initTrainDl(x_train, 
                                         batch_size=batch_size,
-                                        num_workers=num_workers
+                                        num_workers=num_workers,
+                                        sequence_length=sequence_length
                                         )
 
         val_dl = self._initValDl(val_dl)
@@ -164,7 +163,8 @@ class BiGRU():
         train_dl, val_dl = self._initTrainValData(x_train,
                                                   validation_sequence,
                                                   batch_size,
-                                                  num_workers
+                                                  num_workers,
+                                                  sequence_length
                                                   )
         
         self._train(epochs,
@@ -182,15 +182,18 @@ class BiGRU():
                patience
                ):
 
+        self._model.train()
         best_loss = float('inf')
         counter = 0
 
         for epoch_ndx in tqdm((range(1, epochs + 1)), position=0, leave=True):
             epoch_loss = 0.0
-            for x_batch, y_batch in train_dl:  
-                epoch_loss += self._computeBatchLoss(x_batch, y_batch)
-            
-            self._scheduler.step()
+            for x_batch, y_batch in train_dl:   
+                self._optimizer.zero_grad()  
+                loss = self._computeBatchLoss(x_batch, y_batch)
+                loss.backward()     # Actually updates the model weights
+                self._optimizer.step()
+                epoch_loss += loss
 
             if epoch_ndx % validation_cadence != 0:                
                 print(f"Epoch {epoch_ndx}, Loss: {epoch_loss / len(train_dl)}")
@@ -210,26 +213,26 @@ class BiGRU():
                 if stop:
                     break
 
-                self._model.train()
-
     def _computeBatchLoss(self, 
                          x_batch, 
                          y_batch
                          ):     
-              
-        output = self.model(x_batch)
+
+        output = self._model(x_batch)
         loss_function = nn.MSELoss()
         loss = loss_function(output, y_batch)
 
-        return loss.mean()
+        return loss.mean() 
 
-    def _doValidation(self, epoch_ndx, val_dl):
+    def _doValidation(self, val_dl):
         total_loss = 0
         self._model.eval()
-        with torch.no_grad():
+        with torch.no_grad():  
             for x_batch, y_batch in val_dl:
                 loss_var = self._computeBatchLoss(x_batch, y_batch)
                 total_loss += loss_var / val_dl.batch_size
+
+        self._model.train()
 
         return total_loss 
     
@@ -243,7 +246,7 @@ class BiGRU():
         if total_loss < best_loss:
             best_loss = total_loss
             best_epoch_ndx = epoch_ndx
-            self.saveModel('bnn', best_epoch_ndx)
+            self._saveModel('bigru', best_epoch_ndx)
             counter = 0
         else:
             counter += 1
@@ -255,55 +258,35 @@ class BiGRU():
             return False, best_loss, counter
 
     def predict(self, 
-                x_test,   
-                plot=False
+                x_test
                 ):
 
         scaler = normalize(x_test)
         x_test = scaler.fit_transform()
-        val_dl = self.__initValDl(x_test)
+        val_dl = self._initValDl(x_test)
         batch_iter = enumerate(val_dl)
 
         output = torch.tensor([])
-        self.model.eval()
-        with torch.no_grad():
-            for batch_ndx, batch_tup in batch_iter:
-                y_star = self.model(batch_tup[0])
-                output = torch.cat((output, y_star), 0)
+        self._model.eval()
         
-        if plot is True:
-            y_pred = output * scaler.std() + scaler.mean() # * self.std_test + self.mean_test 
-            y_test = (x_test['Close']).values * scaler.std() + scaler.mean() # * self.std_test + self.mean_test
-            test_data = x_test[0: len(x_test)]
-            days = np.array(test_data.index, dtype="datetime64[ms]")
-            
-            fig = plt.figure()
-            
-            axes = fig.add_subplot(111)
-            axes.plot(days, y_test, 'bo-', label="actual") 
-            axes.plot(days, y_pred, 'r+-', label="predicted")
-            
-            fig.autofmt_xdate()
-            
-            plt.legend()
-            plt.show()
-            
-        return output * scaler.std() + scaler.mean()# * self.std_test + self.mean_test 
+        with torch.no_grad():
+            for _, batch_tup in batch_iter:
+                y_star = self._model(batch_tup[0])
+                output = torch.cat((output, y_star), 0)
+
+        output = output.detach().numpy() * scaler.std() + scaler.mean()
+                    
+        return output
 
     def _initModel(self):
         
-        model = Net(
-                input_dim=self._input_dim, 
-                z_dim=self._z_dim, 
-                emission_dim=self._emission_dim,
-                transition_dim=self._transition_dim, 
-                rnn_dim=self._rnn_dim, 
-                rnn_dropout_rate=self._rnn_dropout_rate,
-                variance=self._variance
-            )
+        model = Net(input_size=self._input_size,
+                    hidden_size=self._hidden_size,
+                    output_dim=self._output_dim
+                    )
         
         if self._pretrained:
-            path = self._initModelPath('dmm')
+            path = self._initModelPath('bigru')
             model_dict = torch.load(path)
             model.load_state_dict(model_dict['model_state'])
 
@@ -317,16 +300,42 @@ class BiGRU():
         self._model = model
 
         self._optimizer = self._initOptimizer()
-        self._svi = SVI(self._initStepModel(), 
-                        self._initGuide(), 
-                        self._optimizer, 
-                        loss=TraceMeanField_ELBO()
-                    )
-        # Create learning rate scheduler
-        self._scheduler = self._initScheduler()
+
+    def _saveModel(self, type_str, epoch_ndx):
+        file_path = os.path.join(
+            '..',
+            '..',
+            'models',
+            'BiGRU',
+            '{}_{}_{}_{}.state'.format(
+                    type_str,
+                    self._input_size,
+                    self._hidden_size,
+                    self._num_layers,
+            )
+        )
+
+        os.makedirs(os.path.dirname(file_path), mode=0o755, exist_ok=True)
+
+        model = self._model
+        if isinstance(model, torch.nn.DataParallel):
+            model = model.module
+
+        state = {
+            'model_state': model.state_dict(),
+            'model_name': type(model).__name__,
+            'optimizer_state': self._optimizer.state_dict(),
+            'optimizer_name': type(self._optimizer).__name__,
+            'epoch': epoch_ndx
+        }
+
+        torch.save(state, file_path)
+
+        with open(file_path, 'rb') as f:
+            hashlib.sha1(f.read()).hexdigest()
 
     def _initModelPath(self, type_str):
-        model_dir = '../../models/DMM'
+        model_dir = '../../models/BiGRU'
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
 
@@ -334,14 +343,10 @@ class BiGRU():
             '..', 
             '..', 
             'models', 
-            'DMM', 
-            type_str + '_{}_{}_{}_{}_{}_{}_{}.state'.format(self._input_dim,
-                                                            self._z_dim,
-                                                            self._emission_dim,
-                                                            self._transition_dim,
-                                                            self._rnn_dim,
-                                                            self._rnn_dropout_rate,
-                                                            self._variance
+            'BiGRU', 
+            type_str + '_{}_{}_{}.state'.format(self._input_size,
+                                                            self._hidden_size,
+                                                            self._num_layers
                                                             ),
             )
 

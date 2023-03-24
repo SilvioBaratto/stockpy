@@ -5,7 +5,6 @@ import os
 import shutil
 import sys
 import glob
-sys.path.append("../")
 
 from os.path import exists
 
@@ -25,15 +24,12 @@ from torch.autograd import Variable
 from pyro.distributions.transforms import affine_autoregressive
 from pyro.infer import (
     SVI,
-    Trace_ELBO,
-    TraceGraph_ELBO,
-    Predictive,
-    TraceEnum_ELBO
+    Trace_ELBO
 )
 from pyro.optim import ClippedAdam
 import torch.nn.functional as F
 
-from utils import StockDataset, normalize
+from ..utils import StockDataset, normalize
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -108,13 +104,14 @@ class GHMM(nn.Module):
     This PyTorch Module encapsulates the model as well as the
     variational distribution (the guide) for the Gaussian Hidden Markov Model
     """
-    def __init__(self,
-                 input_dim=4,
-                 z_dim=64,
-                 emission_dim=64,
-                 transition_dim=64,
-                 variance=0.1
-                 ):
+    def __init__(self, 
+                input_size=4, 
+                z_dim=64, 
+                emission_dim=64,
+                transition_dim=64, 
+                variance=0.1,
+                pretrained=False
+                ):
         
         super().__init__()
         self._z_dim = z_dim
@@ -125,8 +122,8 @@ class GHMM(nn.Module):
         device = torch.device("cuda" if use_cuda else "cpu")
 
         # instantiate PyTorch modules used in the model and guide below
-        self.emitter = Emitter(z_dim, input_dim, emission_dim, variance)
-        self.transition = GatedTransition(z_dim, input_dim, transition_dim)
+        self.emitter = Emitter(z_dim, input_size, emission_dim, variance)
+        self.transition = GatedTransition(z_dim, input_size, transition_dim)
 
         if use_cuda:
             if torch.cuda.device_count() > 1:
@@ -214,7 +211,7 @@ class GHMM(nn.Module):
 class GaussianHMM(PyroModule):
 
     def __init__(self, 
-                input_dim=4, 
+                input_size=4, 
                 z_dim=64, 
                 emission_dim=64,
                 transition_dim=64, 
@@ -224,7 +221,7 @@ class GaussianHMM(PyroModule):
         # initialize PyroModule
         super(GaussianHMM, self).__init__()
 
-        self._input_dim = input_dim
+        self._input_size = input_size
         self._z_dim = z_dim
         self._emission_dim = emission_dim
         self._transition_dim = transition_dim
@@ -244,36 +241,32 @@ class GaussianHMM(PyroModule):
                         "weight_decay": .0
                     }
         return ClippedAdam(adam_params)
-
-    def _initOptimizer(self):
-        adam_params = {"lr": 1e-3, 
-                        "betas": (0.96, 0.999),
-                        "clip_norm": 10.0, 
-                        "lrd": 0.99996,
-                        "weight_decay": .0
-                    }
-        return ClippedAdam(adam_params)
     
     def _initScheduler(self):
         return pyro.optim.ExponentialLR({'optimizer': self._optimizer, 
                                          'optim_args': {'lr': 0.01}, 
                                          'gamma': 0.1}
-                                         )    
-
+                                         )
+    
     def _initStepModel(self):
         return self._model.model
     
     def _initGuide(self):
         return self._model.guide
-
+    
     def _initSVI(self):
         return SVI(self._initStepModel(), 
                   self._initGuide(), 
                   self._initOptimizer(), 
                   loss=Trace_ELBO()
                 )
-    
-    def _initTrainDl(self, x_train, batch_size, num_workers, sequence_length):
+
+    def _initTrainDl(self, 
+                     x_train, 
+                     batch_size, 
+                     num_workers, 
+                     sequence_length
+                     ):
         train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
@@ -290,7 +283,9 @@ class GaussianHMM(PyroModule):
 
         return train_dl
 
-    def _initValDl(self, x_test):
+    def _initValDl(self, 
+                   x_test
+                   ):
         val_dl = StockDataset(x_test, 
                                 sequence_length=self._sequence_length
                                 )
@@ -353,7 +348,7 @@ class GaussianHMM(PyroModule):
         val_dl = self._initValDl(val_dl)
 
         return train_dl, val_dl
-    
+  
     def _train(self, 
                epochs,
                train_dl,
@@ -368,7 +363,8 @@ class GaussianHMM(PyroModule):
         for epoch_ndx in tqdm((range(1, epochs + 1)), position=0, leave=True):
             epoch_loss = 0.0
             for x_batch, y_batch in train_dl:  
-                epoch_loss += self._computeBatchLoss(x_batch, y_batch)
+                loss = self._computeBatchLoss(x_batch, y_batch)
+                epoch_loss += loss
             
             self._scheduler.step()
 
@@ -378,7 +374,7 @@ class GaussianHMM(PyroModule):
             else:
                 total_loss = self._doValidation(val_dl)
 
-                print(f"Epoch {epoch_ndx}, Val Loss {total_loss}")
+                print(f"Epoch {epoch_ndx}, Val Loss {total_loss / len(val_dl)}")
 
                 # Early stopping
                 stop, best_loss, counter = self._earlyStopping(total_loss, 
@@ -389,6 +385,7 @@ class GaussianHMM(PyroModule):
                                                                )
                 if stop:
                     break
+
 
     def _computeBatchLoss(self,
                           x_batch,
@@ -412,7 +409,7 @@ class GaussianHMM(PyroModule):
         if total_loss < best_loss:
             best_loss = total_loss
             best_epoch_ndx = epoch_ndx
-            self.saveModel('dmm', best_epoch_ndx)
+            self._saveModel('ghmm', best_epoch_ndx)
             counter = 0
         else:
             counter += 1
@@ -423,13 +420,15 @@ class GaussianHMM(PyroModule):
         else:
             return False, best_loss, counter
     
-    def _doValidation(self, val_dl):
+    def _doValidation(self, 
+                      val_dl
+                      ):
         total_loss = 0
         
         with torch.no_grad():
             for x_batch, y_batch in val_dl:
-                loss_var = self._svi.evaluate_loss(x_batch, y_batch) 
-                total_loss += loss_var / val_dl.batch_size
+                loss = self._svi.evaluate_loss(x_batch, y_batch) 
+                total_loss += loss
 
         return total_loss 
 
@@ -473,7 +472,7 @@ class GaussianHMM(PyroModule):
         # return the predicted y values as a numpy array
         return predicted_y.numpy()
         
-    def saveModel(self, type_str, epoch_ndx):
+    def _saveModel(self, type_str, epoch_ndx):
         file_path = os.path.join(
             '..',
             '..',
@@ -481,7 +480,7 @@ class GaussianHMM(PyroModule):
             'GHMM',
             '{}_{}_{}_{}_{}_{}.state'.format(
                     type_str,
-                    self._input_dim,
+                    self._input_size,
                     self._z_dim,
                     self._emission_dim,
                     self._transition_dim,
@@ -511,7 +510,7 @@ class GaussianHMM(PyroModule):
     def _initModel(self):
         
         model = GHMM(
-                input_dim=self._input_dim, 
+                input_size=self._input_size, 
                 z_dim=self._z_dim, 
                 emission_dim=self._emission_dim,
                 transition_dim=self._transition_dim, 
@@ -547,7 +546,7 @@ class GaussianHMM(PyroModule):
             '..', 
             'models', 
             'GHMM', 
-            type_str + '_{}_{}_{}_{}_{}.state'.format(self._input_dim,
+            type_str + '_{}_{}_{}_{}_{}.state'.format(self._input_size,
                                                             self._z_dim,
                                                             self._emission_dim,
                                                             self._transition_dim,

@@ -1,4 +1,5 @@
-from ._mlp import MLP
 from ._bigru import BiGRU
-
-__all__ = ["MLP", "BiGRU"]
+from ._bilstm import BiLSTM
+from ._gru import GRU
+from ._lstm import LSTM
+from ._mlp import MLP

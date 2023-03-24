@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from torch.autograd import Variable
 import torch.optim.lr_scheduler as lr_scheduler
 
-from utils import StockDataset, normalize
+from ..utils import StockDataset, normalize
 import pandas as pd
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm, trange
