@@ -1,5 +1,3 @@
-from ._ghmm import GHMM 
-from ._bnn import BNN
-from ._dmm import DMM
-
-__all__ = ["GHMM", "BNN", "DMM"]
+from ._bnn import BayesianNN
+from ._dmm import DeepMarkovModel
+from ._ghmm import GaussianHMM

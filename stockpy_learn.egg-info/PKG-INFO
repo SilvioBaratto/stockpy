@@ -1,0 +1,29 @@
+Metadata-Version: 2.1
+Name: stockpy-learn
+Version: 0.1.2
+Summary: Machine Learning library to make stock market prediction
+Home-page: https://github.com/SilvioBaratto/stockpy
+Author: Silvio Baratto
+Author-email: silvio.baratto22@gmail.com
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: Mathematics
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+
+## Description
+**stockpy** is a Python Machine Learning library to detect relevant trading patterns and make investmen predictions. At the moment it supports the following algorithms:
+
+- Long Short Term Memory (LSTM)
+- Bidirectional Long Short Term Memory (BiLSTM)
+- Gated Recurrent Unit (GRU)
+- Bidirectional Gated Recurrent Unit (BiGRU)
+- Multilayer Perceptron (MLP)
+- Gaussian Hidden Markov Models (GHMM)
+- Bayesian Neural Networks (BNN)
+- Deep Markov Model (DMM)

@@ -5,7 +5,6 @@ import shutil
 import sys
 import glob
 from os.path import exists
-sys.path.append("../")
 
 import numpy as np
 import torch
@@ -19,8 +18,7 @@ from pyro.nn import PyroModule
 import pyro.poutine as poutine
 from pyro.infer import (
     SVI,
-    Trace_ELBO,
-    TraceMeanField_ELBO
+    Trace_ELBO
 )
 from pyro.optim import ClippedAdam
 import torch.nn.functional as F
@@ -33,11 +31,16 @@ class Emitter(nn.Module):
     """
     Parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t)
     """
-    def __init__(self, z_dim, x_dim, emission_dim, variance):
+    def __init__(self, 
+                 z_dim, 
+                 input_size, 
+                 emission_dim, 
+                 variance
+                 ):
         super().__init__()
         # initialize the three linear transformations used in the neural network
         self.lin_z_to_hidden = nn.Linear(z_dim, emission_dim)
-        self.lin_x_to_hidden = nn.Linear(x_dim, emission_dim)
+        self.lin_x_to_hidden = nn.Linear(input_size, emission_dim)
         self.lin_hidden_to_mean = nn.Linear(emission_dim, 1)
         # initialize the fixed variance hyperparameter
         self.variance = nn.Parameter(torch.tensor(variance))
@@ -60,11 +63,15 @@ class GatedTransition(nn.Module):
     """
     Parameterizes the dynamics of the latent variables z_t
     """
-    def __init__(self, z_dim, x_dim, transition_dim):
+    def __init__(self, 
+                 z_dim, 
+                 input_size, 
+                 transition_dim
+                 ):
         super().__init__()
         # initialize the two linear transformations used in the neural network
         self.lin_z_to_hidden = nn.Linear(z_dim, transition_dim)
-        self.lin_x_to_hidden = nn.Linear(x_dim, transition_dim)
+        self.lin_x_to_hidden = nn.Linear(input_size, transition_dim)
         # initialize the two gated transformations used in the neural network
         self.lin_hidden_to_hidden1 = nn.Linear(transition_dim, transition_dim)
         self.lin_hidden_to_hidden2 = nn.Linear(transition_dim, transition_dim)
@@ -91,12 +98,16 @@ class Combiner(nn.Module):
     to produce the hidden state h_t, which is used by the emitter and
     transition networks.
     """
-    def __init__(self, z_dim, rnn_dim, hidden_dim):
+    def __init__(self, 
+                 z_dim, 
+                 rnn_dim, 
+                 hidden_size
+                 ):
         super().__init__()
-        self.lin_z_to_hidden = nn.Linear(z_dim, hidden_dim)
-        self.lin_rnn_to_hidden = nn.Linear(rnn_dim, hidden_dim)
-        self.hidden_to_loc = nn.Linear(hidden_dim, z_dim)
-        self.hidden_to_scale = nn.Linear(hidden_dim, z_dim)
+        self.lin_z_to_hidden = nn.Linear(z_dim, hidden_size)
+        self.lin_rnn_to_hidden = nn.Linear(rnn_dim, hidden_size)
+        self.hidden_to_loc = nn.Linear(hidden_size, z_dim)
+        self.hidden_to_scale = nn.Linear(hidden_size, z_dim)
         self.relu = nn.ReLU()
 
     def forward(self, z_prev, rnn_input):
@@ -105,13 +116,13 @@ class Combiner(nn.Module):
         scale = F.softplus(self.hidden_to_scale(hidden))
         return loc, scale
     
-class DeepMarkovModel(nn.Module):
+class Net(nn.Module):
     """
     This PyTorch Module encapsulates the model as well as the
     variational distribution (the guide) for the Deep Markov Model
     """
     def __init__(self, 
-                input_dim=4, 
+                input_size=4, 
                 z_dim=64, 
                 emission_dim=64,
                 transition_dim=64, 
@@ -129,12 +140,11 @@ class DeepMarkovModel(nn.Module):
         device = torch.device("cuda" if use_cuda else "cpu")
 
         # instantiate PyTorch modules used in the model and guide below
-        self.emitter = Emitter(z_dim, input_dim, emission_dim, variance)
-        self.transition = GatedTransition(z_dim, input_dim, transition_dim)
+        self.emitter = Emitter(z_dim, input_size, emission_dim, variance)
+        self.transition = GatedTransition(z_dim, input_size, transition_dim)
         self.combiner = Combiner(z_dim, rnn_dim, emission_dim)
-        self.rnn = nn.GRU(input_size=input_dim, 
+        self.rnn = nn.GRU(input_size=input_size, 
                           hidden_size=rnn_dim,
-                          # nonlinearity='relu', 
                           batch_first=True,
                           bidirectional=False, 
                           num_layers=2, 
@@ -250,10 +260,10 @@ class DeepMarkovModel(nn.Module):
 
             return z_t
     
-class DMM(PyroModule):
+class DeepMarkovModel(PyroModule):
 
     def __init__(self, 
-                input_dim=4, 
+                input_size=4, 
                 z_dim=64, 
                 emission_dim=64,
                 transition_dim=64, 
@@ -263,9 +273,9 @@ class DMM(PyroModule):
                 pretrained=False
                 ):
         # initialize PyroModule
-        super(DMM, self).__init__()
+        super(DeepMarkovModel, self).__init__()
 
-        self._input_dim = input_dim
+        self._input_size = input_size
         self._z_dim = z_dim
         self._emission_dim = emission_dim
         self._transition_dim = transition_dim
@@ -303,10 +313,15 @@ class DMM(PyroModule):
         return SVI(self._initStepModel(), 
                   self._initGuide(), 
                   self._initOptimizer(), 
-                  loss=TraceMeanField_ELBO()
+                  loss=Trace_ELBO()
                 )
 
-    def _initTrainDl(self, x_train, batch_size, num_workers, sequence_length):
+    def _initTrainDl(self, 
+                     x_train, 
+                     batch_size, 
+                     num_workers, 
+                     sequence_length
+                     ):
         train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
@@ -323,7 +338,9 @@ class DMM(PyroModule):
 
         return train_dl
 
-    def _initValDl(self, x_test):
+    def _initValDl(self, 
+                   x_test
+                   ):
         val_dl = StockDataset(x_test, 
                                 sequence_length=self._sequence_length
                                 )
@@ -395,13 +412,15 @@ class DMM(PyroModule):
                patience
                ):
 
+        self._model.rnn.train()
         best_loss = float('inf')
         counter = 0
 
         for epoch_ndx in tqdm((range(1, epochs + 1)), position=0, leave=True):
             epoch_loss = 0.0
             for x_batch, y_batch in train_dl:  
-                epoch_loss += self._computeBatchLoss(x_batch, y_batch)
+                loss = self._computeBatchLoss(x_batch, y_batch)
+                epoch_loss += loss
             
             self._scheduler.step()
 
@@ -411,7 +430,7 @@ class DMM(PyroModule):
             else:
                 total_loss = self._doValidation(val_dl)
 
-                print(f"Epoch {epoch_ndx}, Val Loss {total_loss}")
+                print(f"Epoch {epoch_ndx}, Val Loss {total_loss / len(val_dl)}")
 
                 # Early stopping
                 stop, best_loss, counter = self._earlyStopping(total_loss, 
@@ -423,7 +442,6 @@ class DMM(PyroModule):
                 if stop:
                     break
 
-                self._model.rnn.train()
 
     def _computeBatchLoss(self,
                           x_batch,
@@ -447,7 +465,7 @@ class DMM(PyroModule):
         if total_loss < best_loss:
             best_loss = total_loss
             best_epoch_ndx = epoch_ndx
-            self.saveModel('dmm', best_epoch_ndx)
+            self._saveModel('dmm', best_epoch_ndx)
             counter = 0
         else:
             counter += 1
@@ -458,18 +476,24 @@ class DMM(PyroModule):
         else:
             return False, best_loss, counter
     
-    def _doValidation(self, val_dl):
+    def _doValidation(self, 
+                      val_dl
+                      ):
         total_loss = 0
         self._model.rnn.eval()
         
         with torch.no_grad():
             for x_batch, y_batch in val_dl:
-                loss_var = self._svi.evaluate_loss(x_batch, y_batch) 
-                total_loss += loss_var / val_dl.batch_size
+                loss = self._svi.evaluate_loss(x_batch, y_batch) 
+                total_loss += loss
+
+        self._model.rnn.train()
 
         return total_loss  
     
-    def predict(self, x_test):
+    def predict(self, 
+                x_test
+                ):
         # set the model to evaluation mode
         self._model.eval()
 
@@ -509,7 +533,7 @@ class DMM(PyroModule):
         # return the predicted y values as a numpy array
         return predicted_y.numpy()
     
-    def saveModel(self, type_str, epoch_ndx):
+    def _saveModel(self, type_str, epoch_ndx):
         file_path = os.path.join(
             '..',
             '..',
@@ -517,7 +541,7 @@ class DMM(PyroModule):
             'DMM',
             '{}_{}_{}_{}_{}_{}_{}_{}.state'.format(
                     type_str,
-                    self._input_dim,
+                    self._input_size,
                     self._z_dim,
                     self._emission_dim,
                     self._transition_dim,
@@ -548,8 +572,8 @@ class DMM(PyroModule):
 
     def _initModel(self):
         
-        model = DeepMarkovModel(
-                input_dim=self._input_dim, 
+        model = Net(
+                input_size=self._input_size, 
                 z_dim=self._z_dim, 
                 emission_dim=self._emission_dim,
                 transition_dim=self._transition_dim, 
@@ -574,11 +598,7 @@ class DMM(PyroModule):
         
         pyro.clear_param_store()
         self._optimizer = self._initOptimizer()
-        self._svi = SVI(self._initStepModel(), 
-                        self._initGuide(), 
-                        self._optimizer, 
-                        loss=TraceMeanField_ELBO()
-                    )
+        self._svi = self._initSVI()
         # Create learning rate scheduler
         self._scheduler = self._initScheduler()
 
@@ -592,7 +612,7 @@ class DMM(PyroModule):
             '..', 
             'models', 
             'DMM', 
-            type_str + '_{}_{}_{}_{}_{}_{}_{}.state'.format(self._input_dim,
+            type_str + '_{}_{}_{}_{}_{}_{}_{}.state'.format(self._input_size,
                                                             self._z_dim,
                                                             self._emission_dim,
                                                             self._transition_dim,
