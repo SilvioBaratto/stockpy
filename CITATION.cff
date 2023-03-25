@@ -1,0 +1,10 @@
+cff-version: 0.1.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Baratto"
+  given-names: "Silvio"
+  orcid: "https://orcid.org/0009-0002-1906-0057"
+title: "stockpy: Machine Learning library to make stock market prediction"
+version: 0.1.8
+date-released: 2023-03-25
+url: "https://github.com/SilvioBaratto/stockpy"
