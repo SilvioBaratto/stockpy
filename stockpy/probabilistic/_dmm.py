@@ -172,6 +172,17 @@ class Net(nn.Module):
         self.h_0 = nn.Parameter(torch.zeros(1, 1, rnn_dim))
 
     def model(self, x_data, y_data=None, annealing_factor=1.0):
+        """
+        The model for the Deep Markov Model. Samples the latents z and observed y's one time step at a time.
+
+        Args:
+            x_data (tensor): the input data of shape [batch_size, sequence_length, input_size]
+            y_data (tensor): the observed output data of shape [batch_size, sequence_length, output_size]
+            annealing_factor (float): the KL annealing factor
+
+        Returns:
+            z_t (tensor): the last latent state of the model
+        """
 
         # this is the number of time steps we need to process in the data
         T_max = x_data.size(1)
@@ -223,6 +234,18 @@ class Net(nn.Module):
             return z_t
             
     def guide(self, x_data, y_data=None, annealing_factor=1.0):
+        """
+        The guide for the Deep Markov Model. Samples the latents z one time step at a time.
+
+        Args:
+            x_data (tensor): the input data of shape [batch_size, sequence_length, input_size]
+            y_data (tensor): the observed output data of shape [batch_size, sequence_length, output_size]
+            annealing_factor (float): the KL annealing factor
+
+        Returns:
+            z_t (tensor): the last latent state of the model
+        """
+        
         # this is the number of time steps we need to process in the mini-batch
         T_max = x_data.size(1)
         # register all PyTorch (sub)modules with pyro
@@ -287,8 +310,29 @@ class DeepMarkovModel(PyroModule):
 
         self._initModel()
         self.name = "deep_markov_network"
+
+    def _initSVI(self):
+        """
+        Initializes a Stochastic Variational Inference (SVI) instance to optimize the model and guide.
+
+        Returns:
+            svi (pyro.infer.svi.SVI): SVI instance
+        """
+
+        return SVI(self._model, 
+                  self._guide, 
+                  self._initOptimizer(), 
+                  loss=Trace_ELBO()
+                )
     
     def _initOptimizer(self):
+        """
+        Initializes the optimizer used to train the model.
+
+        Returns:
+            optimizer (pyro.optim.ClippedAdam): Optimizer instance
+        """
+
         adam_params = {"lr": 1e-3, 
                         "betas": (0.96, 0.999),
                         "clip_norm": 10.0, 
@@ -298,30 +342,37 @@ class DeepMarkovModel(PyroModule):
         return ClippedAdam(adam_params)
     
     def _initScheduler(self):
+        """
+        Initializes a learning rate scheduler to control the learning rate during training.
+
+        Returns:
+            scheduler (pyro.optim.ExponentialLR): Learning rate scheduler
+        """
+
         return pyro.optim.ExponentialLR({'optimizer': self._optimizer, 
                                          'optim_args': {'lr': 0.01}, 
                                          'gamma': 0.1}
                                          )
-    
-    def _initStepModel(self):
-        return self._model.model
-    
-    def _initGuide(self):
-        return self._model.guide
-    
-    def _initSVI(self):
-        return SVI(self._initStepModel(), 
-                  self._initGuide(), 
-                  self._initOptimizer(), 
-                  loss=Trace_ELBO()
-                )
-
+        
     def _initTrainDl(self, 
                      x_train, 
                      batch_size, 
                      num_workers, 
                      sequence_length
                      ):
+        """
+        Initializes the training data loader.
+
+        Parameters:
+            x_train (numpy.ndarray or pandas dataset): the training dataset
+            batch_size (int): the batch size to use for training
+            num_workers (int): the number of workers to use for data loading
+            sequence_length (int): the length of the input sequence
+
+        Returns:
+            train_dl (torch.utils.data.DataLoader): the training data loader
+        """
+
         train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
@@ -341,6 +392,16 @@ class DeepMarkovModel(PyroModule):
     def _initValDl(self, 
                    x_test
                    ):
+        """
+        Initializes the validation data loader.
+
+        Parameters:
+            x_test (numpy.ndarray or pandas dataset): the validation dataset
+
+        Returns:
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+        """
+
         val_dl = StockDataset(x_test, 
                                 sequence_length=self._sequence_length
                                 )
@@ -355,31 +416,6 @@ class DeepMarkovModel(PyroModule):
         
         return val_dl
 
-    def fit(self, 
-            x_train,
-            epochs=10,
-            sequence_length=30,
-            batch_size=8, 
-            num_workers=4,
-            validation_sequence=30, 
-            validation_cadence=5,
-            patience=5
-            ):
-        
-        train_dl, val_dl = self._initTrainValData(x_train,
-                                                  validation_sequence,
-                                                  batch_size,
-                                                  num_workers,
-                                                  sequence_length
-                                                  )
-        
-        self._train(epochs,
-                    train_dl,
-                    val_dl,
-                    validation_cadence,
-                    patience
-                    )
-        
     def _initTrainValData(self, 
                           x_train,
                           validation_sequence,
@@ -387,7 +423,21 @@ class DeepMarkovModel(PyroModule):
                           num_workers,
                           sequence_length
                           ):
-        
+        """
+        Initializes the training and validation data loaders.
+
+        Parameters:
+            x_train (numpy.ndarray): the training dataset
+            validation_sequence (int): the number of time steps to reserve for validation during training
+            batch_size (int): the batch size to use during training
+            num_workers (int): the number of workers to use for data loading
+            sequence_length (int): the length of the input sequence
+
+        Returns:
+            train_dl (torch.utils.data.DataLoader): the training data loader
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+        """
+                
         scaler = normalize(x_train)
 
         x_train = scaler.fit_transform()
@@ -403,7 +453,48 @@ class DeepMarkovModel(PyroModule):
         val_dl = self._initValDl(val_dl)
 
         return train_dl, val_dl
-  
+
+    def fit(self, 
+            x_train,
+            epochs=10,
+            sequence_length=30,
+            batch_size=8, 
+            num_workers=4,
+            validation_sequence=30, 
+            validation_cadence=5,
+            patience=5
+            ):
+        """
+        Fits the neural network model to a given dataset.
+
+        Parameters:
+            x_train (numpy.ndarray): the training dataset
+            epochs (int): the number of epochs to train the model for
+            sequence_length (int): the length of the input sequence
+            batch_size (int): the batch size to use during training
+            num_workers (int): the number of workers to use for data loading
+            validation_sequence (int): the number of time steps to reserve for validation during training
+            validation_cadence (int): how often to run validation during training
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+
+        Returns:
+            None
+        """
+
+        train_dl, val_dl = self._initTrainValData(x_train,
+                                                  validation_sequence,
+                                                  batch_size,
+                                                  num_workers,
+                                                  sequence_length
+                                                  )
+        
+        self._train(epochs,
+                    train_dl,
+                    val_dl,
+                    validation_cadence,
+                    patience
+                    )
+          
     def _train(self, 
                epochs,
                train_dl,
@@ -411,6 +502,19 @@ class DeepMarkovModel(PyroModule):
                validation_cadence,
                patience
                ):
+        """
+        Trains the neural network model on the training dataset.
+
+        Parameters:
+            epochs (int): the number of epochs to train the model for
+            train_dl (torch.utils.data.DataLoader): the training data loader
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+            validation_cadence (int): how often to run validation during training
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+
+        Returns:
+            None
+        """
 
         self._model.rnn.train()
         best_loss = float('inf')
@@ -447,6 +551,16 @@ class DeepMarkovModel(PyroModule):
                           x_batch,
                           y_batch
                           ):    
+        """
+        Computes the loss for a given batch of data.
+
+        Parameters:
+            x_batch (torch.Tensor): the input data
+            y_batch (torch.Tensor): the target data
+
+        Returns:
+            torch.Tensor: the loss for the given batch of data
+        """  
 
         loss = self._svi.step(
             x_data=x_batch,
@@ -454,6 +568,31 @@ class DeepMarkovModel(PyroModule):
         )
         # keep track of the training loss
         return loss  # This is the loss over the entire batch
+        
+    def _doValidation(self, 
+                      val_dl
+                      ):
+        """
+        Performs validation on a given validation data loader.
+
+        Parameters:
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+
+        Returns:
+            float: the total loss over the validation set
+        """
+
+        total_loss = 0
+        self._model.rnn.eval()
+        
+        with torch.no_grad():
+            for x_batch, y_batch in val_dl:
+                loss = self._svi.evaluate_loss(x_batch, y_batch) 
+                total_loss += loss
+
+        self._model.rnn.train()
+
+        return total_loss  
     
     def _earlyStopping(self,
                        total_loss,
@@ -462,6 +601,20 @@ class DeepMarkovModel(PyroModule):
                        patience,
                        epoch_ndx
                        ):
+        """
+        Implements early stopping during training.
+
+        Parameters:
+            total_loss (float): the total validation loss
+            best_loss (float): the best validation loss seen so far
+            counter (int): the number of epochs without improvement in validation loss
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+            epoch_ndx (int): the current epoch number
+
+        Returns:
+            tuple: a tuple containing a bool indicating whether to stop early, the best loss seen so far, and the current counter value
+        """
+        
         if total_loss < best_loss:
             best_loss = total_loss
             best_epoch_ndx = epoch_ndx
@@ -476,24 +629,19 @@ class DeepMarkovModel(PyroModule):
         else:
             return False, best_loss, counter
     
-    def _doValidation(self, 
-                      val_dl
-                      ):
-        total_loss = 0
-        self._model.rnn.eval()
-        
-        with torch.no_grad():
-            for x_batch, y_batch in val_dl:
-                loss = self._svi.evaluate_loss(x_batch, y_batch) 
-                total_loss += loss
-
-        self._model.rnn.train()
-
-        return total_loss  
-    
     def predict(self, 
                 x_test
                 ):
+        """
+        Make predictions on a given test set.
+
+        Parameters:
+            x_test (np.ndarray): the test set to make predictions on
+
+        Returns:
+            np.ndarray: the predicted values for the given test set
+        """
+
         # set the model to evaluation mode
         self._model.eval()
 
@@ -533,7 +681,57 @@ class DeepMarkovModel(PyroModule):
         # return the predicted y values as a numpy array
         return predicted_y.numpy()
     
+    def _initModel(self):
+        """
+        Initializes the neural network model.
+
+        Returns:
+            None
+        """
+
+        model = Net(
+                input_size=self._input_size, 
+                z_dim=self._z_dim, 
+                emission_dim=self._emission_dim,
+                transition_dim=self._transition_dim, 
+                rnn_dim=self._rnn_dim, 
+                rnn_dropout_rate=self._rnn_dropout_rate,
+                variance=self._variance
+            )
+        
+        if self._pretrained:
+            path = self._initModelPath('dmm')
+            model_dict = torch.load(path)
+            model.load_state_dict(model_dict['model_state'])
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        if self.use_cuda:
+            if torch.cuda.device_count() > 1:
+                model = nn.DataParallel(model)
+            self._model = model.to(device)
+
+        self._model = model
+        self._guide = model.guide
+        
+        pyro.clear_param_store()
+        self._optimizer = self._initOptimizer()
+        self._svi = self._initSVI()
+        # Create learning rate scheduler
+        self._scheduler = self._initScheduler()
+
     def _saveModel(self, type_str, epoch_ndx):
+        """
+        Saves the model to disk.
+
+        Parameters:
+            type_str (str): a string indicating the type of model
+            epoch_ndx (int): the epoch index
+
+        Returns:
+            None
+        """
+        
         file_path = os.path.join(
             '..',
             '..',
@@ -570,39 +768,17 @@ class DeepMarkovModel(PyroModule):
         with open(file_path, 'rb') as f:
             hashlib.sha1(f.read()).hexdigest()
 
-    def _initModel(self):
-        
-        model = Net(
-                input_size=self._input_size, 
-                z_dim=self._z_dim, 
-                emission_dim=self._emission_dim,
-                transition_dim=self._transition_dim, 
-                rnn_dim=self._rnn_dim, 
-                rnn_dropout_rate=self._rnn_dropout_rate,
-                variance=self._variance
-            )
-        
-        if self._pretrained:
-            path = self._initModelPath('dmm')
-            model_dict = torch.load(path)
-            model.load_state_dict(model_dict['model_state'])
-
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        if self.use_cuda:
-            if torch.cuda.device_count() > 1:
-                model = nn.DataParallel(model)
-            self._model = model.to(device)
-
-        self._model = model
-        
-        pyro.clear_param_store()
-        self._optimizer = self._initOptimizer()
-        self._svi = self._initSVI()
-        # Create learning rate scheduler
-        self._scheduler = self._initScheduler()
-
     def _initModelPath(self, type_str):
+        """
+        Initializes the model path.
+
+        Parameters:
+            type_str (str): a string indicating the type of model
+
+        Returns:
+            str: the path to the initialized model
+        """
+
         model_dir = '../../models/DMM'
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
@@ -640,21 +816,23 @@ class DeepMarkovModel(PyroModule):
                 plot=True
                 ):
         """
-        Simulates trading on predicted values and compare to actual stock prices.
-        
+        Simulate trading based on predicted and real stock prices.
+
         Args:
-            y_pred (torch.Tensor): Predicted stock prices.
-            y_test (torch.Tensor): Actual stock prices.
-            shares (int): Number of shares owned initially.
-            stop_loss (float): The stop loss amount. If the stock price falls below this value, shares are sold.
-            initial_balance (float): The initial balance available for trading.
-            plot (bool): Whether to plot the trading simulation results.
-        
+            predicted (np.ndarray): Array of predicted stock prices.
+            real (np.ndarray): Array of real stock prices.
+            shares (int): Number of shares held at the start of the simulation. Default is 0.
+            stop_loss (float): Stop loss percentage. If the stock price falls below this percentage of the initial price,
+                            all shares will be sold. Default is 0.0.
+            initial_balance (float): Initial balance to start trading with. Default is 10000.
+            threshold (float): Buy/Sell threshold. Default is 0.0.
+            plot (bool): Whether to plot the trading simulation or not. Default is True.
+
         Returns:
-            Tuple of final balance, total profit/loss, and a list of tuples representing each transaction:
-            (timestamp, price, action, shares, balance).
-            If `plot` is True, also returns a Matplotlib figure object.
+            tuple: A tuple containing balance (float), total profit/loss (float), percentage increase (float), 
+            and transactions (list of tuples). The transactions are of the form (timestamp, price, action, shares, balance).
         """
+
         assert predicted.shape == real.shape, "predicted and real must have the same shape"
         assert shares >= 0, "shares cannot be negative"
         assert initial_balance >= 0, "initial_balance cannot be negative"

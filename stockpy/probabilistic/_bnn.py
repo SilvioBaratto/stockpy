@@ -41,6 +41,19 @@ plt.rcParams['figure.dpi'] = 100
 
 
 class BayesianNeuralNetwork(PyroModule):
+    """
+    This class implements a Bayesian Neural Network model using Pyro. 
+    It consists of three linear layers with ReLU activation and dropout applied between them. 
+    The final layer uses a Student's t-distribution instead of a Normal distribution. 
+    The model is trained using maximum likelihood estimation
+
+    Parameters:
+        input_size (int): the number of input features
+        hidden_size (int): the number of hidden units in the GRU layer
+        num_layers (int): the number of GRU layers
+        output_dim (int): the number of output units
+    """
+
     def __init__(self,
                  input_size=4,
                  hidden_size=32,
@@ -60,6 +73,17 @@ class BayesianNeuralNetwork(PyroModule):
         self.name = "bayesian_neural_network"
 
     def forward(self, x_data, y_data=None):
+        """
+        This function computes the forward pass of the Bayesian Neural Network model using Pyro.
+        
+        Args:
+            x_data (torch.Tensor): the input data tensor
+            y_data (torch.Tensor): the target data tensor
+            
+        Returns:
+            torch.Tensor: the output tensor of the model
+        """
+
         x = self.activation(self.hidden_layer1(x_data))
         x = self.dropout1(x)
         x = self.activation(self.hidden_layer2(x))
@@ -99,13 +123,25 @@ class BayesianNN(PyroModule):
         self.name = "bayesianNN"
     
     def _initSVI(self):
+        """
+        Initializes a Stochastic Variational Inference (SVI) instance to optimize the model and guide.
+
+        Returns:
+            svi (pyro.infer.svi.SVI): SVI instance
+        """
         return SVI(self._model, 
-                  self._guide, 
-                  self._initOptimizer(), 
-                  loss=Trace_ELBO()
+                self._guide, 
+                self._initOptimizer(), 
+                loss=Trace_ELBO()
                 )
-        
+
     def _initOptimizer(self):
+        """
+        Initializes the optimizer used to train the model.
+
+        Returns:
+            optimizer (pyro.optim.ClippedAdam): Optimizer instance
+        """
         adam_params = {"lr": 1e-3, 
                         "betas": (0.96, 0.999),
                         "clip_norm": 10.0, 
@@ -113,12 +149,18 @@ class BayesianNN(PyroModule):
                         "weight_decay": .0
                     }
         return ClippedAdam(adam_params)
-    
+
     def _initScheduler(self):
+        """
+        Initializes a learning rate scheduler to control the learning rate during training.
+
+        Returns:
+            scheduler (pyro.optim.ExponentialLR): Learning rate scheduler
+        """
         return pyro.optim.ExponentialLR({'optimizer': self._optimizer, 
-                                         'optim_args': {'lr': 0.01}, 
-                                         'gamma': 0.1}
-                                         )
+                                        'optim_args': {'lr': 0.01}, 
+                                        'gamma': 0.1}
+                                        )
     
     def _initTrainDl(self, 
                      x_train, 
@@ -126,6 +168,19 @@ class BayesianNN(PyroModule):
                      num_workers, 
                      sequence_length=0
                      ):
+        """
+        Initializes the training data loader.
+
+        Parameters:
+            x_train (numpy.ndarray or pandas dataset): the training dataset
+            batch_size (int): the batch size to use for training
+            num_workers (int): the number of workers to use for data loading
+            sequence_length (int): the length of the input sequence
+
+        Returns:
+            train_dl (torch.utils.data.DataLoader): the training data loader
+        """
+
         train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
@@ -142,7 +197,19 @@ class BayesianNN(PyroModule):
 
         return train_dl
 
-    def _initValDl(self, x_test):
+    def _initValDl(self, 
+                   x_test
+                   ):
+        """
+        Initializes the validation data loader.
+
+        Parameters:
+            x_test (numpy.ndarray or pandas dataset): the validation dataset
+
+        Returns:
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+        """
+
         val_dl = StockDataset(x_test, 
                                 sequence_length=self._sequence_length
                                 )
@@ -164,7 +231,21 @@ class BayesianNN(PyroModule):
                           num_workers,
                           sequence_length=0
                           ):
-        
+        """
+        Initializes the training and validation data loaders.
+
+        Parameters:
+            x_train (numpy.ndarray): the training dataset
+            validation_sequence (int): the number of time steps to reserve for validation during training
+            batch_size (int): the batch size to use during training
+            num_workers (int): the number of workers to use for data loading
+            sequence_length (int): the length of the input sequence
+
+        Returns:
+            train_dl (torch.utils.data.DataLoader): the training data loader
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+        """
+
         scaler = normalize(x_train)
 
         x_train = scaler.fit_transform()
@@ -191,7 +272,23 @@ class BayesianNN(PyroModule):
             validation_cadence=5,
             patience=5
             ):
-        
+        """
+        Fits the neural network model to a given dataset.
+
+        Parameters:
+            x_train (numpy.ndarray): the training dataset
+            epochs (int): the number of epochs to train the model for
+            sequence_length (int): the length of the input sequence
+            batch_size (int): the batch size to use during training
+            num_workers (int): the number of workers to use for data loading
+            validation_sequence (int): the number of time steps to reserve for validation during training
+            validation_cadence (int): how often to run validation during training
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+
+        Returns:
+            None
+        """
+
         train_dl, val_dl = self._initTrainValData(x_train,
                                                   validation_sequence,
                                                   batch_size,
@@ -212,6 +309,19 @@ class BayesianNN(PyroModule):
                validation_cadence,
                patience
                ):
+        """
+        Trains the neural network model on the training dataset.
+
+        Parameters:
+            epochs (int): the number of epochs to train the model for
+            train_dl (torch.utils.data.DataLoader): the training data loader
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+            validation_cadence (int): how often to run validation during training
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+
+        Returns:
+            None
+        """
 
         self._model.train()
         best_loss = float('inf')
@@ -246,6 +356,16 @@ class BayesianNN(PyroModule):
                           x_batch,
                           y_batch
                           ):    
+        """
+        Computes the loss for a given batch of data.
+
+        Parameters:
+            x_batch (torch.Tensor): the input data
+            y_batch (torch.Tensor): the target data
+
+        Returns:
+            torch.Tensor: the loss for the given batch of data
+        """  
 
         loss = self._svi.step(
             x_data=x_batch,
@@ -253,6 +373,29 @@ class BayesianNN(PyroModule):
         )
         # keep track of the training loss
         return loss  # This is the loss over the entire batch
+        
+    def _doValidation(self, val_dl):
+        """
+        Performs validation on a given validation data loader.
+
+        Parameters:
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+
+        Returns:
+            float: the total loss over the validation set
+        """
+
+        total_loss = 0
+        self._model.eval()
+        
+        with torch.no_grad():
+            for x_batch, y_batch in val_dl:
+                loss = self._svi.evaluate_loss(x_batch, y_batch) 
+                total_loss += loss
+
+        self._model.train()
+
+        return total_loss  
     
     def _earlyStopping(self,
                        total_loss,
@@ -261,6 +404,20 @@ class BayesianNN(PyroModule):
                        patience,
                        epoch_ndx
                        ):
+        """
+        Implements early stopping during training.
+
+        Parameters:
+            total_loss (float): the total validation loss
+            best_loss (float): the best validation loss seen so far
+            counter (int): the number of epochs without improvement in validation loss
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+            epoch_ndx (int): the current epoch number
+
+        Returns:
+            tuple: a tuple containing a bool indicating whether to stop early, the best loss seen so far, and the current counter value
+        """
+
         if total_loss < best_loss:
             best_loss = total_loss
             best_epoch_ndx = epoch_ndx
@@ -274,23 +431,19 @@ class BayesianNN(PyroModule):
             return True, best_loss, counter
         else:
             return False, best_loss, counter
-    
-    def _doValidation(self, val_dl):
-        total_loss = 0
-        self._model.eval()
-        
-        with torch.no_grad():
-            for x_batch, y_batch in val_dl:
-                loss = self._svi.evaluate_loss(x_batch, y_batch) 
-                total_loss += loss
-
-        self._model.train()
-
-        return total_loss  
 
     def predict(self, 
                 x_test
                 ):
+        """
+        Make predictions on a given test set.
+
+        Parameters:
+            x_test (np.ndarray): the test set to make predictions on
+
+        Returns:
+            np.ndarray: the predicted values for the given test set
+        """
 
         scaler = normalize(x_test)
         x_test = scaler.fit_transform()
@@ -319,7 +472,54 @@ class BayesianNN(PyroModule):
         
         return output
     
+    def _initModel(self):
+        """
+        Initializes the neural network model.
+
+        Returns:
+            None
+        """
+
+        model = BayesianNeuralNetwork(input_size=self._input_size,
+                                      hidden_size=self._hidden_size,
+                                      output_dim=self._output_dim
+                                      )
+        
+        guide = AutoDiagonalNormal(model)
+        
+        if self._pretrained:
+            path = self._initModelPath('bnn')
+            model_dict = torch.load(path)
+            model.load_state_dict(model_dict['model_state'])
+
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        if self.use_cuda:
+            if torch.cuda.device_count() > 1:
+                model = nn.DataParallel(model)
+            self._model = model.to(device)
+
+        self._model = model
+        self._guide = guide
+        
+        pyro.clear_param_store()
+        self._optimizer = self._initOptimizer()
+        self._svi = self._initSVI()
+        # Create learning rate scheduler
+        self._scheduler = self._initScheduler()
+
     def _saveModel(self, type_str, epoch_ndx):
+        """
+        Saves the model to disk.
+
+        Parameters:
+            type_str (str): a string indicating the type of model
+            epoch_ndx (int): the epoch index
+
+        Returns:
+            None
+        """
+
         file_path = os.path.join(
             '..',
             '..',
@@ -352,37 +552,17 @@ class BayesianNN(PyroModule):
         with open(file_path, 'rb') as f:
             hashlib.sha1(f.read()).hexdigest()
 
-    def _initModel(self):
-        
-        model = BayesianNeuralNetwork(input_size=self._input_size,
-                                      hidden_size=self._hidden_size,
-                                      output_dim=self._output_dim
-                                      )
-        
-        guide = AutoDiagonalNormal(model)
-        
-        if self._pretrained:
-            path = self._initModelPath('bnn')
-            model_dict = torch.load(path)
-            model.load_state_dict(model_dict['model_state'])
-
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        if self.use_cuda:
-            if torch.cuda.device_count() > 1:
-                model = nn.DataParallel(model)
-            self._model = model.to(device)
-
-        self._model = model
-        self._guide = guide
-        
-        pyro.clear_param_store()
-        self._optimizer = self._initOptimizer()
-        self._svi = self._initSVI()
-        # Create learning rate scheduler
-        self._scheduler = self._initScheduler()
-
     def _initModelPath(self, type_str):
+        """
+        Initializes the model path.
+
+        Parameters:
+            type_str (str): a string indicating the type of model
+
+        Returns:
+            str: the path to the initialized model
+        """
+
         model_dir = '../../models/BNN'
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
@@ -416,21 +596,23 @@ class BayesianNN(PyroModule):
                 plot=True
                 ):
         """
-        Simulates trading on predicted values and compare to actual stock prices.
-        
+        Simulate trading based on predicted and real stock prices.
+
         Args:
-            y_pred (torch.Tensor): Predicted stock prices.
-            y_test (torch.Tensor): Actual stock prices.
-            shares (int): Number of shares owned initially.
-            stop_loss (float): The stop loss amount. If the stock price falls below this value, shares are sold.
-            initial_balance (float): The initial balance available for trading.
-            plot (bool): Whether to plot the trading simulation results.
-        
+            predicted (np.ndarray): Array of predicted stock prices.
+            real (np.ndarray): Array of real stock prices.
+            shares (int): Number of shares held at the start of the simulation. Default is 0.
+            stop_loss (float): Stop loss percentage. If the stock price falls below this percentage of the initial price,
+                            all shares will be sold. Default is 0.0.
+            initial_balance (float): Initial balance to start trading with. Default is 10000.
+            threshold (float): Buy/Sell threshold. Default is 0.0.
+            plot (bool): Whether to plot the trading simulation or not. Default is True.
+
         Returns:
-            Tuple of final balance, total profit/loss, and a list of tuples representing each transaction:
-            (timestamp, price, action, shares, balance).
-            If `plot` is True, also returns a Matplotlib figure object.
+            tuple: A tuple containing balance (float), total profit/loss (float), percentage increase (float), 
+            and transactions (list of tuples). The transactions are of the form (timestamp, price, action, shares, balance).
         """
+
         assert predicted.shape == real.shape, "predicted and real must have the same shape"
         assert shares >= 0, "shares cannot be negative"
         assert initial_balance >= 0, "initial_balance cannot be negative"

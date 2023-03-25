@@ -26,20 +26,26 @@ from pylab import rcParams
 plt.rcParams['figure.dpi'] = 100
 
 class Net(nn.Module):
+    """
+    A class representing a neural network model for time series prediction.
+
+    Parameters:
+        input_size (int): the number of input features
+        hidden_size (int): the number of hidden units in the GRU layer
+        num_layers (int): the number of GRU layers
+        output_dim (int): the number of output units
+    """
     def __init__(self, 
                 input_size=4,  
                 hidden_size=32, 
                 num_layers=2, 
-                output_dim=1, 
-                dropout=0.2,
-                seq_length=30
+                output_dim=1
                 ):
 
         super().__init__()
         self.input_size = input_size # this is the number of features
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.sequence_length = seq_length
 
         self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
         # self.dropout = nn.Dropout(dropout)
@@ -50,6 +56,15 @@ class Net(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x):
+        """
+        Defines the forward pass of the neural network.
+
+        Parameters:
+            x (torch.Tensor): the input tensor
+
+        Returns:
+            out (torch.Tensor): the output tensor
+        """
         batch_size = x.size(0)
         h0 = Variable(torch.zeros(self.num_layers, batch_size, self.hidden_size))
         
@@ -88,6 +103,12 @@ class GRU():
         self.name = "bidirectional GRU neural network"
 
     def _initOptimizer(self):
+        """
+        Initializes the optimizer for the neural network model.
+        
+        Returns:
+            optimizer (torch.optim.Adam): the Adam optimizer for the model
+        """
         return torch.optim.Adam(self._model.parameters(), lr=1e-3)
         
     def _initTrainDl(self, 
@@ -96,6 +117,19 @@ class GRU():
                      num_workers, 
                      sequence_length
                      ):
+        """
+        Initializes the training data loader.
+
+        Parameters:
+            x_train (numpy.ndarray or pandas dataset): the training dataset
+            batch_size (int): the batch size to use for training
+            num_workers (int): the number of workers to use for data loading
+            sequence_length (int): the length of the input sequence
+
+        Returns:
+            train_dl (torch.utils.data.DataLoader): the training data loader
+        """
+
         train_dl = StockDataset(x_train, sequence_length=sequence_length)
 
         train_dl = DataLoader(train_dl, 
@@ -112,7 +146,19 @@ class GRU():
 
         return train_dl
 
-    def _initValDl(self, x_test):
+    def _initValDl(self, 
+                   x_test
+                   ):
+        """
+        Initializes the validation data loader.
+
+        Parameters:
+            x_test (numpy.ndarray or pandas dataset): the validation dataset
+
+        Returns:
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+        """
+
         val_dl = StockDataset(x_test, 
                                 sequence_length=self._sequence_length
                                 )
@@ -134,7 +180,21 @@ class GRU():
                           num_workers,
                           sequence_length
                           ):
-        
+        """
+        Initializes the training and validation data loaders.
+
+        Parameters:
+            x_train (numpy.ndarray): the training dataset
+            validation_sequence (int): the number of time steps to reserve for validation during training
+            batch_size (int): the batch size to use during training
+            num_workers (int): the number of workers to use for data loading
+            sequence_length (int): the length of the input sequence
+
+        Returns:
+            train_dl (torch.utils.data.DataLoader): the training data loader
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+        """
+
         scaler = normalize(x_train)
 
         x_train = scaler.fit_transform()
@@ -161,7 +221,23 @@ class GRU():
             validation_cadence=5,
             patience=5
             ):
-        
+        """
+        Fits the neural network model to a given dataset.
+
+        Parameters:
+            x_train (numpy.ndarray): the training dataset
+            epochs (int): the number of epochs to train the model for
+            sequence_length (int): the length of the input sequence
+            batch_size (int): the batch size to use during training
+            num_workers (int): the number of workers to use for data loading
+            validation_sequence (int): the number of time steps to reserve for validation during training
+            validation_cadence (int): how often to run validation during training
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+
+        Returns:
+            None
+        """
+
         train_dl, val_dl = self._initTrainValData(x_train,
                                                   validation_sequence,
                                                   batch_size,
@@ -183,6 +259,19 @@ class GRU():
                validation_cadence,
                patience
                ):
+        """
+        Trains the neural network model on the training dataset.
+
+        Parameters:
+            epochs (int): the number of epochs to train the model for
+            train_dl (torch.utils.data.DataLoader): the training data loader
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+            validation_cadence (int): how often to run validation during training
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+
+        Returns:
+            None
+        """
 
         self._model.train()
         best_loss = float('inf')
@@ -219,6 +308,16 @@ class GRU():
                          x_batch, 
                          y_batch
                          ):     
+        """
+        Computes the loss for a given batch of data.
+
+        Parameters:
+            x_batch (torch.Tensor): the input data
+            y_batch (torch.Tensor): the target data
+
+        Returns:
+            torch.Tensor: the loss for the given batch of data
+        """  
 
         output = self._model(x_batch)
         loss_function = nn.MSELoss()
@@ -227,6 +326,16 @@ class GRU():
         return loss.mean() 
 
     def _doValidation(self, val_dl):
+        """
+        Performs validation on a given validation data loader.
+
+        Parameters:
+            val_dl (torch.utils.data.DataLoader): the validation data loader
+
+        Returns:
+            float: the total loss over the validation set
+        """
+
         total_loss = 0
         self._model.eval()
         with torch.no_grad():  
@@ -245,6 +354,20 @@ class GRU():
                        patience,
                        epoch_ndx
                        ):
+        """
+        Implements early stopping during training.
+
+        Parameters:
+            total_loss (float): the total validation loss
+            best_loss (float): the best validation loss seen so far
+            counter (int): the number of epochs without improvement in validation loss
+            patience (int): how many epochs to wait for improvement in validation loss before stopping early
+            epoch_ndx (int): the current epoch number
+
+        Returns:
+            tuple: a tuple containing a bool indicating whether to stop early, the best loss seen so far, and the current counter value
+        """
+
         if total_loss < best_loss:
             best_loss = total_loss
             best_epoch_ndx = epoch_ndx
@@ -262,6 +385,15 @@ class GRU():
     def predict(self, 
                 x_test
                 ):
+        """
+        Make predictions on a given test set.
+
+        Parameters:
+            x_test (np.ndarray): the test set to make predictions on
+
+        Returns:
+            np.ndarray: the predicted values for the given test set
+        """
 
         scaler = normalize(x_test)
         x_test = scaler.fit_transform()
@@ -281,7 +413,13 @@ class GRU():
         return output
 
     def _initModel(self):
-        
+        """
+        Initializes the neural network model.
+
+        Returns:
+            None
+        """
+
         model = Net(input_size=self._input_size,
                     hidden_size=self._hidden_size,
                     output_dim=self._output_dim
@@ -304,6 +442,17 @@ class GRU():
         self._optimizer = self._initOptimizer()
 
     def _saveModel(self, type_str, epoch_ndx):
+        """
+        Saves the model to disk.
+
+        Parameters:
+            type_str (str): a string indicating the type of model
+            epoch_ndx (int): the epoch index
+
+        Returns:
+            None
+        """
+
         file_path = os.path.join(
             '..',
             '..',
@@ -337,6 +486,16 @@ class GRU():
             hashlib.sha1(f.read()).hexdigest()
 
     def _initModelPath(self, type_str):
+        """
+        Initializes the model path.
+
+        Parameters:
+            type_str (str): a string indicating the type of model
+
+        Returns:
+            str: the path to the initialized model
+        """
+
         model_dir = '../../models/GRU'
         if not os.path.exists(model_dir):
             os.makedirs(model_dir)
@@ -370,21 +529,23 @@ class GRU():
                 plot=True
                 ):
         """
-        Simulates trading on predicted values and compare to actual stock prices.
-        
+        Simulate trading based on predicted and real stock prices.
+
         Args:
-            y_pred (torch.Tensor): Predicted stock prices.
-            y_test (torch.Tensor): Actual stock prices.
-            shares (int): Number of shares owned initially.
-            stop_loss (float): The stop loss amount. If the stock price falls below this value, shares are sold.
-            initial_balance (float): The initial balance available for trading.
-            plot (bool): Whether to plot the trading simulation results.
-        
+            predicted (np.ndarray): Array of predicted stock prices.
+            real (np.ndarray): Array of real stock prices.
+            shares (int): Number of shares held at the start of the simulation. Default is 0.
+            stop_loss (float): Stop loss percentage. If the stock price falls below this percentage of the initial price,
+                            all shares will be sold. Default is 0.0.
+            initial_balance (float): Initial balance to start trading with. Default is 10000.
+            threshold (float): Buy/Sell threshold. Default is 0.0.
+            plot (bool): Whether to plot the trading simulation or not. Default is True.
+
         Returns:
-            Tuple of final balance, total profit/loss, and a list of tuples representing each transaction:
-            (timestamp, price, action, shares, balance).
-            If `plot` is True, also returns a Matplotlib figure object.
+            tuple: A tuple containing balance (float), total profit/loss (float), percentage increase (float), 
+            and transactions (list of tuples). The transactions are of the form (timestamp, price, action, shares, balance).
         """
+
         assert predicted.shape == real.shape, "predicted and real must have the same shape"
         assert shares >= 0, "shares cannot be negative"
         assert initial_balance >= 0, "initial_balance cannot be negative"
