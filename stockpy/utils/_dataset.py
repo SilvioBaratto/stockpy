@@ -9,7 +9,6 @@ from pandas_datareader import data as pdr
 import pathlib
 from tqdm.auto import tqdm
 from datetime import date, datetime
-from scipy.signal import savgol_filter
 
 import torch
 from torch import nn as nn
@@ -297,11 +296,8 @@ class StockDataset(torch.utils.data.Dataset):
         self.target= "Close"
         self.features = ['High', 'Low', 'Open', 'Volume']
 
-        y = savgol_filter((dataframe[self.target].values), window_size, 2)
+        y = (dataframe[self.target].values)
         x = (dataframe[self.features].values)
-
-        for i in range(x.shape[1]):
-            x[:, i] = savgol_filter(x[:, i], window_length=window_size, polyorder=2)
         
         self.y = torch.tensor(y).reshape(-1,1).float()
         self.X = torch.tensor(x).float()

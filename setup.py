@@ -16,7 +16,7 @@ long_description="""
 
 setuptools.setup(
     name='stockpy-learn',
-    version='0.1.8',
+    version='0.1.13',
     author='Silvio Baratto',
     author_email='silvio.baratto22@gmail.com',
     description='Machine Learning library to make stock market prediction',

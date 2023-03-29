@@ -1,9 +1,7 @@
 import argparse
 import pandas as pd
 import numpy as np
-import sys
-sys.path.append("..")
-from util.StockDataset import StockData
+from stockpy.utils import StockData
 
 def main():
     parser = argparse.ArgumentParser()
@@ -68,7 +66,7 @@ def main():
     parser.add_argument('--folder',
                         help="First n stocks in range",
                         action='store',
-                        default="../../stock/",
+                        default="stock/",
                         )
    
     cli_args = parser.parse_args()

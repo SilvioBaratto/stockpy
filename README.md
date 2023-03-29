@@ -70,7 +70,7 @@ To install the package:
 > python setup.py install
 ```
 ## Data downloader
-The data downloader is a command-line application located in the cmd folder under the name of data.py, which can be used to download and update stock market data. The downloader has been tested and verified using Ubuntu 22.04 LTS.
+The data downloader is a command-line application located named `data.py`, which can be used to download and update stock market data. The downloader has been tested and verified using Ubuntu 22.04 LTS.
 
 | Parameter       | Explanation
 |-----------------|-------------------------------------|
