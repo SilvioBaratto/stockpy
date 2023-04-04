@@ -4,15 +4,15 @@ import torch.nn as nn
 import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
-from dataclasses import dataclass
 
+from dataclasses import dataclass
 @dataclass
 class ModelArgs:
     input_size: int = 4
     hidden_size: int = 8
     output_size: int = 1
     num_layers: int = 2
-    dropout: float = 0.2
+    dropout: float = 0.1
 
 
 class _BayesianNN(PyroModule):
@@ -39,19 +39,11 @@ class _BayesianNN(PyroModule):
             PyroModule[nn.ReLU](),
             PyroModule[nn.Dropout](args.dropout),
             PyroModule[nn.Linear](args.hidden_size, 
-                                  args.hidden_size * 2), # [8] -> [16]
+                                  args.input_size), # [8] -> [4]
             PyroModule[nn.ReLU](),
             PyroModule[nn.Dropout](args.dropout),
-            PyroModule[nn.Linear](args.hidden_size * 2, 
-                                  args.hidden_size * 2), # [16] -> [16]
-            PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](args.dropout),
-            PyroModule[nn.Linear](args.hidden_size * 2, 
-                                  args.hidden_size), # [16] -> [8]
-            PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](args.dropout),
-            PyroModule[nn.Linear](args.hidden_size, 
-                                  args.output_size), # [8] -> [1]
+            PyroModule[nn.Linear](args.input_size, 
+                                  args.output_size), # [4] -> [1]
         )
 
     def forward(self, x_data, y_data=None):
@@ -74,7 +66,7 @@ class _BayesianNN(PyroModule):
                               obs=y_data)
             
         return x
-    
+
     @property
     def model_type(self):
         return "probabilistic"

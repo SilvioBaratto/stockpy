@@ -149,7 +149,7 @@ See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
 
 setuptools.setup(
     name='stockpy-learn',
-    version='0.1.13',
+    version='0.1.15',
     author='Silvio Baratto',
     author_email='silvio.baratto22@gmail.com',
     description='Machine Learning library to make stock market prediction',

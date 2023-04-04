@@ -5,13 +5,13 @@ import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
 import pyro.poutine as poutine
+import math
 import torch.nn.functional as F
-from dataclasses import dataclass
 
+from dataclasses import dataclass
 @dataclass
 class ModelArgs:
     input_size: int = 4
-    hidden_size: int = 8
     z_dim: int = 32
     emission_dim: int = 32
     transition_dim: int = 32

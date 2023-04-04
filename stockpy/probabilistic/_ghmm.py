@@ -1,21 +1,22 @@
 import torch
 import torch.nn as nn
+import math
 
 import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
 import pyro.poutine as poutine
-from dataclasses import dataclass
 
+from dataclasses import dataclass
 @dataclass
 class ModelArgs:
     input_size: int = 4
-    hidden_size: int = 8
     z_dim: int = 32
     emission_dim: int = 32
     transition_dim: int = 32
     output_size: int = 1
     variance: float = 0.1
+
 
 class Emitter(nn.Module):
     """
@@ -140,6 +141,7 @@ class _GaussianHMM(nn.Module):
             for t in range(1, T_max):
                 # sample the next latent state z_t from the transition model
                 z_loc, z_scale = self.transition(z_prev, x_data[:, t - 1, :])
+
                 with poutine.scale(None, annealing_factor):
                     z_t = pyro.sample("z_%d" % t,
                                     dist.Normal(z_loc, z_scale)
@@ -147,7 +149,6 @@ class _GaussianHMM(nn.Module):
 
                 # compute the mean of the Gaussian distribution p(y_t | z_t)
                 mean_t, variance = self.emitter(z_t, x_data[:, t - 1, :])
-
                 # the next statement instructs pyro to observe y_t according to the
                 # Gaussian distribution p(y_t | z_t)
                 pyro.sample("obs_y_%d" % t,
@@ -199,7 +200,7 @@ class _GaussianHMM(nn.Module):
                 z_prev = z_t
 
             return z_t
-        
+
     @property
     def model_type(self):
         return "probabilistic"

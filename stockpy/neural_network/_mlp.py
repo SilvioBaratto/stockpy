@@ -9,7 +9,6 @@ class ModelArgs:
     input_size: int = 4
     hidden_size: int = 8
     output_size: int = 1
-    num_layers: int = 2
     dropout: float = 0.2
 
 class _MLP(nn.Module):
@@ -31,16 +30,13 @@ class _MLP(nn.Module):
         nn.Linear(args.input_size, args.hidden_size),   # [4] -> [8]
         nn.ReLU(),
         nn.Dropout(args.dropout),
-        nn.Linear(args.hidden_size, args.hidden_size * 2), # [8] -> [16]
+        nn.Linear(args.hidden_size, args.hidden_size), # [8] -> [8]
         nn.ReLU(),
         nn.Dropout(args.dropout),
-        nn.Linear(args.hidden_size * 2, args.hidden_size * 2), # [16] -> [16]
+        nn.Linear(args.hidden_size, args.input_size), # [8] -> [4]
         nn.ReLU(),
         nn.Dropout(args.dropout),
-        nn.Linear(args.hidden_size * 2, args.hidden_size), # [16] -> [8]
-        nn.ReLU(),
-        nn.Dropout(args.dropout),
-        nn.Linear(args.hidden_size, args.output_size) # [8] -> [1]
+        nn.Linear(args.input_size, args.output_size), # [4] -> [1]
         )
 
     def forward(self, x):

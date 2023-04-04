@@ -28,23 +28,20 @@ class _LSTM(nn.Module):
         super().__init__()
 
         self.lstm = nn.LSTM(input_size=args.input_size, 
-                          hidden_size=args.hidden_size * 4, 
+                          hidden_size=args.hidden_size * 2, 
                           num_layers=args.num_layers, 
                           batch_first=True,
                           )
         
         self.layers = nn.Sequential(
         nn.ReLU(),
-        nn.Linear(args.hidden_size * 4, args.hidden_size * 2), # [32] -> [16]
-        nn.ReLU(),
-        nn.Dropout(args.dropout),
-        nn.Linear(args.hidden_size * 2, args.hidden_size * 2), # [16] -> [16]
-        nn.ReLU(),
-        nn.Dropout(args.dropout),
         nn.Linear(args.hidden_size * 2, args.hidden_size), # [16] -> [8]
         nn.ReLU(),
         nn.Dropout(args.dropout),
-        nn.Linear(args.hidden_size, args.output_size), # [8] -> [1]
+        nn.Linear(args.hidden_size, args.input_size), # [8] -> [4]
+        nn.ReLU(),
+        nn.Dropout(args.dropout),
+        nn.Linear(args.input_size, args.output_size), # [4] -> [1]
         )
 
 
@@ -61,10 +58,10 @@ class _LSTM(nn.Module):
         batch_size = x.size(0)
         h0 = Variable(torch.zeros(ModelArgs.num_layers, 
                                   batch_size, 
-                                  ModelArgs.hidden_size * 4))
+                                  ModelArgs.hidden_size * 2))
         c0 = Variable(torch.zeros(ModelArgs.num_layers, 
                                   batch_size, 
-                                  ModelArgs.hidden_size * 4))
+                                  ModelArgs.hidden_size * 2))
         
         _, (hn, _) = self.lstm(x, (h0, c0))
         out = self.layers(hn[0])       

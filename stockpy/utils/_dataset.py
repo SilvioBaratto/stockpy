@@ -269,20 +269,6 @@ class normalize():
                             )
         return df['Close'][0]
 
-def normalize_stock(X_train, X_test):
-    target = "Close"
-    tot_mean = X_train[target].mean()
-    tot_std = X_train[target].std()
-
-    for c in X_train.columns:
-        mean = X_train[c].mean()
-        std = X_train[c].std()
-
-        X_train[c] = (X_train[c] - mean) / std
-        X_test[c] = (X_test[c] - mean) / std
-
-    return tot_mean, tot_std
-
 class StockDataset(torch.utils.data.Dataset):
     def __init__(self, 
                 dataframe, 

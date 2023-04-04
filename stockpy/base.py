@@ -14,6 +14,7 @@ import torch.nn as nn
 from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 import torch.optim.lr_scheduler as lr_scheduler
+from typing import Union
 
 import pyro
 import pyro.distributions as dist
@@ -25,6 +26,7 @@ from pyro.infer import (
 )
 from pyro.optim import ClippedAdam
 import torch.nn.functional as F
+from torchviz import make_dot
 
 from .utils import StockDataset, normalize
 import pandas as pd
@@ -61,12 +63,11 @@ class ModelTrainer():
         self._initModel(model)
 
     def _modelEval(self):
-        print(self._model.eval)
+        print(self._model.eval())
     
     def _initOptimizer(self):
         """
         Initializes the optimizer used to train the model.
-
         Returns:
             optimizer (torch.optim.AdamW): Optimizer instance
         """
@@ -90,7 +91,6 @@ class ModelTrainer():
     def _initSVI(self):
         """
         Initializes a Stochastic Variational Inference (SVI) instance to optimize the model and guide.
-
         Returns:
             svi (pyro.infer.svi.SVI): SVI instance
         """
@@ -110,7 +110,6 @@ class ModelTrainer():
     def _initScheduler(self):
         """
         Initializes a learning rate scheduler to control the learning rate during training.
-
         Returns:
             scheduler (pyro.optim.ExponentialLR): Learning rate scheduler
         """
@@ -135,13 +134,11 @@ class ModelTrainer():
                      ):
         """
         Initializes the training data loader.
-
         Parameters:
             x_train (numpy.ndarray or pandas dataset): the training dataset
             batch_size (int): the batch size to use for training
             num_workers (int): the number of workers to use for data loading
             sequence_length (int): the length of the input sequence
-
         Returns:
             train_dl (torch.utils.data.DataLoader): the training data loader
         """
@@ -167,10 +164,8 @@ class ModelTrainer():
                    ):
         """
         Initializes the validation data loader.
-
         Parameters:
             x_test (numpy.ndarray or pandas dataset): the validation dataset
-
         Returns:
             val_dl (torch.utils.data.DataLoader): the validation data loader
         """
@@ -198,14 +193,12 @@ class ModelTrainer():
                           ):
         """
         Initializes the training and validation data loaders.
-
         Parameters:
             x_train (numpy.ndarray): the training dataset
             validation_sequence (int): the number of time steps to reserve for validation during training
             batch_size (int): the batch size to use during training
             num_workers (int): the number of workers to use for data loading
             sequence_length (int): the length of the input sequence
-
         Returns:
             train_dl (torch.utils.data.DataLoader): the training data loader
             val_dl (torch.utils.data.DataLoader): the validation data loader
@@ -253,16 +246,21 @@ class ModelTrainer():
         Returns:
             None
         """
-        if self._model.__class__.__name__[1:] == 'MLP': sequence_length = 0
-        if self._model.__class__.__name__[1:] == 'BayesianNN': sequence_length = 0
+        sequence_lengths = {
+            "MLP": 0,
+            "BayesianNN": 0,
+            # Add more model types and sequence lengths here
+        }
+
+        sequence_length = sequence_lengths.get(self._model.__class__.__name__[1:], sequence_length)
 
         train_dl, val_dl = self._initTrainValData(x_train,
-                                                  validation_sequence,
-                                                  batch_size,
-                                                  num_workers,
-                                                  sequence_length
-                                                  )
-        
+                                                validation_sequence,
+                                                batch_size,
+                                                num_workers,
+                                                sequence_length
+                                                )
+
         self._train(epochs,
                     train_dl,
                     val_dl,
@@ -322,7 +320,7 @@ class ModelTrainer():
                                                                epoch_ndx
                                                                )
                 if stop:
-                    break   
+                    break  
 
     def _computeBatchLoss(self, 
                          x_batch, 
@@ -330,11 +328,9 @@ class ModelTrainer():
                          ):     
         """
         Computes the loss for a given batch of data.
-
         Parameters:
             x_batch (torch.Tensor): the input data
             y_batch (torch.Tensor): the target data
-
         Returns:
             torch.Tensor: the loss for the given batch of data
         """  
@@ -355,10 +351,8 @@ class ModelTrainer():
     def _doValidation(self, val_dl):
         """
         Performs validation on a given validation data loader.
-
         Parameters:
             val_dl (torch.utils.data.DataLoader): the validation data loader
-
         Returns:
             float: the total loss over the validation set
         """
@@ -420,10 +414,8 @@ class ModelTrainer():
                 ):
         """
         Make predictions on a given test set.
-
         Parameters:
             x_test (np.ndarray): the test set to make predictions on
-
         Returns:
             np.ndarray: the predicted values for the given test set
         """
@@ -512,7 +504,6 @@ class ModelTrainer():
     def _initModel(self, model):
         """
         Initializes the neural network model.
-
         Returns:
             None
         """
@@ -542,18 +533,16 @@ class ModelTrainer():
         
         pyro.clear_param_store()
         self._optimizer = self._initOptimizer()
-        if self._model.model_type == "probabilistic":
+        if self.type == "probabilistic":
             self._svi = self._initSVI()
         self._scheduler = self._initScheduler()
 
     def _saveModel(self, type_str, epoch_ndx):
         """
         Saves the model to disk.
-
         Parameters:
             type_str (str): a string indicating the type of model
             epoch_ndx (int): the epoch index
-
         Returns:
             None
         """
@@ -573,28 +562,6 @@ class ModelTrainer():
         model = self._model
         if isinstance(model, torch.nn.DataParallel):
             model = model.module
-
-        if self.type == 'neural_network':
-            state = {
-                'model_state': model.state_dict(),
-                'model_name': type(model).__name__,
-                'optimizer_state': self._optimizer.state_dict(),
-                'optimizer_name': type(self._optimizer).__name__,
-                'epoch': epoch_ndx
-            }
-        elif self.type == 'probabilistic':
-            state = {
-                'model_state': model.state_dict(),
-                'model_name': type(model).__name__,
-                'optimizer_state': self._optimizer.get_state(),
-                'optimizer_name': type(self._optimizer).__name__,
-                'epoch': epoch_ndx
-            }         
-
-        torch.save(state, file_path)
-
-        with open(file_path, 'rb') as f:
-            hashlib.sha1(f.read()).hexdigest()
 
     def _initModelPath(self, model, type_str):
         """

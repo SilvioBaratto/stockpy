@@ -35,16 +35,13 @@ class _BiGRU(nn.Module):
                           )
         self.layers = nn.Sequential(
         nn.ReLU(),
-        nn.Linear(args.hidden_size * 2 * 2, args.hidden_size * 2), # [32] -> [16]
-        nn.ReLU(),
-        nn.Dropout(args.dropout),
-        nn.Linear(args.hidden_size * 2, args.hidden_size * 2), # [16] -> [16]
-        nn.ReLU(),
-        nn.Dropout(args.dropout),
         nn.Linear(args.hidden_size * 2, args.hidden_size), # [16] -> [8]
         nn.ReLU(),
         nn.Dropout(args.dropout),
-        nn.Linear(args.hidden_size, args.output_size), # [8] -> [1]
+        nn.Linear(args.hidden_size, args.input_size), # [8] -> [4]
+        nn.ReLU(),
+        nn.Dropout(args.dropout),
+        nn.Linear(args.input_size, args.output_size), # [4] -> [1]
         )
 
     def forward(self, x):
@@ -58,9 +55,9 @@ class _BiGRU(nn.Module):
             out (torch.Tensor): the output tensor
         """
         batch_size = x.size(0)
-        h0 = Variable(torch.zeros(ModelArgs.num_layers*2, 
+        h0 = Variable(torch.zeros(ModelArgs.num_layers * 2, 
                                   batch_size, 
-                                  ModelArgs.hidden_size * 2)
+                                  ModelArgs.hidden_size * 2 * 2)
                                   )
         
         out, _ = self.gru(x, (h0))
