@@ -34,11 +34,11 @@ df = pd.read_csv('AAPL.csv', parse_dates=True, index_col='Date').dropna(how="any
 # split data into training and testing sets
 X_train, X_test = train_test_split(df, test_size=0.1, shuffle=False)
 
-# create LSTM model instance and fit to training data
+# create model instance and fit to training data
 predictor = DeepMarkovModel()
 predictor.fit(X_train, batch_size=24, epochs=10)
 
-# use LSTM model to make predictions on test data
+# predictions on test data
 y_pred = predictor.predict(X_test)
 ```
 The above code can be applied to all models in the library, just make sure to import from the correct location, either `stockpy.neural_network` or `stockpy.probabilistic`.
