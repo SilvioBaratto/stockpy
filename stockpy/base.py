@@ -14,7 +14,7 @@ import torch.nn as nn
 from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 import torch.optim.lr_scheduler as lr_scheduler
-from typing import Union
+from typing import Union, Tuple
 
 import pyro
 import pyro.distributions as dist
@@ -26,6 +26,7 @@ from pyro.infer import (
     Predictive
 )
 from pyro.optim import ClippedAdam
+from pyro.nn import PyroModule
 import torch.nn.functional as F
 from torchviz import make_dot
 
@@ -34,22 +35,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from tqdm.auto import tqdm, trange
-from dataclasses import dataclass
-
-@dataclass
-class ModelArgs:
-    dropout: float = 0.1
-    pretrained: bool = False
-    lr: float = 0.001
-    betas: tuple = (0.9, 0.999)
-    lrd: float = 0.99996
-    clip_norm: float = 10.0
-    weight_decay: float = 0.001
-    eps: float = 1e-8
-    amsgrad: bool = False
-    optim_args: float = 0.01
-    gamma: float = 0.1
-    step_size: float = 50
+from .config import ModelArgs as args
 
 class ModelTrainer():
 
@@ -58,7 +44,7 @@ class ModelTrainer():
                  **kwargs
                  ):
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
         self.use_cuda = torch.cuda.is_available()
         self._initModel(model)
@@ -66,30 +52,30 @@ class ModelTrainer():
     def _modelEval(self):
         print(self._model.eval())
     
-    def _initOptimizer(self):
+    def _initOptimizer(self) -> torch.optim.Optimizer:
         """
         Initializes the optimizer used to train the model.
         Returns:
             optimizer (torch.optim.AdamW): Optimizer instance
         """
         if self.type == "probabilistic":
-            adam_params = {"lr": ModelArgs.lr, 
-                            "betas": ModelArgs.betas,
-                            "lrd": ModelArgs.lrd,
-                            "weight_decay": ModelArgs.weight_decay
+            adam_params = {"lr": args.lr, 
+                            "betas": args.betas,
+                            "lrd": args.lrd,
+                            "weight_decay": args.weight_decay
                         }
             return ClippedAdam(adam_params)
         elif self.type == "neural_network":
             return torch.optim.Adam(self._model.parameters(), 
-                                    lr=ModelArgs.lr, 
-                                    betas=ModelArgs.betas, 
-                                    eps=ModelArgs.eps, 
-                                    weight_decay=ModelArgs.weight_decay, 
+                                    lr=args.lr, 
+                                    betas=args.betas, 
+                                    eps=args.eps, 
+                                    weight_decay=args.weight_decay, 
                                     amsgrad=False)
         else:
             raise ValueError("Model type not recognized")
         
-    def _initSVI(self):
+    def _initSVI(self) -> pyro.infer.svi.SVI:
         """
         Initializes a Stochastic Variational Inference (SVI) instance to optimize the model and guide.
         Returns:
@@ -108,7 +94,7 @@ class ModelTrainer():
                     loss=Trace_ELBO()
                     )
         
-    def _initScheduler(self):
+    def _initScheduler(self) -> Union[pyro.optim.ExponentialLR, torch.optim.lr_scheduler.StepLR]:
         """
         Initializes a learning rate scheduler to control the learning rate during training.
         Returns:
@@ -116,23 +102,23 @@ class ModelTrainer():
         """
         if self.type == "probabilistic":
             return pyro.optim.ExponentialLR({'optimizer': self._optimizer, 
-                                            'optim_args': {'lr': ModelArgs.optim_args}, 
-                                            'gamma': ModelArgs.gamma}
+                                            'optim_args': {'lr': args.optim_args}, 
+                                            'gamma': args.gamma}
                                             )
         elif self.type == "neural_network":
             return torch.optim.lr_scheduler.StepLR(self._optimizer, 
-                                                step_size=ModelArgs.step_size, 
-                                                gamma=ModelArgs.gamma
+                                                step_size=args.step_size, 
+                                                gamma=args.gamma
                                                 )
         else:
             raise ValueError("Model type not recognized")
         
     def _initTrainDl(self, 
-                     x_train, 
-                     batch_size, 
-                     num_workers, 
-                     sequence_length
-                     ):
+                    x_train: Union[np.ndarray, pd.core.frame.DataFrame], 
+                    batch_size: int, 
+                    num_workers: int, 
+                    sequence_length: int
+                    ) -> torch.utils.data.DataLoader:
         """
         Initializes the training data loader.
         Parameters:
@@ -161,8 +147,8 @@ class ModelTrainer():
         return train_dl
 
     def _initValDl(self, 
-                   x_test
-                   ):
+                   x_test: Union[np.ndarray, pd.core.frame.DataFrame]
+                   )-> torch.utils.data.DataLoader:
         """
         Initializes the validation data loader.
         Parameters:
@@ -186,12 +172,12 @@ class ModelTrainer():
         return val_dl
     
     def _initTrainValData(self, 
-                          x_train,
-                          validation_sequence,
-                          batch_size,
-                          num_workers,
-                          sequence_length
-                          ):
+                          x_train: Union[np.ndarray, pd.core.frame.DataFrame],
+                          validation_sequence: int,
+                          batch_size: int,
+                          num_workers: int,
+                          sequence_length: int
+                          )-> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
         """
         Initializes the training and validation data loaders.
         Parameters:
@@ -222,15 +208,15 @@ class ModelTrainer():
         return train_dl, val_dl
 
     def fit(self, 
-            x_train,
-            epochs=10,
-            sequence_length=30,
-            batch_size=8, 
-            num_workers=4,
-            validation_sequence=30, 
-            validation_cadence=5,
-            patience=5
-            ):
+            x_train: Union[np.ndarray, pd.core.frame.DataFrame],
+            epochs : int=10,
+            sequence_length : int=30,
+            batch_size : int=8, 
+            num_workers : int =4,
+            validation_sequence : int =30, 
+            validation_cadence : int =5,
+            patience : int =5
+            ) -> None:
         """
         Fits the neural network model to a given dataset.
 
@@ -270,12 +256,12 @@ class ModelTrainer():
                     )
                 
     def _train(self,
-               epochs,
-               train_dl,
-               val_dl,
-               validation_cadence,
-               patience
-               ):
+               epochs : int,
+               train_dl : torch.utils.data.DataLoader,
+               val_dl : torch.utils.data.DataLoader,
+               validation_cadence : int,
+               patience : int
+               ) -> None:
         
         if self._model.__class__.__name__[1:] != 'GaussianHMM': 
             self._model.train()
@@ -324,9 +310,9 @@ class ModelTrainer():
                     break  
 
     def _computeBatchLoss(self, 
-                         x_batch, 
-                         y_batch
-                         ):     
+                         x_batch : torch.Tensor, 
+                         y_batch : torch.Tensor
+                         ) -> torch.Tensor:
         """
         Computes the loss for a given batch of data.
         Parameters:
@@ -349,7 +335,9 @@ class ModelTrainer():
         
         return loss
     
-    def _doValidation(self, val_dl):
+    def _doValidation(self, 
+                      val_dl : torch.utils.data.DataLoader
+                      ) -> float: 
         """
         Performs validation on a given validation data loader.
         Parameters:
@@ -375,12 +363,12 @@ class ModelTrainer():
         return val_loss / len(val_dl)
 
     def _earlyStopping(self,
-                       total_loss,
-                       best_loss,
-                       counter,
-                       patience,
-                       epoch_ndx
-                       ):
+                       total_loss: float,
+                       best_loss: float,
+                       counter: int,
+                       patience: int,
+                       epoch_ndx: int
+                       ) -> Tuple[bool, float, int]:
         """
         Implements early stopping during training.
 
@@ -397,9 +385,7 @@ class ModelTrainer():
 
         if total_loss < best_loss:
             best_loss = total_loss
-            best_epoch_ndx = epoch_ndx
-            self._saveModel(self._model.__class__.__name__[1:], 
-                            best_epoch_ndx)
+            self._saveModel(self._model.__class__.__name__[1:])
             counter = 0
         else:
             counter += 1
@@ -411,8 +397,8 @@ class ModelTrainer():
             return False, best_loss, counter
         
     def predict(self, 
-                x_test
-                ):
+                x_test: Union[np.ndarray, pd.core.frame.DataFrame]
+                ) -> np.ndarray:
         """
         Make predictions on a given test set.
         Parameters:
@@ -437,7 +423,8 @@ class ModelTrainer():
         return output
     
     def _predict_neural_network(self, 
-                                val_dl):
+                                val_dl : torch.utils.data.DataLoader
+                                ) -> torch.Tensor:
         output = torch.tensor([])
         self._model.eval()
         
@@ -449,7 +436,8 @@ class ModelTrainer():
         return output
     
     def _predict_probabilistic(self,
-                               val_dl):
+                               val_dl : torch.utils.data.DataLoader
+                               ) -> torch.Tensor:
         
         if self._model.__class__.__name__[1:] == 'BayesianNN':
             output = torch.tensor([])
@@ -502,14 +490,16 @@ class ModelTrainer():
             # return the predicted y values as a numpy array
             return output
 
-    def _initModel(self, model):
+    def _initModel(self, 
+                   model : Union[nn.Module, PyroModule]
+                   ) -> None:
         """
         Initializes the neural network model.
         Returns:
             None
         """
         
-        if ModelArgs.pretrained:
+        if args.pretrained:
             path = self._initModelPath(model, model.__class__.__name__[1:])
             model_dict = torch.load(path)
             model.load_state_dict(model_dict['model_state'])
@@ -538,7 +528,9 @@ class ModelTrainer():
             self._svi = self._initSVI()
         self._scheduler = self._initScheduler()
 
-    def _saveModel(self, type_str, epoch_ndx):
+    def _saveModel(self, 
+                   type_str : str
+                   ) -> None:
         """
         Saves the model to disk.
         Parameters:
@@ -553,8 +545,8 @@ class ModelTrainer():
             '..', 
             'models', 
             self._model.__class__.__name__[1:], 
-            type_str + '_{}_{}.state'.format(ModelArgs.dropout,
-                                                ModelArgs.weight_decay
+            type_str + '_{}_{}.state'.format(args.dropout,
+                                                args.weight_decay
                                                 ),
             )
 
@@ -564,7 +556,9 @@ class ModelTrainer():
         if isinstance(model, torch.nn.DataParallel):
             model = model.module
 
-    def _initModelPath(self, model, type_str):
+    def _initModelPath(self, 
+                       model : Union[nn.Module, PyroModule], 
+                       type_str : str) -> str:
         """
         Initializes the model path.
 
@@ -584,8 +578,8 @@ class ModelTrainer():
             '..', 
             'models', 
             model.__class__.__name__[1:], 
-            type_str + '_{}_{}.state'.format(ModelArgs.dropout,
-                                                ModelArgs.weight_decay
+            type_str + '_{}_{}.state'.format(args.dropout,
+                                                args.weight_decay
                                                 ),
             )
 
@@ -596,158 +590,3 @@ class ModelTrainer():
         
         # Return the most recent matching file
         return file_list[0]
-    
-    def trading(self, 
-                predicted, 
-                real, 
-                shares=0, 
-                stop_loss=0.0, 
-                initial_balance=10000, 
-                threshold=0.0, 
-                plot=True
-                ):
-
-
-        """
-        Simulate trading based on predicted and real stock prices.
-
-        Args:
-            predicted (np.ndarray): Array of predicted stock prices.
-            real (np.ndarray): Array of real stock prices.
-            shares (int): Number of shares held at the start of the simulation. Default is 0.
-            stop_loss (float): Stop loss percentage. If the stock price falls below this percentage of the initial price,
-                            all shares will be sold. Default is 0.0.
-            initial_balance (float): Initial balance to start trading with. Default is 10000.
-            threshold (float): Buy/Sell threshold. Default is 0.0.
-            plot (bool): Whether to plot the trading simulation or not. Default is True.
-
-        Returns:
-            tuple: A tuple containing balance (float), total profit/loss (float), percentage increase (float), 
-            and transactions (list of tuples). The transactions are of the form (timestamp, price, action, shares, balance).
-        """
-        
-        assert predicted.shape == real.shape, "predicted and real must have the same shape"
-        assert shares >= 0, "shares cannot be negative"
-        assert initial_balance >= 0, "initial_balance cannot be negative"
-        assert 0 <= stop_loss <= 1, "stop_loss must be between 0 and 1"
-
-        transactions = []
-        balance = initial_balance
-        num_shares = shares
-        total_profit_loss = 0
-
-        if num_shares == 0 and balance >= real[0]:
-            num_shares = int(balance / real[0])
-            balance -= num_shares * real[0]
-            transactions.append((0, real[0], "BUY", num_shares, balance))
-
-        for i in range(1, len(predicted)):
-            if predicted[i] > real[i-1] * (1 + threshold):
-                if num_shares == 0:
-                    num_shares = int(balance / real[i])
-                    balance -= num_shares * real[i]
-                    transactions.append((i, real[i], "BUY", num_shares, balance))
-                elif num_shares > 0:
-                    balance += num_shares * real[i]
-                    total_profit_loss += (real[i] - real[i-1]) * num_shares
-                    transactions.append((i, real[i], "SELL", num_shares, balance))
-                    num_shares = 0
-            elif predicted[i] < real[i-1] * (1 - threshold):
-                if num_shares == 0:
-                    continue
-                elif num_shares > 0:
-                    balance += num_shares * real[i]
-                    total_profit_loss += (real[i] - real[i-1]) * num_shares
-                    transactions.append((i, real[i], "SELL", num_shares, balance))
-                    num_shares = 0
-
-            if stop_loss > 0 and num_shares > 0 and real[i] < (real[0] - stop_loss):
-                balance += num_shares * real[i]
-                total_profit_loss += (real[i] - real[i-1]) * num_shares
-                transactions.append((i, real[i], "SELL", num_shares, balance))
-                num_shares = 0
-
-        if num_shares > 0:
-            balance += num_shares * real[-1]
-            total_profit_loss += (real[-1] - real[-2]) * num_shares
-
-
-
-
-
-            assert predicted.shape == real.shape, "predicted and real must have the same shape"
-            assert shares >= 0, "shares cannot be negative"
-            assert initial_balance >= 0, "initial_balance cannot be negative"
-            assert 0 <= stop_loss <= 1, "stop_loss must be between 0 and 1"
-
-            transactions = []
-            balance = initial_balance
-            num_shares = shares
-            total_profit_loss = 0
-
-            if num_shares == 0 and balance >= real[0]:
-                num_shares = int(balance / real[0])
-                balance -= num_shares * real[0]
-                transactions.append((0, real[0], "BUY", num_shares, balance))
-
-            for i in range(1, len(predicted)):
-                if predicted[i] > real[i-1] * (1 + threshold):
-                    if num_shares == 0:
-                        num_shares = int(balance / real[i])
-                        balance -= num_shares * real[i]
-                        transactions.append((i, real[i], "BUY", num_shares, balance))
-                    elif num_shares > 0:
-                        balance += num_shares * real[i]
-                        total_profit_loss += (real[i] - real[i-1]) * num_shares
-                        transactions.append((i, real[i], "SELL", num_shares, balance))
-                        num_shares = 0
-                elif predicted[i] < real[i-1] * (1 - threshold):
-                    if num_shares == 0:
-                        continue
-                    elif num_shares > 0:
-                        balance += num_shares * real[i]
-                        total_profit_loss += (real[i] - real[i-1]) * num_shares
-                        transactions.append((i, real[i], "SELL", num_shares, balance))
-                        num_shares = 0
-
-                if stop_loss > 0 and num_shares > 0 and real[i] < (real[0] - stop_loss):
-                    balance += num_shares * real[i]
-                    total_profit_loss += (real[i] - real[i-1]) * num_shares
-                    transactions.append((i, real[i], "SELL", num_shares, balance))
-                    num_shares = 0
-
-            if num_shares > 0:
-                balance += num_shares * real[-1]
-                total_profit_loss += (real[-1] - real[-2]) * num_shares
-                transactions.append((len(predicted)-1, real[-1], "SELL", num_shares, balance))
-                num_shares = 0
-
-            percentage_increase = (balance - initial_balance) / initial_balance * 100
-
-            if plot:
-                fig, ax = plt.subplots(figsize=(12, 6))
-                ax.plot(real, label='Real')
-                ax.plot(predicted, label='Predicted')
-                buy_scatter = ax.scatter([], [], c='g', marker='^', s=100)
-                sell_scatter = ax.scatter([], [], c='r', marker='v', s=100)
-                for transaction in transactions:
-                    timestamp, price, action, shares, balance = transaction
-                    if action == 'BUY':
-                        buy_scatter = ax.scatter(timestamp, predicted[timestamp], c='g', marker='^', s=100)
-                    elif action == 'SELL':
-                        sell_scatter = ax.scatter(timestamp, predicted[timestamp], c='r', marker='v', s=100)
-                ax.set_xlabel('Time')
-                ax.set_ylabel('Price')
-                ax.set_title('Trading Simulation')
-                fig.autofmt_xdate()
-                ax.legend((ax.plot([], label='Real')[0], ax.plot([], label='Predicted')[0], buy_scatter, sell_scatter),
-                        ('Real', 'Predicted', 'Buy', 'Sell'))
-                ax.text(0.05, 0.05, 
-                        'Percentage increase: ${:.2f}%'.format(percentage_increase[0]), 
-                        ha='left', va='center',
-                        transform=ax.transAxes, 
-                        bbox=dict(facecolor='white', alpha=0.5)
-                        )
-                plt.show()
-            
-            return balance, total_profit_loss, percentage_increase, transactions

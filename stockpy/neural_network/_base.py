@@ -4,19 +4,7 @@ from ._bigru import _BiGRU
 from ._bilstm import _BiLSTM
 from ._lstm import _LSTM
 from ._mlp import _MLP
-from dataclasses import dataclass
-
-@dataclass
-class ModelArgs:
-    input_size: int = 4
-    hidden_size: int = 8
-    rnn_size: int = 32
-    output_size: int = 1
-    num_layers: int = 2
-    dropout: float = 0.2
-    dropout: float = 0.2
-    pretrained: bool = False
-    l2: float = 0.01
+from ..config import ModelArgs as args
 
 class GRU(ModelTrainer):
 
@@ -25,9 +13,9 @@ class GRU(ModelTrainer):
                 ):
         
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
-        super().__init__(model=_GRU(args=ModelArgs), **kwargs)
+        super().__init__(model=_GRU(), **kwargs)
         
 class BiGRU(ModelTrainer):
 
@@ -36,9 +24,9 @@ class BiGRU(ModelTrainer):
                 ):
         
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
-        super().__init__(model=_BiGRU(args=ModelArgs), **kwargs)
+        super().__init__(model=_BiGRU(), **kwargs)
         
 class BiLSTM(ModelTrainer):
 
@@ -47,9 +35,9 @@ class BiLSTM(ModelTrainer):
                 ):
     
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
-        super().__init__(model=_BiLSTM(args=ModelArgs), **kwargs)
+        super().__init__(model=_BiLSTM(), **kwargs)
         
 class LSTM(ModelTrainer):
 
@@ -58,9 +46,9 @@ class LSTM(ModelTrainer):
                 ):
     
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
-        super().__init__(model=_LSTM(args=ModelArgs), **kwargs)
+        super().__init__(model=_LSTM(), **kwargs)
         
 class MLP(ModelTrainer):
 
@@ -69,6 +57,6 @@ class MLP(ModelTrainer):
                 ):
     
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
-        super().__init__(model=_MLP(args=ModelArgs), **kwargs)
+        super().__init__(model=_MLP(), **kwargs)

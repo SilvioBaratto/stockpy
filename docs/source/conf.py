@@ -103,6 +103,10 @@ todo_include_todos = True
 add_module_names = False
 
 # -- Options for HTML output ----------------------------------------------
+# -- Options for HTML output ----------------------------------------------
+
+# logo
+html_logo = "_static/img/logo.png"
 
 html_theme = "sphinx_rtd_theme"
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]

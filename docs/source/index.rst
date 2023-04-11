@@ -13,7 +13,4 @@ stockpy Documentation
    :maxdepth: 2
    :caption: stockpy Core:
 
-   models
-
-Indices and tables
-==================
+   Module

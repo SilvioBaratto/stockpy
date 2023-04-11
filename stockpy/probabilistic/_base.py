@@ -1,32 +1,18 @@
 from ..base import ModelTrainer
-from ._bnn import _BayesianNN
-from ._ghmm import _GaussianHMM
-from ._dmm import _DeepMarkovModel
-
-from dataclasses import dataclass
-
-@dataclass
-class ModelArgs:
-    input_size: int = 4
-    hidden_size: int = 8
-    rnn_dim: int = 32
-    output_size: int = 1
-    dropout: float = 0.2
-    z_dim: int = 32
-    emission_dim: int = 32
-    transition_dim: int = 32
-    variance: float = 0.1
+from ._bnn import BayesianNN as BNN
+from ._ghmm import GaussianHMM as GHMM 
+from ._dmm import DeepMarkovModel as DMM
+from ..config import ModelArgs as args
 
 class BayesianNN(ModelTrainer):
-
     def __init__(self,
                  **kwargs
                 ):
         
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
-        super().__init__(model=_BayesianNN(args=ModelArgs), **kwargs)
+        super().__init__(model=BNN(), **kwargs)
 
 class GaussianHMM(ModelTrainer):
     def __init__(self,
@@ -34,9 +20,9 @@ class GaussianHMM(ModelTrainer):
                 ):
         
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
-        super().__init__(model=_GaussianHMM(args=ModelArgs), **kwargs)
+        super().__init__(model=GHMM(), **kwargs)
 
 class DeepMarkovModel(ModelTrainer):
     def __init__(self,
@@ -44,6 +30,6 @@ class DeepMarkovModel(ModelTrainer):
                 ):
         
         for key, value in kwargs.items():
-            setattr(ModelArgs, key, value)
+            setattr(args, key, value)
 
-        super().__init__(model=_DeepMarkovModel(args=ModelArgs), **kwargs)
+        super().__init__(model=DMM(), **kwargs)

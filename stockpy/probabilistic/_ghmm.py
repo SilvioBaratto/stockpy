@@ -6,26 +6,36 @@ import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
 import pyro.poutine as poutine
-
-from dataclasses import dataclass
-@dataclass
-class ModelArgs:
-    input_size: int = 4
-    z_dim: int = 32
-    emission_dim: int = 32
-    transition_dim: int = 32
-    output_size: int = 1
-    variance: float = 0.1
-
+from typing import Tuple, Optional
+from ..config import ModelArgs as args
 
 class Emitter(nn.Module):
     """
-    Parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t)
-    """
-    def __init__(self,
-                 args: ModelArgs
-                 ):
+    Parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t).
 
+    :ivar lin_z_to_hidden: a linear transformation from the latent space to a hidden state
+    :vartype lin_z_to_hidden: torch.nn.Linear
+    :ivar lin_x_to_hidden: a linear transformation from the input space to a hidden state
+    :vartype lin_x_to_hidden: torch.nn.Linear
+    :ivar lin_hidden_to_mean: a linear transformation from the hidden state to the output mean
+    :vartype lin_hidden_to_mean: torch.nn.Linear
+    :ivar variance: the fixed variance hyperparameter
+    :vartype variance: torch.nn.Parameter
+    :ivar relu: a ReLU activation function
+    :vartype relu: torch.nn.ReLU
+
+    :example:
+        >>> emitter = Emitter()
+        >>> print(emitter)
+        Emitter(
+          (lin_z_to_hidden): Linear(in_features=16, out_features=32, bias=True)
+          (lin_x_to_hidden): Linear(in_features=4, out_features=32, bias=True)
+          (lin_hidden_to_mean): Linear(in_features=32, out_features=1, bias=True)
+          (relu): ReLU()
+        )
+    """
+
+    def __init__(self):
         super().__init__()
         # initialize the three linear transformations used in the neural network
         self.lin_z_to_hidden = nn.Linear(args.z_dim, args.emission_dim)
@@ -36,11 +46,21 @@ class Emitter(nn.Module):
         # initialize the non-linearities used in the neural network
         self.relu = nn.ReLU()
 
-    def forward(self, z_t, x_t):
+    def forward(self, 
+                z_t: torch.Tensor, 
+                x_t: torch.Tensor) -> Tuple[torch.Tensor, torch.nn.parameter.Parameter]:
         """
         Given the latent z at a particular time step t and the input x at time step t,
-        we return the mean and variance of the Gaussian distribution p(y_t|z_t, x_t)
+        we return the mean and variance of the Gaussian distribution p(y_t|z_t, x_t).
+
+        :param z_t: the latent variable at time step t
+        :type z_t: torch.Tensor
+        :param x_t: the input variable at time step t
+        :type x_t: torch.Tensor
+        :return: a tuple containing the mean and variance of the Gaussian distribution
+        :rtype: tuple
         """
+
         h1 = self.relu(self.lin_z_to_hidden(z_t))
         h2 = self.relu(self.lin_x_to_hidden(x_t))
         h3 = h1 + h2  # element-wise sum of the two hidden states
@@ -50,30 +70,58 @@ class Emitter(nn.Module):
 
 class GatedTransition(nn.Module):
     """
-    Parameterizes the dynamics of the latent variables z_t
+    Parameterizes the dynamics of the latent variables z_t.
+
+    :ivar lin_z_to_hidden: a linear transformation from the latent space to a hidden state
+    :vartype lin_z_to_hidden: torch.nn.Linear
+    :ivar lin_x_to_hidden: a linear transformation from the input space to a hidden state
+    :vartype lin_x_to_hidden: torch.nn.Linear
+    :ivar lin_hidden_to_hidden1: the first gated transformation
+    :vartype lin_hidden_to_hidden1: torch.nn.Linear
+    :ivar lin_hidden_to_hidden2: the second gated transformation
+    :vartype lin_hidden_to_hidden2: torch.nn.Linear
+    :ivar relu: a ReLU activation function
+    :vartype relu: torch.nn.ReLU
+    :ivar sigmoid: a sigmoid activation function
+    :vartype sigmoid: torch.nn.Sigmoid
+
+    :example:
+        >>> gated_transition = GatedTransition()
+        >>> print(gated_transition)
+        GatedTransition(
+          (lin_z_to_hidden): Linear(in_features=16, out_features=32, bias=True)
+          (lin_x_to_hidden): Linear(in_features=4, out_features=32, bias=True)
+          (lin_hidden_to_hidden1): Linear(in_features=32, out_features=32, bias=True)
+          (lin_hidden_to_hidden2): Linear(in_features=32, out_features=32, bias=True)
+          (relu): ReLU()
+          (sigmoid): Sigmoid()
+        )
     """
-    def __init__(self, 
-                 args: ModelArgs
-                 ):
+    def __init__(self):
         super().__init__()
         # initialize the two linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(args.z_dim, 
-                                         args.transition_dim)
-        self.lin_x_to_hidden = nn.Linear(args.input_size, 
-                                         args.transition_dim)
+        self.lin_z_to_hidden = nn.Linear(args.z_dim, args.transition_dim)
+        self.lin_x_to_hidden = nn.Linear(args.input_size, args.transition_dim)
         # initialize the two gated transformations used in the neural network
-        self.lin_hidden_to_hidden1 = nn.Linear(args.transition_dim, 
-                                               args.transition_dim)
-        self.lin_hidden_to_hidden2 = nn.Linear(args.transition_dim, 
-                                               args.transition_dim)
+        self.lin_hidden_to_hidden1 = nn.Linear(args.transition_dim, args.transition_dim)
+        self.lin_hidden_to_hidden2 = nn.Linear(args.transition_dim, args.transition_dim)
         # initialize the non-linearities used in the neural network
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self, z_t, x_t):
+    def forward(self, 
+                z_t: torch.Tensor, 
+                x_t: torch.Tensor) -> Tuple[torch.Tensor, torch.nn.parameter.Parameter]:
         """
         Given the latent z at a particular time step t and the input x at time step t,
-        we return the parameters for the Gaussian distribution p(z_t | z_{t-1}, x_t)
+        we return the parameters for the Gaussian distribution p(z_t | z_{t-1}, x_t).
+
+        :param z_t: the latent variable at time step t
+        :type z_t: torch.Tensor
+        :param x_t: the input variable at time step t
+        :type x_t: torch.Tensor
+        :return: a tuple containing the mean and variance of the Gaussian distribution
+        :rtype: tuple
         """
         h1 = self.relu(self.lin_z_to_hidden(z_t))
         h2 = self.relu(self.lin_x_to_hidden(x_t))
@@ -83,13 +131,36 @@ class GatedTransition(nn.Module):
         mu_t = h3
         return mu_t, 1.0
 
-class _GaussianHMM(nn.Module):
+class GaussianHMM(nn.Module):
     """
-    This PyTorch Module encapsulates the model as well as the
-    variational distribution (the guide) for the Gaussian Hidden Markov Model
+    This PyTorch Module encapsulates the model as well as the variational distribution (the guide)
+    for the Gaussian Hidden Markov Model.
+
+    :param input_size: the number of input features
+    :type input_size: int
+    :param z_dim: The dimensionality of the latent variables z.
+    :type z_dim: int
+    :param emission_dim: The dimensionality of the hidden state in the Emitter network.
+    :type emission_dim: int
+    :param transition_dim: The dimensionality of the hidden state in the Gated Transition network.
+    :type transition_dim: int
+    :param variance: The initial variance value for the observation distribution.
+    :type variance: float
+
+    :ivar emitter: the Emitter module which parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t)
+    :vartype emitter: Emitter
+    :ivar transition: the GatedTransition module which parameterizes the dynamics of the latent variables z_t
+    :vartype transition: GatedTransition
+    :ivar z_0: a trainable parameter representing the initial latent state
+    :vartype z_0: torch.nn.Parameter
+    :ivar z_q_0: a trainable parameter representing the initial latent state for the variational distribution
+    :vartype z_q_0: torch.nn.Parameter
+    :example:
+        >>> from stockpy.probabilistic import GaussianHMM
+        >>> gaussian_hmm = GaussianHMM()
     """
-    def __init__(self, 
-                args: ModelArgs):
+
+    def __init__(self):
         
         super().__init__()
 
@@ -97,8 +168,8 @@ class _GaussianHMM(nn.Module):
         device = torch.device("cuda" if use_cuda else "cpu")
 
         # instantiate PyTorch modules used in the model and guide below
-        self.emitter = Emitter(args)
-        self.transition = GatedTransition(args)
+        self.emitter = Emitter()
+        self.transition = GatedTransition()
 
         if use_cuda:
             if torch.cuda.device_count() > 1:
@@ -114,17 +185,30 @@ class _GaussianHMM(nn.Module):
         self.z_0 = nn.Parameter(torch.zeros(args.z_dim))
         self.z_q_0 = nn.Parameter(torch.zeros(1, args.z_dim))
 
-    def model(self, x_data, y_data=None, annealing_factor=1.0):
+    def model(self, 
+              x_data: torch.Tensor, 
+              y_data: Optional[torch.Tensor] = None, 
+              annealing_factor: float = 1.0
+              ) -> torch.Tensor:
         """
-        This function defines the generative model for a Gaussian Hidden Markov Model.
-        It generates a sequence of latent variables and observations by looping
-        through time steps and sampling from the prior and likelihood.
+        This function defines the generative process of the Gaussian Hidden Markov Model (GaussianHMM).
+        It takes a mini-batch of input sequences `x_data`, and if available, their corresponding
+        output sequences `y_data`, and generates a sequence of latent variables `z_t` at each time step.
+        It uses a DNN to model the emission probability distribution `p(y_t|z_t, x_t)` and 
+        another DNN to model the transition probability distribution `p(z_t|z_{t-1}, x_t)`.
+        It returns the final sampled latent variable `z_t`.
 
-        Args:
-            x_data: the observed data
-            y_data: optional, used if the model is being used for prediction
-            annealing_factor: optional, used for KL annealing. Defaults to 1.0.
+        :param x_data: input data of size (batch_size, num_time_steps, input_size)
+        :type x_data: torch.Tensor
+        :param y_data: output data of size (batch_size, num_time_steps, output_size), defaults to None
+        :type y_data: Optional[torch.Tensor], optional
+        :param annealing_factor: controls the weight of the KL divergence term, defaults to 1.0
+        :type annealing_factor: float, optional
+
+        :returns: tensor of size (batch_size, latent_dim) representing the final sampled latent variable
+        :rtype: torch.Tensor
         """
+
         T_max = x_data.size(1)
 
         # register all PyTorch (sub)modules with pyro
@@ -163,16 +247,26 @@ class _GaussianHMM(nn.Module):
         
         return z_t
 
-    def guide(self, x_data, y_data=None, annealing_factor=1.0):
+    def guide(self, 
+              x_data: torch.Tensor, 
+              y_data: Optional[torch.Tensor] = None, 
+              annealing_factor: float = 1.0
+              ) -> torch.Tensor:
         """
-        This function defines the guide for a Gaussian Hidden Markov Model.
-        It is used to approximate the posterior distribution over the latent variables.
+        Defines the guide function for the Deep Markov Model. This function is used
+        for the variational inference procedure in Pyro.
 
-        Args:
-            x_data: the observed data
-            y_data: optional, used if the model is being used for prediction
-            annealing_factor: optional, used for KL annealing. Defaults to 1.0.
+        :param x_data: The input data tensor of shape (batch_size, T_max, input_size)
+        :type x_data: torch.Tensor
+        :param y_data: The output data tensor of shape (batch_size, T_max, output_size), defaults to None
+        :type y_data: Optional[torch.Tensor], optional
+        :param annealing_factor: The scaling factor for the KL term in the loss function, defaults to 1.0
+        :type annealing_factor: float, optional
+
+        :returns: The latent variable tensor sampled at the final time step, of shape (batch_size, z_dim)
+        :rtype: torch.Tensor
         """
+        
         T_max = x_data.size(1)
 
         # register all PyTorch (sub)modules with pyro
@@ -180,7 +274,7 @@ class _GaussianHMM(nn.Module):
         pyro.module("ghmm", self)
 
         # initialize the values of the latent variables using heuristics
-        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), ModelArgs.z_dim)
+        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), args.z_dim)
         z_prev = z_q_0_expanded
 
         with pyro.plate("z_minibatch", len(x_data)):

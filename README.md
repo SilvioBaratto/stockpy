@@ -80,7 +80,7 @@ To install the package:
 
 ```bash
 > cd stockpy
-> python setup.py install
+> ./install.sh
 ```
 ## Data downloader
 The data downloader is a command-line application located named `data.py`, which can be used to download and update stock market data. The downloader has been tested and verified using Ubuntu 22.04 LTS.
