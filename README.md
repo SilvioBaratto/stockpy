@@ -1,6 +1,6 @@
 <p align="center">
   <a href="https://github.com/SilvioBaratto/stockpy" target="_blank" >
-    <img alt="stockpy" src="docs/source/_static/img/logo.png" width="400" />
+    <img alt="stockpy" src="docs/source/_static/img/logo.svg" width="400" />
   </a>
 </p>
 
