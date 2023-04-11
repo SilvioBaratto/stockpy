@@ -22,6 +22,7 @@ from pyro.infer.autoguide import AutoDiagonalNormal
 from pyro.infer import (
     SVI,
     Trace_ELBO,
+    TraceMeanField_ELBO,
     Predictive
 )
 from pyro.optim import ClippedAdam
