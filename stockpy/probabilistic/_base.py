@@ -1,35 +1,35 @@
-from ..base import ModelTrainer
+from ..base import Base
 from ._bnn import BayesianNN as BNN
 from ._ghmm import GaussianHMM as GHMM 
 from ._dmm import DeepMarkovModel as DMM
-from ..config import ModelArgs as args
+from ..config import shared
 
-class BayesianNN(ModelTrainer):
+class BayesianNN(Base):
     def __init__(self,
                  **kwargs
                 ):
         
         for key, value in kwargs.items():
-            setattr(args, key, value)
+            setattr(shared, key, value)
 
         super().__init__(model=BNN(), **kwargs)
 
-class GaussianHMM(ModelTrainer):
+class GaussianHMM(Base):
     def __init__(self,
                  **kwargs
                 ):
         
         for key, value in kwargs.items():
-            setattr(args, key, value)
+            setattr(shared, key, value)
 
         super().__init__(model=GHMM(), **kwargs)
 
-class DeepMarkovModel(ModelTrainer):
+class DeepMarkovModel(Base):
     def __init__(self,
                  **kwargs
                 ):
         
         for key, value in kwargs.items():
-            setattr(args, key, value)
+            setattr(shared, key, value)
 
         super().__init__(model=DMM(), **kwargs)

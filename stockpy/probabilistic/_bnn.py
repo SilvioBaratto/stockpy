@@ -4,7 +4,7 @@ import torch.nn as nn
 import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
-from ..config import ModelArgs as args
+from ..config import prob_args, shared
 
 
 class BayesianNN(PyroModule):
@@ -35,22 +35,22 @@ class BayesianNN(PyroModule):
         """
         Initializes the Bayesian Neural Network model.
 
-        :param args: a class containing the model hyperparameters
-        :type args: ModelArgs
+        :param prob_args: a class containing the model hyperparameters
+        :type prob_args: ModelArgs
         """
         
         super().__init__()
         self.layers = PyroModule[nn.Sequential](
-            PyroModule[nn.Linear](args.input_size, 
-                                  args.hidden_size), # [4] -> [8]
+            PyroModule[nn.Linear](prob_args.input_size, 
+                                  prob_args.hidden_size), # [4] -> [8]
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](args.dropout),
-            PyroModule[nn.Linear](args.hidden_size, 
-                                  args.input_size), # [8] -> [4]
+            PyroModule[nn.Dropout](shared.dropout),
+            PyroModule[nn.Linear](prob_args.hidden_size, 
+                                  prob_args.input_size), # [8] -> [4]
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](args.dropout),
-            PyroModule[nn.Linear](args.input_size, 
-                                  args.output_size), # [4] -> [1]
+            PyroModule[nn.Dropout](shared.dropout),
+            PyroModule[nn.Linear](prob_args.input_size, 
+                                  prob_args.output_size), # [4] -> [1]
         )
 
     def forward(self, x_data: torch.Tensor, 

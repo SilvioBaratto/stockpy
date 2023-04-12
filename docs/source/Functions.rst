@@ -1,10 +1,9 @@
-Module
-======
+Functions
+=========
 
 .. toctree::
    :glob:
    :maxdepth: 2
    :caption: Contents:
 
-   Probabilistic
-   Neural Network
+   algos

@@ -7,7 +7,7 @@ import pyro.distributions as dist
 from pyro.nn import PyroModule
 import pyro.poutine as poutine
 from typing import Tuple, Optional
-from ..config import ModelArgs as args
+from ..config import prob_args
 
 class Emitter(nn.Module):
     """
@@ -38,11 +38,11 @@ class Emitter(nn.Module):
     def __init__(self):
         super().__init__()
         # initialize the three linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(args.z_dim, args.emission_dim)
-        self.lin_x_to_hidden = nn.Linear(args.input_size, args.emission_dim)
-        self.lin_hidden_to_mean = nn.Linear(args.emission_dim, 1)
+        self.lin_z_to_hidden = nn.Linear(prob_args.z_dim, prob_args.emission_dim)
+        self.lin_x_to_hidden = nn.Linear(prob_args.input_size, prob_args.emission_dim)
+        self.lin_hidden_to_mean = nn.Linear(prob_args.emission_dim, 1)
         # initialize the fixed variance hyperparameter
-        self.variance = nn.Parameter(torch.tensor(args.variance))
+        self.variance = nn.Parameter(torch.tensor(prob_args.variance))
         # initialize the non-linearities used in the neural network
         self.relu = nn.ReLU()
 
@@ -100,11 +100,11 @@ class GatedTransition(nn.Module):
     def __init__(self):
         super().__init__()
         # initialize the two linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(args.z_dim, args.transition_dim)
-        self.lin_x_to_hidden = nn.Linear(args.input_size, args.transition_dim)
+        self.lin_z_to_hidden = nn.Linear(prob_args.z_dim, prob_args.transition_dim)
+        self.lin_x_to_hidden = nn.Linear(prob_args.input_size, prob_args.transition_dim)
         # initialize the two gated transformations used in the neural network
-        self.lin_hidden_to_hidden1 = nn.Linear(args.transition_dim, args.transition_dim)
-        self.lin_hidden_to_hidden2 = nn.Linear(args.transition_dim, args.transition_dim)
+        self.lin_hidden_to_hidden1 = nn.Linear(prob_args.transition_dim, prob_args.transition_dim)
+        self.lin_hidden_to_hidden2 = nn.Linear(prob_args.transition_dim, prob_args.transition_dim)
         # initialize the non-linearities used in the neural network
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
@@ -182,8 +182,8 @@ class GaussianHMM(nn.Module):
         # define a (trainable) parameters z_0 and z_q_0 that help define
         # the probability distributions p(z_1) and q(z_1)
         # (since for t = 1 there are no previous latents to condition on)
-        self.z_0 = nn.Parameter(torch.zeros(args.z_dim))
-        self.z_q_0 = nn.Parameter(torch.zeros(1, args.z_dim))
+        self.z_0 = nn.Parameter(torch.zeros(prob_args.z_dim))
+        self.z_q_0 = nn.Parameter(torch.zeros(1, prob_args.z_dim))
 
     def model(self, 
               x_data: torch.Tensor, 
@@ -274,7 +274,7 @@ class GaussianHMM(nn.Module):
         pyro.module("ghmm", self)
 
         # initialize the values of the latent variables using heuristics
-        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), args.z_dim)
+        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), prob_args.z_dim)
         z_prev = z_q_0_expanded
 
         with pyro.plate("z_minibatch", len(x_data)):

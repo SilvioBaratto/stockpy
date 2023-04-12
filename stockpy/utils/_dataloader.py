@@ -8,14 +8,16 @@ from yahoofinancials import YahooFinancials
 from pandas_datareader import data as pdr
 import pathlib
 from tqdm.auto import tqdm
+from torch.utils.data import DataLoader
 from datetime import date, datetime
+from typing import Union, Tuple
 
 import torch
 from torch import nn as nn
 from sklearn.preprocessing import StandardScaler
+from dataclasses import dataclass
+from ..config import training
 
-# TODO: Function that returns the dataset in pandas with index Date and without index Date
-# TODO: Implement better the folder creation
 
 class StockData():
 
@@ -305,3 +307,100 @@ class StockDataset(torch.utils.data.Dataset):
             return self.X[i], self.y[i]
 
         else: return x, self.y[i] 
+
+def _initTrainDl(x_train: Union[np.ndarray, pd.core.frame.DataFrame]) -> torch.utils.data.DataLoader:
+    """
+    Initializes the training data loader.
+
+    This method creates a DataLoader object for the training dataset, 
+    which is used during the training process. The DataLoader object handles the batching, 
+    shuffling, and loading of the training data. The method also sets the batch size, 
+    number of workers, and sequence length attributes.
+
+    :param x_train: The training dataset, as a NumPy ndarray or pandas DataFrame
+    :type x_train: Union[np.ndarray, pd.core.frame.DataFrame]
+    :param batch_size: The batch size to use for training
+    :type batch_size: int
+    :param num_workers: The number of workers to use for data loading
+    :type num_workers: int
+    :param sequence_length: The length of the input sequence
+    :type sequence_length: int
+    :return: The DataLoader object used to handle the training data
+    :rtype: torch.utils.data.DataLoader
+    """
+
+    train_dl = StockDataset(x_train, sequence_length=training.sequence_length)
+
+    train_dl = DataLoader(train_dl, 
+                        batch_size=training.batch_size * (torch.cuda.device_count() \
+                                                                   if training.use_cuda else 1),  
+                        num_workers=training.num_workers,
+                        pin_memory=training.use_cuda,
+                        shuffle=True
+                        )
+
+    return train_dl
+
+def _initValDl(x_test: Union[np.ndarray, pd.core.frame.DataFrame])-> torch.utils.data.DataLoader:
+    """
+    Initializes the validation data loader.
+
+    This method creates a DataLoader object for the validation dataset, 
+    which is used during the validation process. The DataLoader object handles 
+    the batching and loading of the validation data. It uses the batch size, 
+    number of workers, and sequence length attributes set during the training process.
+
+    :param x_test: The validation dataset, as a NumPy ndarray or pandas DataFrame
+    :type x_test: Union[np.ndarray, pd.core.frame.DataFrame]
+    :return: The DataLoader object used to handle the validation data
+    :rtype: torch.utils.data.DataLoader
+    """
+
+    val_dl = StockDataset(x_test, 
+                            sequence_length=training.sequence_length
+                            )
+
+    val_dl = DataLoader(val_dl, 
+                        batch_size=training.batch_size * (torch.cuda.device_count() \
+                                                    if training.use_cuda else 1), 
+                        num_workers=training.num_workers,
+                        pin_memory=training.use_cuda,
+                        shuffle=False
+                        )
+        
+    return val_dl
+    
+def _initTrainValDl(x_train: Union[np.ndarray, pd.core.frame.DataFrame]) \
+                    -> Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]:
+    """
+    Initializes the training and validation data loaders.
+
+    This method takes the provided training dataset and splits it into training and validation sets. 
+    It then initializes DataLoader objects for both sets, which are used during the training and validation 
+    processes. The DataLoader objects handle the batching and loading of the data.
+
+    :param x_train: The input dataset to be split into training and validation sets, as a NumPy ndarray or pandas DataFrame
+    :type x_train: Union[np.ndarray, pd.core.frame.DataFrame]
+    :param validation_sequence: The number of time steps to reserve for validation during training
+    :type validation_sequence: int
+    :param batch_size: The batch size to use during training
+    :type batch_size: int
+    :param num_workers: The number of workers to use for data loading
+    :type num_workers: int
+    :param sequence_length: The length of the input sequence
+    :type sequence_length: int
+    :return: A tuple containing the DataLoader objects for the training and validation sets
+    :rtype: Tuple[torch.utils.data.DataLoader, torch.utils.data.DataLoader]
+    """
+
+    scaler = normalize(x_train)
+
+    x_train = scaler.fit_transform()
+    val_dl = x_train[-training.validation_sequence:]
+    x_train = x_train[:len(x_train)-len(val_dl)]
+
+    train_dl = _initTrainDl(x_train)
+
+    val_dl = _initValDl(val_dl)
+
+    return train_dl, val_dl

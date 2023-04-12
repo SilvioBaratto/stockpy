@@ -14,3 +14,4 @@ stockpy Documentation
    :caption: stockpy Core:
 
    Module
+   Functions

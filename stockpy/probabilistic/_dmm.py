@@ -8,7 +8,7 @@ import pyro.poutine as poutine
 import math
 import torch.nn.functional as F
 from typing import Tuple, Optional
-from ..config import ModelArgs as args
+from ..config import prob_args
 
 class Emitter(nn.Module):
     """
@@ -39,11 +39,11 @@ class Emitter(nn.Module):
     def __init__(self):
         super().__init__()
         # initialize the three linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(args.z_dim, args.emission_dim)
-        self.lin_x_to_hidden = nn.Linear(args.input_size, args.emission_dim)
-        self.lin_hidden_to_mean = nn.Linear(args.emission_dim, 1)
+        self.lin_z_to_hidden = nn.Linear(prob_args.z_dim, prob_args.emission_dim)
+        self.lin_x_to_hidden = nn.Linear(prob_args.input_size, prob_args.emission_dim)
+        self.lin_hidden_to_mean = nn.Linear(prob_args.emission_dim, 1)
         # initialize the fixed variance hyperparameter
-        self.variance = nn.Parameter(torch.tensor(args.variance))
+        self.variance = nn.Parameter(torch.tensor(prob_args.variance))
         # initialize the non-linearities used in the neural network
         self.relu = nn.ReLU()
 
@@ -101,11 +101,11 @@ class GatedTransition(nn.Module):
     def __init__(self):
         super().__init__()
         # initialize the two linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(args.z_dim, args.transition_dim)
-        self.lin_x_to_hidden = nn.Linear(args.input_size, args.transition_dim)
+        self.lin_z_to_hidden = nn.Linear(prob_args.z_dim, prob_args.transition_dim)
+        self.lin_x_to_hidden = nn.Linear(prob_args.input_size, prob_args.transition_dim)
         # initialize the two gated transformations used in the neural network
-        self.lin_hidden_to_hidden1 = nn.Linear(args.transition_dim, args.transition_dim)
-        self.lin_hidden_to_hidden2 = nn.Linear(args.transition_dim, args.transition_dim)
+        self.lin_hidden_to_hidden1 = nn.Linear(prob_args.transition_dim, prob_args.transition_dim)
+        self.lin_hidden_to_hidden2 = nn.Linear(prob_args.transition_dim, prob_args.transition_dim)
         # initialize the non-linearities used in the neural network
         self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
@@ -150,10 +150,10 @@ class Combiner(nn.Module):
     """
     def __init__(self):
         super().__init__()
-        self.lin_z_to_hidden = nn.Linear(args.z_dim, args.emission_dim)
-        self.lin_rnn_to_hidden = nn.Linear(args.rnn_dim, args.emission_dim)
-        self.hidden_to_loc = nn.Linear(args.emission_dim, args.z_dim)
-        self.hidden_to_scale = nn.Linear(args.emission_dim, args.z_dim)
+        self.lin_z_to_hidden = nn.Linear(prob_args.z_dim, prob_args.emission_dim)
+        self.lin_rnn_to_hidden = nn.Linear(prob_args.rnn_dim, prob_args.emission_dim)
+        self.hidden_to_loc = nn.Linear(prob_args.emission_dim, prob_args.z_dim)
+        self.hidden_to_scale = nn.Linear(prob_args.emission_dim, prob_args.z_dim)
         self.relu = nn.ReLU()
 
     def forward(self, 
@@ -231,8 +231,8 @@ class DeepMarkovModel(nn.Module):
         self.transition = GatedTransition()
         self.combiner = Combiner()
 
-        self.rnn = nn.GRU(input_size=args.input_size, 
-                          hidden_size=args.rnn_dim,
+        self.rnn = nn.GRU(input_size=prob_args.input_size, 
+                          hidden_size=prob_args.rnn_dim,
                           batch_first=True,
                           bidirectional=False, 
                           num_layers=2
@@ -253,10 +253,10 @@ class DeepMarkovModel(nn.Module):
         # define a (trainable) parameters z_0 and z_q_0 that help define
         # the probability distributions p(z_1) and q(z_1)
         # (since for t = 1 there are no previous latents to condition on)
-        self.z_0 = nn.Parameter(torch.zeros(args.z_dim))
-        self.z_q_0 = nn.Parameter(torch.zeros(1, args.z_dim))
+        self.z_0 = nn.Parameter(torch.zeros(prob_args.z_dim))
+        self.z_q_0 = nn.Parameter(torch.zeros(1, prob_args.z_dim))
         # define a (trainable) parameter for the initial hidden state of the RNN
-        self.h_0 = nn.Parameter(torch.zeros(1, 1, args.rnn_dim))
+        self.h_0 = nn.Parameter(torch.zeros(1, 1, prob_args.rnn_dim))
 
     def model(self, 
               x_data: torch.Tensor, 
@@ -371,7 +371,7 @@ class DeepMarkovModel(nn.Module):
         # rnn_output contains the hidden state at each time step
         rnn_output, _ = self.rnn(x_data, h_0_contig)
         
-        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), args.z_dim)
+        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), prob_args.z_dim)
         z_prev = z_q_0_expanded
         
         # we enclose all the sample statements in the guide in a plate.
@@ -396,5 +396,11 @@ class DeepMarkovModel(nn.Module):
             return z_t
 
     @property
-    def model_type(self):
+    def model_type(self) -> str:
+        """
+        Returns the type of model.
+
+        :returns: The model type as a string.
+        :rtype: str
+        """
         return "probabilistic"
