@@ -66,13 +66,13 @@ class Predict(Model):
         Returns:
             torch.Tensor: The predicted target values as a torch.Tensor.
         """
-        output = torch.tensor([]).to(self.device)
+        output = torch.tensor([]).to(self._device)
         self._model.eval()
 
         with torch.no_grad():
             for x_batch, _ in val_dl:
                 # to device
-                x_batch = x_batch.to(self.device)
+                x_batch = x_batch.to(self._device)
                 y_star = self._model(x_batch)
                 output = torch.cat((output, y_star), 0)
                 
