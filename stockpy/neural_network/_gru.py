@@ -57,7 +57,7 @@ class GRU(nn.Module):
         batch_size = x.size(0)
         h0 = Variable(torch.zeros(nn_args.num_layers, 
                                   batch_size, 
-                                  nn_args.hidden_size * 2))
+                                  nn_args.hidden_size * 2)).to(self.device)
         
         _, (hn) = self.gru(x, (h0))
         out = self.layers(hn[0])       
@@ -65,6 +65,16 @@ class GRU(nn.Module):
 
         return out
     
+    def to(self, device: torch.device) -> None:
+        """
+        Moves the model to the specified device.
+
+        :param device: The device to move the model to.
+        :type device: torch.device
+        """
+        self.device = device
+        super().to(device)
+
     @property
     def model_type(self) -> str:
         """

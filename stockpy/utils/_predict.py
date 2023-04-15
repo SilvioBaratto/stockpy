@@ -45,7 +45,7 @@ class Predict(Model):
             output = self._predict_neural_network(val_dl)
         else:
             raise ValueError("Model type not recognized")
-
+        output = output.to('cpu')
         output = output.detach().numpy() * scaler.std() + scaler.mean()
                     
         return output
@@ -66,14 +66,17 @@ class Predict(Model):
         Returns:
             torch.Tensor: The predicted target values as a torch.Tensor.
         """
-        output = torch.tensor([])
+        output = torch.tensor([]).to(self.device)
         self._model.eval()
-        
+
         with torch.no_grad():
             for x_batch, _ in val_dl:
+                # to device
+                x_batch = x_batch.to(self.device)
                 y_star = self._model(x_batch)
                 output = torch.cat((output, y_star), 0)
                 
+        output.to('cpu')
         return output
     
     def _predict_probabilistic(self,

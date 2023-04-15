@@ -57,14 +57,14 @@ class Model():
             model_dict = torch.load(path)
             model.load_state_dict(model_dict['model_state'])
 
+      
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
         if training.use_cuda:
             if torch.cuda.device_count() > 1:
                 model = nn.DataParallel(model)
-            self._model = model.to(device)
+            self._model = model
+            self._model.to(device)
 
-        self._model = model
 
         if self._model.model_type == "neural_network":
             self.type = 'neural_network'

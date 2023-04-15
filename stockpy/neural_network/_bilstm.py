@@ -58,16 +58,29 @@ class BiLSTM(nn.Module):
         h0 = Variable(torch.zeros(nn_args.num_layers * 2, 
                                   batch_size, 
                                   nn_args.hidden_size)
-                                  )
+                                  ).to(self.device)
         c0 = Variable(torch.zeros(nn_args.num_layers * 2, 
                                   batch_size, 
-                                  nn_args.hidden_size))
+                                  nn_args.hidden_size)).to(self.device)
         
         out, _ = self.lstm(x, (h0, c0))
         out = self.layers(out[:, -1, :])       
         out = out.view(-1, 1)
 
         return out
+    
+    def to(self, device: torch.device) -> torch.nn.Module:
+        """
+        Moves the model to the specified device.
+
+        :param device: The device to move the model to.
+        :type device: torch.device
+
+        :returns: The model moved to the specified device.
+        :rtype: torch.nn.Module
+        """
+        self.device = device
+        return super().to(device)
     
     @property
     def model_type(self) -> str:
