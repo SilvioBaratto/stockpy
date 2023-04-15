@@ -155,3 +155,27 @@ Here are the guidelines to submit a patch:
 ## License
 
 See the [LICENSE](LICENSE) file for license rights and limitations (MIT).
+
+## stockpy Legal Disclaimer
+
+Please read this legal disclaimer carefully before using stockpy-learn library. By using stockpy-learn library, you agree to be bound by this disclaimer.
+
+stockpy-learn library is provided for informational and educational purposes only and is not intended as a recommendation, offer or solicitation for the purchase or sale of any financial instrument or securities. The information provided in the stockpy-learn library is not to be construed as financial, investment, legal, or tax advice, and the use of any information provided in stockpy-learn library is at your own risk.
+
+stockpy-learn library is not a substitute for professional financial or investment advice and should not be relied upon for making investment decisions. You should consult a qualified financial or investment professional before making any investment decision.
+
+We make no representation or warranty, express or implied, as to the accuracy, completeness, or suitability of any information provided in stockpy, and we shall not be liable for any errors or omissions in such information.
+
+We shall not be liable for any direct, indirect, incidental, special, consequential, or exemplary damages arising from the use of stockpy library or any information provided therein.
+
+stockpy-learn library is provided "as is" without warranty of any kind, either express or implied, including but not limited to the implied warranties of merchantability, fitness for a particular purpose, or non-infringement.
+
+We reserve the right to modify or discontinue stockpy-learn library at any time without notice. We shall not be liable for any modification, suspension, or discontinuance of stockpy-learn library.
+
+By using stockpy-learn library, you agree to indemnify and hold us harmless from any claim or demand, including reasonable attorneys' fees, made by any third party due to or arising out of your use of stockpy-learn library, your violation of this disclaimer, or your violation of any law or regulation.
+
+This legal disclaimer is governed by and construed in accordance with the laws of Italy, and any disputes relating to this disclaimer shall be subject to the exclusive jurisdiction of the courts of Italy.
+
+If you have any questions about this legal disclaimer, please contact us at silvio.baratto22@gmail.com.
+
+By using stockpy-learn library, you acknowledge that you have read and understood this legal disclaimer and agree to be bound by its terms and conditions.
