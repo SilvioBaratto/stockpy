@@ -164,9 +164,6 @@ class GaussianHMM(nn.Module):
         
         super().__init__()
 
-        use_cuda = torch.cuda.is_available()
-        device = torch.device("cuda" if use_cuda else "cpu")
-
         # instantiate PyTorch modules used in the model and guide below
         self.emitter = Emitter()
         self.transition = GatedTransition()

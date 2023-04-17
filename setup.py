@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name='stockpy-learn',
-    version='0.1.16',
+    version='0.1.16.3',
     author='Silvio Baratto',
     author_email='silvio.baratto22@gmail.com',
     description='Machine Learning library to make stock market prediction',
