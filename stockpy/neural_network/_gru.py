@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from ..config import nn_args, shared
+from ..config import nn_args, shared, training
 
 class GRU(nn.Module):
     """
@@ -57,7 +57,7 @@ class GRU(nn.Module):
         batch_size = x.size(0)
         h0 = Variable(torch.zeros(nn_args.num_layers, 
                                   batch_size, 
-                                  nn_args.hidden_size * 2)).to(self.device)
+                                  nn_args.hidden_size * 2)).to(training.device)
         
         _, (hn) = self.gru(x, (h0))
         out = self.layers(hn[0])       
@@ -72,7 +72,6 @@ class GRU(nn.Module):
         :param device: The device to move the model to.
         :type device: torch.device
         """
-        self.device = device
         super().to(device)
 
     @property

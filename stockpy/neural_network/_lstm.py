@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from ..config import nn_args, shared
+from ..config import nn_args, shared, training
 
 class LSTM(nn.Module):
     """
@@ -41,7 +41,6 @@ class LSTM(nn.Module):
             nn.Dropout(shared.dropout),
             nn.Linear(nn_args.input_size, nn_args.output_size), # [input_size] -> [output_size]
         )
-        self._device = None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -54,8 +53,8 @@ class LSTM(nn.Module):
         :rtype: torch.Tensor
         """
         batch_size = x.size(0)
-        h0 = Variable(torch.zeros(nn_args.num_layers, batch_size, nn_args.hidden_size * 2)).to(self._device)
-        c0 = Variable(torch.zeros(nn_args.num_layers, batch_size, nn_args.hidden_size * 2)).to(self._device)
+        h0 = Variable(torch.zeros(nn_args.num_layers, batch_size, nn_args.hidden_size * 2)).to(training.device)
+        c0 = Variable(torch.zeros(nn_args.num_layers, batch_size, nn_args.hidden_size * 2)).to(training.device)
         _, (hn, _) = self.lstm(x, (h0, c0))
         out = self.layers(hn[0])   
         out = out.view(-1,1)
@@ -64,12 +63,11 @@ class LSTM(nn.Module):
 
     def to(self, device: torch.device) -> None:
         """
-        Moves the LSTM model to the specified device.
+        Moves the model to the specified device.
 
-        :param device: The device to move the LSTM model to.
+        :param device: The device to move the model to.
         :type device: torch.device
         """
-        self._device = device
         super().to(device)
 
     

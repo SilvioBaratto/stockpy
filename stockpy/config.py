@@ -45,6 +45,7 @@ class training:
     sequence_length : int = 30
     validation_sequence : int = 30
     use_cuda = torch.cuda.is_available()
+    device : str = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     num_workers : int = 4
     validation_cadence : int = 5
     patience : int = 5

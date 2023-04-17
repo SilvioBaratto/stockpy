@@ -7,7 +7,7 @@ import pyro.distributions as dist
 from pyro.nn import PyroModule
 import pyro.poutine as poutine
 from typing import Tuple, Optional
-from ..config import prob_args
+from ..config import prob_args, training
 
 class Emitter(nn.Module):
     """
@@ -171,13 +171,13 @@ class GaussianHMM(nn.Module):
         self.emitter = Emitter()
         self.transition = GatedTransition()
 
-        if use_cuda:
+        if training.use_cuda:
             if torch.cuda.device_count() > 1:
                 self.emitter = nn.DataParallel(self.emitter)
                 self.transition = nn.DataParallel(self.transition)
 
-            self.emitter = self.emitter.to(device)
-            self.transition = self.transition.to(device)
+            self.emitter = self.emitter.to(training.device)
+            self.transition = self.transition.to(training.device)
 
         # define a (trainable) parameters z_0 and z_q_0 that help define
         # the probability distributions p(z_1) and q(z_1)

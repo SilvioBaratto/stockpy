@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from ..config import nn_args, shared
+from ..config import nn_args, shared, training
 
 class BiLSTM(nn.Module):
     """
@@ -61,7 +61,7 @@ class BiLSTM(nn.Module):
                                   ).to(self.device)
         c0 = Variable(torch.zeros(nn_args.num_layers * 2, 
                                   batch_size, 
-                                  nn_args.hidden_size)).to(self.device)
+                                  nn_args.hidden_size)).to(training.device)
         
         out, _ = self.lstm(x, (h0, c0))
         out = self.layers(out[:, -1, :])       
@@ -69,18 +69,14 @@ class BiLSTM(nn.Module):
 
         return out
     
-    def to(self, device: torch.device) -> torch.nn.Module:
+    def to(self, device: torch.device) -> None:
         """
         Moves the model to the specified device.
 
         :param device: The device to move the model to.
         :type device: torch.device
-
-        :returns: The model moved to the specified device.
-        :rtype: torch.nn.Module
         """
-        self.device = device
-        return super().to(device)
+        super().to(device)
     
     @property
     def model_type(self) -> str:

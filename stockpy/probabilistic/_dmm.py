@@ -8,7 +8,7 @@ import pyro.poutine as poutine
 import math
 import torch.nn.functional as F
 from typing import Tuple, Optional
-from ..config import prob_args
+from ..config import prob_args, training
 
 class Emitter(nn.Module):
     """
@@ -223,9 +223,6 @@ class DeepMarkovModel(nn.Module):
         
         super().__init__()
 
-        use_cuda = torch.cuda.is_available()
-        device = torch.device("cuda" if use_cuda else "cpu")
-
         # instantiate PyTorch modules used in the model and guide below
         self.emitter = Emitter()
         self.transition = GatedTransition()
@@ -238,17 +235,17 @@ class DeepMarkovModel(nn.Module):
                           num_layers=2
                           )
 
-        if use_cuda:
+        if training.use_cuda:
             if torch.cuda.device_count() > 1:
                 self.emitter = nn.DataParallel(self.emitter)
                 self.transition = nn.DataParallel(self.transition)
                 self.combiner = nn.DataParallel(self.combiner)
                 self.rnn = nn.DataParallel(self.rnn)
 
-            self.emitter = self.emitter.to(device)
-            self.transition = self.transition.to(device)
-            self.combiner = self.combiner.to(device)
-            self.rnn = self.rnn.to(self.device)
+            self.emitter = self.emitter.to(training.device)
+            self.transition = self.transition.to(training.device)
+            self.combiner = self.combiner.to(training.device)
+            self.rnn = self.rnn.to(training.device)
 
         # define a (trainable) parameters z_0 and z_q_0 that help define
         # the probability distributions p(z_1) and q(z_1)
