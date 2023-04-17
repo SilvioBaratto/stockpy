@@ -58,13 +58,23 @@ class BiGRU(nn.Module):
         batch_size = x.size(0)
         h0 = Variable(torch.zeros(nn_args.num_layers * 2, 
                                   batch_size, 
-                                  nn_args.hidden_size))
+                                  nn_args.hidden_size)).to(self.device)
         
         out, _ = self.gru(x, (h0))
         out = self.layers(out[:, -1, :])       
         out = out.view(-1, 1)
 
         return out
+    
+    def to(self, device: torch.device) -> None:
+        """
+        Moves the model to the specified device.
+
+        :param device: The device to move the model to.
+        :type device: torch.device
+        """
+        self.device = device
+        super().to(device)
 
     @property
     def model_type(self) -> str:

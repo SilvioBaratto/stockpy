@@ -26,7 +26,6 @@ setuptools.setup(
         "torch>=1.9.1",
         "pyro-ppl>=1.7.0",
         "numpy>=1.21.2",
-        "hashlib>=1.0.1",
         "pandas>=1.3.3",
         "yfinance>=0.1.63",
         "yahoofinancials>=1.6",

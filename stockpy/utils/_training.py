@@ -132,6 +132,7 @@ class Trainer(Model):
             epoch_loss = 0.0
             for x_batch, y_batch in train_dl:   
                 if self.type == "neural_network":
+                    self._model.train()
                     self._optimizer.zero_grad()  
                     loss = self._computeBatchLoss(x_batch, y_batch)
 
@@ -181,6 +182,10 @@ class Trainer(Model):
                 y_data=y_batch
             )
         elif self.type == "neural_network":
+
+            x_batch = x_batch.to(self._device)
+            y_batch = y_batch.to(self._device)
+
             output = self._model(x_batch)
             loss_function = nn.MSELoss()
             loss = loss_function(output, y_batch)
@@ -206,6 +211,10 @@ class Trainer(Model):
         with torch.no_grad():  
             for x_batch, y_batch in val_dl:
                 if self.type == 'neural_network':
+
+                    x_batch = x_batch.to(self._device)
+                    y_batch = y_batch.to(self._device)
+
                     output = self._model(x_batch)
                     loss_fn = nn.MSELoss()
                     loss = loss_fn(output, y_batch)
