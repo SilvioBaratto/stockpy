@@ -19,14 +19,15 @@
 ## Description
 **stockpy** is a Python Machine Learning library designed to facilitate stock market data analysis and predictions. It currently supports the following algorithms:
 
+- Deep Markov Model (DeepMarkovModel)
+- Gaussian Hidden Markov Models (GaussianHMM)
+- Bayesian Neural Networks (BayesianNN)
 - Long Short Term Memory (LSTM)
 - Bidirectional Long Short Term Memory (BiLSTM)
 - Gated Recurrent Unit (GRU)
 - Bidirectional Gated Recurrent Unit (BiGRU)
 - Multilayer Perceptron (MLP)
-- Gaussian Hidden Markov Models (GaussianHMM)
-- Bayesian Neural Networks (BayesianNN)
-- Deep Markov Model (DeepMarkovModel)
+- Transformer (`Warning`: this module is still in development and contains errors)
 
 **stockpy** can be used to perform a range of tasks such as detecting relevant trading patterns, making predictions and generating trading signals.
 
