@@ -7,11 +7,12 @@ import numpy as np
 from .config import training
 from .utils._dataloader import normalize
 from .utils._training import Trainer
+from .utils._generate import Generate
 from .utils._model import Model
 from .utils._predict import Predict
 from .utils._dataloader import _initTrainValDl
 
-class Base(Trainer, Predict):
+class Base(Trainer, Predict, Generate):
 
     def __init__(self, 
                  model = None,
@@ -83,3 +84,21 @@ class Base(Trainer, Predict):
         """
         
         return self._predict(x_test)
+    
+    def generate(self,
+                 n_samples : int
+                 ) -> np.ndarray:
+        """
+        Generate mid to long term prediction
+
+        Parameters:
+            n_samples (int): number of samples for the long term prediction
+
+        Return:
+            np.ndarray: The predicted long term forecasting.
+        """
+        
+        # TODO in this function I want to generate mid to long term predictions for each stock 
+        # using transformers models and reinforcement learning. 
+
+        raise NotImplementedError("This method is not implemented yet.")

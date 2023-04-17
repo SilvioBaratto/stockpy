@@ -117,6 +117,11 @@ python3 data.py --update-stock --stock="AAPL" --start="2014-01-01"
 python3 data.py --download --folder="../../example"
 ```
 
+## TODOS
+- Implementing other functionalities as portfolio optimization
+- Implement transformers
+- Implement stockGPT to make long term predictions
+
 ## Authors and acknowledgements
 **stockpy** is currently developed and mantained by **Silvio Baratto**. You can contact me at:
 - silvio.baratto22 at gmail.com
