@@ -1,9 +1,12 @@
+import os
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from ..config import nn_args, shared, training
+from ._base_model import BaseRegressorRNN
+from ._base_model import BaseClassifierRNN
+from ..config import Config as cfg
 
-class BiGRU(nn.Module):
+class BiGRURegressor(BaseRegressorRNN):
     """
     A class representing a Bidirectional Gated Recurrent Unit (BiGRU) model for stock prediction.
 
@@ -28,59 +31,61 @@ class BiGRU(nn.Module):
     """
     def __init__(self):
         super().__init__()
-        self.gru = nn.GRU(input_size=nn_args.input_size, 
-                          hidden_size=nn_args.hidden_size, 
-                          num_layers=nn_args.num_layers, 
+        self.gru = nn.GRU(input_size=cfg.nn.input_size, 
+                          hidden_size=cfg.nn.hidden_size, 
+                          num_layers=cfg.nn.num_layers, 
                           batch_first=True,
                           bidirectional=True
                           )
-        self.layers = nn.Sequential(
-            nn.ReLU(),
-            nn.Linear(nn_args.hidden_size * 2, nn_args.hidden_size), # [2 * hidden_size] -> [hidden_size]
-            nn.ReLU(),
-            nn.Dropout(shared.dropout),
-            nn.Linear(nn_args.hidden_size, nn_args.input_size), # [hidden_size] -> [input_size]
-            nn.ReLU(),
-            nn.Dropout(shared.dropout),
-            nn.Linear(nn_args.input_size, nn_args.output_size), # [input_size] -> [output_size]
-        )
+        self.fc = nn.Linear(cfg.nn.hidden_size, cfg.nn.output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Defines the forward pass of the BiGRU model.
-
         :param x: The input tensor.
         :type x: torch.Tensor
-
         :returns: The output tensor, corresponding to the predicted target variable(s).
         :rtype: torch.Tensor
         """
         batch_size = x.size(0)
-        h0 = Variable(torch.zeros(nn_args.num_layers * 2, 
+        h0 = Variable(torch.zeros(cfg.nn.num_layers * 2, 
                                   batch_size, 
-                                  nn_args.hidden_size)).to(training.device)
+                                  cfg.nn.hidden_size)
+                                  ).to(cfg.training.device)
         
-        out, _ = self.gru(x, (h0))
-        out = self.layers(out[:, -1, :])       
+        _, (hn) = self.gru(x, (h0))
+        out = self.fc(hn[0])     
         out = out.view(-1, 1)
 
         return out
-    
-    def to(self, device: torch.device) -> None:
-        """
-        Moves the model to the specified device.
+        
+class BiGRUClassifier(BaseClassifierRNN):
+    def __init__(self):
+        super().__init__()
+        self.gru = nn.GRU(input_size=cfg.nn.input_size, 
+                          hidden_size=cfg.nn.hidden_size, 
+                          num_layers=cfg.nn.num_layers, 
+                          batch_first=True,
+                          bidirectional=True
+                          )
+        self.fc = nn.Linear(cfg.nn.hidden_size, cfg.nn.output_size)
 
-        :param device: The device to move the model to.
-        :type device: torch.device
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        super().to(device)
+        Defines the forward pass of the BiGRU model.
+        :param x: The input tensor.
+        :type x: torch.Tensor
+        :returns: The output tensor, corresponding to the predicted target variable(s).
+        :rtype: torch.Tensor
+        """
+        batch_size = x.size(0)
+        h0 = Variable(torch.zeros(cfg.nn.num_layers * 2, 
+                                  batch_size, 
+                                  cfg.nn.hidden_size)
+                                  ).to(cfg.training.device)
+        
+        _, (hn) = self.gru(x, (h0))
+        out = self.fc(hn[0])     
+        out = out.view(-1, 1)
 
-    @property
-    def model_type(self) -> str:
-        """
-        Returns the type of model.
-
-        :returns: The model type as a string.
-        :rtype: str
-        """
-        return "neural_network"
+        return out

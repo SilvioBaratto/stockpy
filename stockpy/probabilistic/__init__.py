@@ -1,3 +1,3 @@
-from ._base import BayesianNN
-from ._base import GaussianHMM
-from ._base import DeepMarkovModel
+from ._base import BayesianNNRegressor
+from ._base import GaussianHMMRegressor
+from ._base import DeepMarkovModelRegressor

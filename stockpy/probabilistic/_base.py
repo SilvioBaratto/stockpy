@@ -1,35 +1,38 @@
 from ..base import Base
-from ._bnn import BayesianNN as BNN
-from ._ghmm import GaussianHMM as GHMM 
-from ._dmm import DeepMarkovModel as DMM
-from ..config import shared
+from ._bnn import BayesianNNRegressor as _BayesianNNRegressor
+from ._ghmm import GaussianHMMRegressor as _GaussianHMMRegressor
+from ._dmm import DeepMarkovModelRegressor as _DeepMarkovModelRegressor
+from ..config import Config as cfg
 
-class BayesianNN(Base):
+class BayesianNNRegressor(Base):
     def __init__(self,
                  **kwargs
                 ):
         
         for key, value in kwargs.items():
-            setattr(shared, key, value)
+            setattr(cfg.shared, key, value)
+            setattr(cfg.prob, key, value)
 
-        super().__init__(model=BNN(), **kwargs)
+        super().__init__(model=_BayesianNNRegressor(), **kwargs)
 
-class GaussianHMM(Base):
+class GaussianHMMRegressor(Base):
     def __init__(self,
                  **kwargs
                 ):
         
         for key, value in kwargs.items():
-            setattr(shared, key, value)
+            setattr(cfg.shared, key, value)
+            setattr(cfg.prob, key, value)
 
-        super().__init__(model=GHMM(), **kwargs)
+        super().__init__(model=_GaussianHMMRegressor(), **kwargs)
 
-class DeepMarkovModel(Base):
+class DeepMarkovModelRegressor(Base):
     def __init__(self,
                  **kwargs
                 ):
         
         for key, value in kwargs.items():
-            setattr(shared, key, value)
+            setattr(cfg.shared, key, value)
+            setattr(cfg.prob, key, value)
 
-        super().__init__(model=DMM(), **kwargs)
+        super().__init__(model=_DeepMarkovModelRegressor(), **kwargs)

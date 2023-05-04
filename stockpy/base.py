@@ -3,16 +3,14 @@ import torch.nn as nn
 from typing import Union, Tuple
 import pandas as pd
 import numpy as np
-
-from .config import training
-from .utils._dataloader import normalize
 from .utils._training import Trainer
-from .utils._generate import Generate
 from .utils._model import Model
 from .utils._predict import Predict
-from .utils._dataloader import _initTrainValDl
+from .utils._dataloader import StockDataset 
 
-class Base(Trainer, Predict, Generate):
+from .config import Config as cfg
+
+class Base(Trainer, Predict):
 
     def __init__(self, 
                  model = None,
@@ -22,10 +20,11 @@ class Base(Trainer, Predict, Generate):
         super().__init__(model=model, **kwargs)
 
     def _modelEval(self):
-        print(self._model.eval())
+        print(self.model.eval())
             
     def fit(self, 
-            x_train: Union[np.ndarray, pd.core.frame.DataFrame],
+            X: Union[np.ndarray, pd.core.frame.DataFrame],
+            y: Union[np.ndarray, pd.core.frame.DataFrame],
             **kwargs
             ) -> None:
         """
@@ -56,18 +55,24 @@ class Base(Trainer, Predict, Generate):
 
         :return: None
         """
+        # Set attributes from kwargs
         for key, value in kwargs.items():
-            setattr(training, key, value)
+            setattr(cfg.training, key, value)
 
-        if self.name == "MLP" or self.name == "BayesianNN":
-            training.sequence_length = 0
-        
-        train_dl, val_dl = _initTrainValDl(x_train)
+        self._sd = StockDataset(X=X, y=y, scale_y=True if self.category == "regressor" else False)
 
-        self._train(train_dl, val_dl)
+        train_dl = self._sd.getDl(self.model)
+        val_dl = self._sd.getValDl(self.model)
+
+        training = {
+            "regressor" : self._trainRegressor,
+            "classifier" : self._trainClassifier
+        }
+
+        training[self.category](train_dl, val_dl)
                         
     def predict(self, 
-                x_test: Union[np.ndarray, pd.core.frame.DataFrame]
+                X: Union[np.ndarray, pd.core.frame.DataFrame]
                 ) -> np.ndarray:
         """
         Generate predictions for the given test set using the trained model.
@@ -82,8 +87,16 @@ class Base(Trainer, Predict, Generate):
         Returns:
             np.ndarray: The predicted target values for the given test set, as a NumPy array.
         """
-        
-        return self._predict(x_test)
+    
+        predictor = {
+            "regressor" : self._predictRegressor,
+            "classifier" : self._predictClassifier
+        }
+
+        X = self._sd._fit_transform(X, self._sd._get_x_scaler())
+        test_dl = self._sd.getTestDl(self.model, X)
+
+        return predictor[self.category](test_dl).cpu().detach().numpy() * self._sd._std_y() + self._sd._mean_y()
     
     def generate(self,
                  n_samples : int
@@ -101,4 +114,5 @@ class Base(Trainer, Predict, Generate):
         # TODO in this function I want to generate mid to long term predictions for each stock 
         # using transformers models and reinforcement learning. 
 
-        raise NotImplementedError("This method is not implemented yet.")
+        return self._generate(n_samples)
+

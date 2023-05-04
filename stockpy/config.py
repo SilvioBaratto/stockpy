@@ -2,19 +2,20 @@ import torch
 from dataclasses import dataclass
 
 @dataclass
-class nn_args:
-    # neural network
-    input_size: int = 4
-    hidden_size: int = 8
-    output_size: int = 1
+class Common:
+    input_size: int = 6
+    hidden_size: int = 32
+    output_size: int = 5
+
+@dataclass
+class NN(Common):
+    num_filters: int = 32
+    pool_size: int = 2
+    kernel_size: int = 3
     num_layers: int = 2
 
 @dataclass
-class prob_args:
-    # probabilistic
-    input_size : int = 4
-    hidden_size : int = 8
-    output_size: int = 1
+class Prob(Common):
     rnn_dim: int = 32
     z_dim: int = 32
     emission_dim: int = 32
@@ -22,8 +23,7 @@ class prob_args:
     variance: float = 0.1
 
 @dataclass
-class shared:
-    # shared
+class Shared:
     dropout: float = 0.2
     pretrained: bool = False
     lr: float = 0.001
@@ -38,15 +38,22 @@ class shared:
     step_size: float = 50
 
 @dataclass
-class training:
-    # training
-    epochs : int = 10
-    batch_size : int = 24
-    sequence_length : int = 30
-    validation_sequence : int = 30
+class Training:
+    epochs: int = 10
+    batch_size: int = 24
+    sequence_length: int = 30
     use_cuda = torch.cuda.is_available()
-    device : str = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    num_workers : int = 4
-    validation_cadence : int = 5
-    patience : int = 5
-    
+    device: str = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    num_workers: int = 4
+    validation_cadence: int = 5
+    patience: int = 5
+    prediction_window: int = 1
+
+@dataclass
+class Config:
+    comm: Common = Common()
+    nn: NN = NN()
+    prob: Prob = Prob()
+    shared: Shared = Shared()
+    training: Training = Training()
+

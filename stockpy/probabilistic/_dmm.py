@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 
@@ -5,179 +6,14 @@ import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
 import pyro.poutine as poutine
-import math
 import torch.nn.functional as F
 from typing import Tuple, Optional
-from ..config import prob_args, training
+from ._base_model import BaseRegressorRNN
+from ._base_model import BaseClassifierRNN
+from ._hmm_utils import Emitter, GatedTransition, Combiner
+from ..config import Config as cfg
 
-class Emitter(nn.Module):
-    """
-    Parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t).
-
-    :ivar lin_z_to_hidden: a linear transformation from the latent space to a hidden state
-    :vartype lin_z_to_hidden: torch.nn.Linear
-    :ivar lin_x_to_hidden: a linear transformation from the input space to a hidden state
-    :vartype lin_x_to_hidden: torch.nn.Linear
-    :ivar lin_hidden_to_mean: a linear transformation from the hidden state to the output mean
-    :vartype lin_hidden_to_mean: torch.nn.Linear
-    :ivar variance: the fixed variance hyperparameter
-    :vartype variance: torch.nn.Parameter
-    :ivar relu: a ReLU activation function
-    :vartype relu: torch.nn.ReLU
-
-    :example:
-        >>> emitter = Emitter()
-        >>> print(emitter)
-        Emitter(
-          (lin_z_to_hidden): Linear(in_features=16, out_features=32, bias=True)
-          (lin_x_to_hidden): Linear(in_features=4, out_features=32, bias=True)
-          (lin_hidden_to_mean): Linear(in_features=32, out_features=1, bias=True)
-          (relu): ReLU()
-        )
-    """
-
-    def __init__(self):
-        super().__init__()
-        # initialize the three linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(prob_args.z_dim, prob_args.emission_dim)
-        self.lin_x_to_hidden = nn.Linear(prob_args.input_size, prob_args.emission_dim)
-        self.lin_hidden_to_mean = nn.Linear(prob_args.emission_dim, 1)
-        # initialize the fixed variance hyperparameter
-        self.variance = nn.Parameter(torch.tensor(prob_args.variance))
-        # initialize the non-linearities used in the neural network
-        self.relu = nn.ReLU()
-
-    def forward(self, 
-                z_t: torch.Tensor, 
-                x_t: torch.Tensor) -> Tuple[torch.Tensor, torch.nn.parameter.Parameter]:
-        """
-        Given the latent z at a particular time step t and the input x at time step t,
-        we return the mean and variance of the Gaussian distribution p(y_t|z_t, x_t).
-
-        :param z_t: the latent variable at time step t
-        :type z_t: torch.Tensor
-        :param x_t: the input variable at time step t
-        :type x_t: torch.Tensor
-        :return: a tuple containing the mean and variance of the Gaussian distribution
-        :rtype: tuple
-        """
-
-        h1 = self.relu(self.lin_z_to_hidden(z_t))
-        h2 = self.relu(self.lin_x_to_hidden(x_t))
-        h3 = h1 + h2  # element-wise sum of the two hidden states
-        mean = self.lin_hidden_to_mean(h3)
-        return mean, self.variance
-    
-
-class GatedTransition(nn.Module):
-    """
-    Parameterizes the dynamics of the latent variables z_t.
-
-    :ivar lin_z_to_hidden: a linear transformation from the latent space to a hidden state
-    :vartype lin_z_to_hidden: torch.nn.Linear
-    :ivar lin_x_to_hidden: a linear transformation from the input space to a hidden state
-    :vartype lin_x_to_hidden: torch.nn.Linear
-    :ivar lin_hidden_to_hidden1: the first gated transformation
-    :vartype lin_hidden_to_hidden1: torch.nn.Linear
-    :ivar lin_hidden_to_hidden2: the second gated transformation
-    :vartype lin_hidden_to_hidden2: torch.nn.Linear
-    :ivar relu: a ReLU activation function
-    :vartype relu: torch.nn.ReLU
-    :ivar sigmoid: a sigmoid activation function
-    :vartype sigmoid: torch.nn.Sigmoid
-
-    :example:
-        >>> gated_transition = GatedTransition()
-        >>> print(gated_transition)
-        GatedTransition(
-          (lin_z_to_hidden): Linear(in_features=16, out_features=32, bias=True)
-          (lin_x_to_hidden): Linear(in_features=4, out_features=32, bias=True)
-          (lin_hidden_to_hidden1): Linear(in_features=32, out_features=32, bias=True)
-          (lin_hidden_to_hidden2): Linear(in_features=32, out_features=32, bias=True)
-          (relu): ReLU()
-          (sigmoid): Sigmoid()
-        )
-    """
-    def __init__(self):
-        super().__init__()
-        # initialize the two linear transformations used in the neural network
-        self.lin_z_to_hidden = nn.Linear(prob_args.z_dim, prob_args.transition_dim)
-        self.lin_x_to_hidden = nn.Linear(prob_args.input_size, prob_args.transition_dim)
-        # initialize the two gated transformations used in the neural network
-        self.lin_hidden_to_hidden1 = nn.Linear(prob_args.transition_dim, prob_args.transition_dim)
-        self.lin_hidden_to_hidden2 = nn.Linear(prob_args.transition_dim, prob_args.transition_dim)
-        # initialize the non-linearities used in the neural network
-        self.relu = nn.ReLU()
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, 
-                z_t: torch.Tensor, 
-                x_t: torch.Tensor) -> Tuple[torch.Tensor, torch.nn.parameter.Parameter]:
-        """
-        Given the latent z at a particular time step t and the input x at time step t,
-        we return the parameters for the Gaussian distribution p(z_t | z_{t-1}, x_t).
-
-        :param z_t: the latent variable at time step t
-        :type z_t: torch.Tensor
-        :param x_t: the input variable at time step t
-        :type x_t: torch.Tensor
-        :return: a tuple containing the mean and variance of the Gaussian distribution
-        :rtype: tuple
-        """
-        h1 = self.relu(self.lin_z_to_hidden(z_t))
-        h2 = self.relu(self.lin_x_to_hidden(x_t))
-        gated1 = self.sigmoid(self.lin_hidden_to_hidden1(h1))
-        gated2 = self.sigmoid(self.lin_hidden_to_hidden2(h2))
-        h3 = gated1 * h1 + gated2 * h2
-        mu_t = h3
-        return mu_t, 1.0
-
-    
-class Combiner(nn.Module):
-    """
-    Combines the previous hidden state z_{t-1} and the current input x_t
-    to produce the hidden state h_t, which is used by the emitter and
-    transition networks.
-
-    :ivar lin_z_to_hidden: a linear transformation from the latent space to a hidden state
-    :vartype lin_z_to_hidden: torch.nn.Linear
-    :ivar lin_rnn_to_hidden: a linear transformation from the RNN output to a hidden state
-    :vartype lin_rnn_to_hidden: torch.nn.Linear
-    :ivar hidden_to_loc: a linear transformation from the hidden state to the mean of the Gaussian distribution
-    :vartype hidden_to_loc: torch.nn.Linear
-    :ivar hidden_to_scale: a linear transformation from the hidden state to the pre-activation scale of the Gaussian distribution
-    :vartype hidden_to_scale: torch.nn.Linear
-    """
-    def __init__(self):
-        super().__init__()
-        self.lin_z_to_hidden = nn.Linear(prob_args.z_dim, prob_args.emission_dim)
-        self.lin_rnn_to_hidden = nn.Linear(prob_args.rnn_dim, prob_args.emission_dim)
-        self.hidden_to_loc = nn.Linear(prob_args.emission_dim, prob_args.z_dim)
-        self.hidden_to_scale = nn.Linear(prob_args.emission_dim, prob_args.z_dim)
-        self.relu = nn.ReLU()
-
-    def forward(self, 
-                z_prev : torch.Tensor, 
-                rnn_input : torch.Tensor
-                ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Combines the previous hidden state z_{t-1} and the current input x_t
-        to produce the hidden state h_t, which is used by the emitter and
-        transition networks.
-
-        :param z_prev: the previous latent variable
-        :type z_prev: torch.Tensor
-        :param rnn_input: the current input variable
-        :type rnn_input: torch.Tensor
-        :return: a tuple containing the mean and variance of the Gaussian distribution
-        :rtype: tuple
-        """
-        hidden = self.relu(self.lin_z_to_hidden(z_prev) + self.lin_rnn_to_hidden(rnn_input))
-        loc = self.hidden_to_loc(hidden)
-        scale = F.softplus(self.hidden_to_scale(hidden))
-        return loc, scale
-    
-class DeepMarkovModel(nn.Module):
+class DeepMarkovModelRegressor(BaseRegressorRNN):
     """
     The DeepMarkovModel class implements a Deep Markov Model, which is a
     generative model for time series data that combines recurrent neural networks
@@ -218,7 +54,6 @@ class DeepMarkovModel(nn.Module):
         >>> from stockpy.probabilistic import DeepMarkovModel
         >>> deep_markov_model = DeepMarkovModel()
     """
-
     def __init__(self):
         
         super().__init__()
@@ -228,32 +63,32 @@ class DeepMarkovModel(nn.Module):
         self.transition = GatedTransition()
         self.combiner = Combiner()
 
-        self.rnn = nn.GRU(input_size=prob_args.input_size, 
-                          hidden_size=prob_args.rnn_dim,
+        self.rnn = nn.GRU(input_size=cfg.prob.input_size, 
+                          hidden_size=cfg.prob.rnn_dim,
                           batch_first=True,
                           bidirectional=False, 
                           num_layers=2
                           )
 
-        if training.use_cuda:
+        if cfg.training.use_cuda:
             if torch.cuda.device_count() > 1:
                 self.emitter = nn.DataParallel(self.emitter)
                 self.transition = nn.DataParallel(self.transition)
                 self.combiner = nn.DataParallel(self.combiner)
                 self.rnn = nn.DataParallel(self.rnn)
 
-            self.emitter = self.emitter.to(training.device)
-            self.transition = self.transition.to(training.device)
-            self.combiner = self.combiner.to(training.device)
-            self.rnn = self.rnn.to(training.device)
+            self.emitter = self.emitter.to(cfg.training.device)
+            self.transition = self.transition.to(cfg.training.device)
+            self.combiner = self.combiner.to(cfg.training.device)
+            self.rnn = self.rnn.to(cfg.training.device)
 
         # define a (trainable) parameters z_0 and z_q_0 that help define
         # the probability distributions p(z_1) and q(z_1)
         # (since for t = 1 there are no previous latents to condition on)
-        self.z_0 = nn.Parameter(torch.zeros(prob_args.z_dim))
-        self.z_q_0 = nn.Parameter(torch.zeros(1, prob_args.z_dim))
+        self.z_0 = nn.Parameter(torch.zeros(cfg.prob.z_dim))
+        self.z_q_0 = nn.Parameter(torch.zeros(1, cfg.prob.z_dim))
         # define a (trainable) parameter for the initial hidden state of the RNN
-        self.h_0 = nn.Parameter(torch.zeros(1, 1, prob_args.rnn_dim))
+        self.h_0 = nn.Parameter(torch.zeros(1, 1, cfg.prob.rnn_dim))
 
     def model(self, 
               x_data: torch.Tensor, 
@@ -368,7 +203,7 @@ class DeepMarkovModel(nn.Module):
         # rnn_output contains the hidden state at each time step
         rnn_output, _ = self.rnn(x_data, h_0_contig)
         
-        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), prob_args.z_dim)
+        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), cfg.prob.z_dim)
         z_prev = z_q_0_expanded
         
         # we enclose all the sample statements in the guide in a plate.
@@ -391,13 +226,3 @@ class DeepMarkovModel(nn.Module):
                 z_prev = z_t
 
             return z_t
-
-    @property
-    def model_type(self) -> str:
-        """
-        Returns the type of model.
-
-        :returns: The model type as a string.
-        :rtype: str
-        """
-        return "probabilistic"

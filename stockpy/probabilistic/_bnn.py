@@ -1,13 +1,16 @@
+import os
 import torch
 import torch.nn as nn
 
 import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
-from ..config import prob_args, shared
+from ._base_model import BaseRegressorFFNN
+from ._base_model import BaseClassifierFFNN
+from ..config import Config as cfg
 
 
-class BayesianNN(PyroModule):
+class BayesianNNRegressor(BaseRegressorFFNN):
     """
     This class implements a Bayesian Neural Network model using Pyro. 
     It consists of three linear layers with ReLU activation and dropout applied between them. 
@@ -30,7 +33,6 @@ class BayesianNN(PyroModule):
         >>> from stockpy.probabilistic import BayesianNN
         >>> bayesian_nn = BayesianNN()
     """
-    
     def __init__(self):
         """
         Initializes the Bayesian Neural Network model.
@@ -41,16 +43,16 @@ class BayesianNN(PyroModule):
         
         super().__init__()
         self.layers = PyroModule[nn.Sequential](
-            PyroModule[nn.Linear](prob_args.input_size, 
-                                  prob_args.hidden_size), # [4] -> [8]
+            PyroModule[nn.Linear](cfg.prob.input_size, 
+                                  cfg.prob.hidden_size), # [4] -> [8]
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](shared.dropout),
-            PyroModule[nn.Linear](prob_args.hidden_size, 
-                                  prob_args.input_size), # [8] -> [4]
+            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Linear](cfg.prob.hidden_size, 
+                                  cfg.prob.input_size), # [8] -> [4]
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](shared.dropout),
-            PyroModule[nn.Linear](prob_args.input_size, 
-                                  prob_args.output_size), # [4] -> [1]
+            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Linear](cfg.prob.input_size, 
+                                  cfg.prob.output_size), # [4] -> [1]
         )
 
     def forward(self, x_data: torch.Tensor, 
@@ -75,13 +77,3 @@ class BayesianNN(PyroModule):
                               obs=y_data)
             
         return x
-
-    @property
-    def model_type(self):
-        """
-        Returns the type of the model.
-
-        :returns: the type of the model
-        :rtype: str
-        """
-        return "probabilistic"

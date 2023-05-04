@@ -1,8 +1,11 @@
+import os
 import torch
 import torch.nn as nn
-from ..config import nn_args, shared
+from ._base_model import BaseRegressorFFNN
+from ._base_model import BaseClassifierFFNN
+from ..config import Config as cfg
 
-class MLP(nn.Module):
+class MLPRegressor(BaseRegressorFFNN):
     """
     A class representing a Multilayer Perceptron (MLP) neural network model for stock prediction.
 
@@ -33,16 +36,16 @@ class MLP(nn.Module):
         """
         super().__init__()
         self.layers = nn.Sequential(
-            nn.Linear(nn_args.input_size, nn_args.hidden_size),   # [input_size] -> [hidden_size]
+            nn.Linear(cfg.nn.input_size, cfg.nn.hidden_size),   # [input_size] -> [hidden_size]
             nn.ReLU(),
-            nn.Dropout(shared.dropout),
-            nn.Linear(nn_args.hidden_size, nn_args.hidden_size),  # [hidden_size] -> [hidden_size]
+            nn.Dropout(cfg.shared.dropout),
+            nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),  # [hidden_size] -> [hidden_size]
             nn.ReLU(),
-            nn.Dropout(shared.dropout),
-            nn.Linear(nn_args.hidden_size, nn_args.input_size),   # [hidden_size] -> [input_size]
+            nn.Dropout(cfg.shared.dropout),
+            nn.Linear(cfg.nn.hidden_size, cfg.nn.input_size),   # [hidden_size] -> [input_size]
             nn.ReLU(),
-            nn.Dropout(shared.dropout),
-            nn.Linear(nn_args.input_size, nn_args.output_size),   # [input_size] -> [output_size]
+            nn.Dropout(cfg.shared.dropout),
+            nn.Linear(cfg.nn.input_size, cfg.nn.output_size),   # [input_size] -> [output_size]
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -56,13 +59,37 @@ class MLP(nn.Module):
         :rtype: torch.Tensor
         """
         return self.layers(x)
-
-    @property
-    def model_type(self) -> str:
+    
+class MLPClassifier(BaseClassifierFFNN):
+    def __init__(self):
         """
-        Returns the type of model.
+        Initializes the MLP neural network model.
 
-        :returns: The model type as a string.
-        :rtype: str
+        :param args: The arguments to configure the model.
+        :type args: ModelArgs
         """
-        return "neural_network"
+        super().__init__()
+        self.layers = nn.Sequential(
+            nn.Linear(cfg.nn.input_size, cfg.nn.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(cfg.shared.dropout),
+            nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),
+            nn.ReLU(),
+            nn.Dropout(cfg.shared.dropout),
+            nn.Linear(cfg.nn.hidden_size, cfg.nn.input_size),
+            nn.ReLU(),
+            nn.Dropout(cfg.shared.dropout),
+            nn.Linear(cfg.nn.input_size, cfg.nn.output_size)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Defines the forward pass of the neural network.
+
+        :param x: The input tensor.
+        :type x: torch.Tensor
+
+        :returns: The output tensor, corresponding to the predicted target variable(s).
+        :rtype: torch.Tensor
+        """
+        return self.layers(x)
