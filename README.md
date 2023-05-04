@@ -42,14 +42,16 @@ from stockpy.probabilistic import DeepMarkovModel, BayesianNN, GaussianHMM
 from stockpy.neural_network import LSTM, GRU, MLP, BiGRU, BiLSTM
 
 # read CSV file and drop missing values
-df = pd.read_csv('AAPL.csv', parse_dates=True, index_col='Date').dropna(how="any")
+df = pd.read_csv('../stock/AAPL.csv', parse_dates=True, index_col='Date').dropna(how="any")
 
-# split data into training and testing sets
-X_train, X_test = train_test_split(df, test_size=0.1, shuffle=False)
+# split data into training and test set
+X = df[['Open', 'High', 'Low', 'Volume']]
+y = df['Close']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, shuffle=False)
 
 # create model instance and fit to training data
 predictor = DeepMarkovModel()
-predictor.fit(X_train, batch_size=24, epochs=10)
+predictor.fit(X_train, y_train, batch_size=24, epochs=10)
 
 # predictions on test data
 y_pred = predictor.predict(X_test)
