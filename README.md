@@ -27,7 +27,6 @@
 - Gated Recurrent Unit (GRU)
 - Bidirectional Gated Recurrent Unit (BiGRU)
 - Multilayer Perceptron (MLP)
-- Transformer (`Warning`: this module is still in development and contains errors)
 
 **stockpy** can be used to perform a range of tasks such as detecting relevant trading patterns, making predictions and generating trading signals.
 
