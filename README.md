@@ -50,7 +50,7 @@ y = df['Close']
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, shuffle=False)
 
 # create model instance and fit to training data
-predictor = DeepMarkovModel()
+predictor = DeepMarkovModelRegressor()
 predictor.fit(X_train, y_train, batch_size=24, epochs=10)
 
 # predictions on test data
