@@ -42,8 +42,6 @@ class Model:
 
         else:
             raise ValueError("Model type not recognized")
-
-        self._initModel(model)
     
     def _initModel(self, 
                 model: Union[nn.Module, PyroModule]
@@ -75,7 +73,8 @@ class Model:
         self.name = self._model.name
 
         if self.type == "probabilistic":
-            if self._model.name == 'BayesianNNRegressor':
+            if self._model.name == 'BayesianNNRegressor' \
+                or self._model.name == 'BayesianCNNRegressor':
                 self._guide = AutoDiagonalNormal(self._model)
             else:
                 self._guide = self._model.guide

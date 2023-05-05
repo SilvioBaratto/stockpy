@@ -3,15 +3,15 @@ from dataclasses import dataclass
 
 @dataclass
 class Common:
-    input_size: int = 6
+    input_size: int = 4
     hidden_size: int = 32
-    output_size: int = 5
+    output_size: int = 10
+    num_filters: int = 32
+    pool_size: int = 1
+    kernel_size: int = 3
 
 @dataclass
 class NN(Common):
-    num_filters: int = 32
-    pool_size: int = 2
-    kernel_size: int = 3
     num_layers: int = 2
 
 @dataclass

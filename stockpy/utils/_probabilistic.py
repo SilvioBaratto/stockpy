@@ -12,6 +12,7 @@ import pyro.distributions as dist
 import torch.nn.functional as F
 
 import pyro
+from pyro.nn import PyroModule
 from pyro.infer import (
     SVI,
     Trace_ELBO
@@ -28,14 +29,16 @@ class Probabilistic(Model):
                  **kwargs
                  ):
         
-        super().__init__(model, **kwargs)
-        pyro.clear_param_store()
-        self._optimizer = self._initOptimizer()
-        self._svi = self._initSVI()
-        self._scheduler = self._initScheduler()
+        super().__init__(model, **kwargs)        
+        self.model = model
+        
+    def _initInputOutput(self, 
+                        dataloader: torch.utils.data.DataLoader,
+                        model: nn.Module) -> None:
 
-        if self.type != "probabilistic":
-            raise ValueError("Model type not recognized")
+        cfg.comm.input_size = dataloader.dataset.input_size
+        cfg.comm.output_size = dataloader.dataset.output_size
+        self._initModel(model=model)
         
     def _initOptimizer(self) -> torch.optim.Optimizer:
         """
@@ -72,8 +75,10 @@ class Probabilistic(Model):
         Returns:
             pyro.infer.svi.SVI: The SVI instance used to optimize the model and guide.
         """
-        model_to_use = self._model if self.name == 'BayesianNNRegressor' else self._model.model
-
+        model_to_use = self._model if self.name == 'BayesianNNRegressor' \
+                            or self.name == "BayesianCNNRegressor" \
+                            else self._model.model
+        
         return SVI(model_to_use, 
                 self._guide, 
                 self._initOptimizer(), 
@@ -99,11 +104,28 @@ class Probabilistic(Model):
                                         'optim_args': {'lr': cfg.shared.optim_args}, 
                                         'gamma': cfg.shared.gamma}
                                         )
+    def _initComponent(self,
+                       train_dl : torch.utils.data.DataLoader,
+                       model : nn.Module) -> None:
+        """
+        Initializes the component.
+        This method initializes the component by setting the input and output size, initializing the model, optimizer, and scheduler.
+        Parameters:
+            train_dl (torch.utils.data.DataLoader): The training data loader.
+            model (nn.Module): The model to train.
+        """
+        self._initInputOutput(train_dl, model)
+        pyro.clear_param_store()
+        self._optimizer = self._initOptimizer()
+        self._svi = self._initSVI()
+        self._scheduler = self._initScheduler()
     
     def _trainRegressor(self,
                         train_dl : torch.utils.data.DataLoader) -> float:
        
         train_loss = 0.0
+        self._initComponent(train_dl, self.model)
+
         if self.name == 'DeepMarkovModel':
             self._model.rnn.train()
         for x_batch, y_batch in train_dl:
@@ -201,7 +223,7 @@ class Probabilistic(Model):
         Returns:
             torch.Tensor: The predicted target values as a torch.Tensor.
         """     
-        if self.name == 'BayesianNNRegressor':
+        if self.name == 'BayesianNNRegressor' or self.name == 'BayesianCNNRegressor':
             output = torch.tensor([])
             for x_batch in test_dl:
                 x_batch = x_batch.to(cfg.training.device)

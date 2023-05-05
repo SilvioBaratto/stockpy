@@ -37,8 +37,8 @@ To demonstrate the usage of stockpy, we can perform the following code to read a
 ```Python
 from sklearn.model_selection import train_test_split
 import pandas as pd
-from stockpy.probabilistic import DeepMarkovModel, BayesianNN, GaussianHMM
-from stockpy.neural_network import LSTM, GRU, MLP, BiGRU, BiLSTM
+from stockpy.probabilistic import DeepMarkovModelRegressor
+from stockpy.neural_network import LSTMRegressor
 
 # read CSV file and drop missing values
 df = pd.read_csv('../stock/AAPL.csv', parse_dates=True, index_col='Date').dropna(how="any")

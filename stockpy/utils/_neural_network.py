@@ -26,11 +26,15 @@ class NeuralNetwork(Model):
                  ):
 
         super().__init__(model, **kwargs)
-        self._optimizer = self._initOptimizer()
-        self._scheduler = self._initScheduler()
+        self.model = model
+        
+    def _initInputOutput(self, 
+                        dataloader: torch.utils.data.DataLoader,
+                        model: nn.Module) -> None:
 
-        if self.type != "neural_network":
-            raise ValueError("Model type not recognized")
+        cfg.comm.input_size = dataloader.dataset.input_size
+        cfg.comm.output_size = dataloader.dataset.output_size
+        self._initModel(model=model)
         
     def _initOptimizer(self) -> torch.optim.Optimizer:
         """
@@ -68,10 +72,25 @@ class NeuralNetwork(Model):
                                                 gamma=cfg.shared.gamma
                                                 )
     
+    def _initComponent(self,
+                       train_dl : torch.utils.data.DataLoader,
+                       model : nn.Module) -> None:
+        """
+        Initializes the component.
+        This method initializes the component by setting the input and output size, initializing the model, optimizer, and scheduler.
+        Parameters:
+            train_dl (torch.utils.data.DataLoader): The training data loader.
+            model (nn.Module): The model to train.
+        """
+        self._initInputOutput(train_dl, model)
+        self._optimizer = self._initOptimizer()
+        self._scheduler = self._initScheduler()
+    
     def _trainRegressor(self,
                         train_dl : torch.utils.data.DataLoader) -> float:
         
         train_loss = 0.0
+        self._initComponent(train_dl, self.model)
         self._model.train()
         for x_batch, y_batch in train_dl:
             loss = self._computeBatchLossRegressor(x_batch, y_batch)
@@ -128,8 +147,10 @@ class NeuralNetwork(Model):
     
     def _trainClassifier(self,
                         train_dl: torch.utils.data.DataLoader) -> float:
-
+        
+        self._initComponent(train_dl, self.model)
         assert self.category == "classifier", "Model is not a classification model"
+
         self._model.train()
         loss_function = nn.CrossEntropyLoss()
         train_loss = 0.0

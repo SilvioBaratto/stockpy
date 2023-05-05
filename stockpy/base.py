@@ -18,6 +18,7 @@ class Base(Trainer, Predict):
                  ):
     
         super().__init__(model=model, **kwargs)
+        self.model = model
 
     def _modelEval(self):
         print(self.model.eval())
