@@ -24,9 +24,9 @@ class Predict(BaseComponent):
     def __init__(self, model=None, **kwargs):
         super().__init__(model=model, **kwargs)
 
-    def _predictRegressor(self,
-                          test_dl : torch.utils.data.DataLoader
-                          ) -> torch.Tensor:
+    def _predict(self,
+                test_dl : torch.utils.data.DataLoader
+                ) -> torch.Tensor:
         """
         Generate predictions for the given test set using the trained model.
 
@@ -42,11 +42,11 @@ class Predict(BaseComponent):
             np.ndarray: The predicted target values for the given test set, as a NumPy array.
         """
 
-        return self.component._predictRegressor(test_dl)
+        return self.component._predict(test_dl)
 
-    def _predictClassifier(self,
-                          test_dl : torch.utils.data.DataLoader
-                          ) -> np.ndarray:
+    def _score(self,
+                test_dl : torch.utils.data.DataLoader
+                ) -> np.ndarray:
         
         # return self.component._predict(test_dl).detach().numpy()
-        pass
+        return self.component._score(test_dl)

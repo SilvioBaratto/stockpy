@@ -53,7 +53,7 @@ class BayesianCNNRegressor(BaseRegressorCNN):
             PyroModule[nn.Flatten](),
             PyroModule[nn.Linear](cfg.prob.num_filters * (input_size - cfg.prob.kernel_size + 1) // cfg.prob.pool_size, cfg.prob.hidden_size),
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Dropout](cfg.comm.dropout),
             PyroModule[nn.Linear](cfg.prob.hidden_size, output_size)
         )
 
@@ -108,7 +108,7 @@ class BayesianCNNClassifier(BaseClassifierCNN):
             PyroModule[nn.Flatten](),
             PyroModule[PyroLinear](cfg.prob.num_filters * (input_size - cfg.prob.kernel_size + 1) // cfg.prob.pool_size, cfg.prob.hidden_size),
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Dropout](cfg.comm.dropout),
             PyroModule[PyroLinear](cfg.prob.hidden_size, output_size),
             PyroModule[nn.Softmax](dim=1)
         )

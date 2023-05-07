@@ -43,7 +43,7 @@ class CNNRegressor(BaseRegressorCNN):
             nn.Flatten(),
             nn.Linear(cfg.nn.num_filters * ((input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size), cfg.nn.hidden_size),
             nn.ReLU(),
-            nn.Dropout(cfg.shared.dropout),
+            nn.Dropout(cfg.comm.dropout),
             nn.Linear(cfg.nn.hidden_size, output_size)
         )
 
@@ -87,7 +87,7 @@ class CNNClassifier(BaseClassifierCNN):
             nn.Flatten(),
             nn.Linear(cfg.nn.num_filters * ((input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size), cfg.nn.hidden_size),
             nn.ReLU(),
-            nn.Dropout(cfg.shared.dropout),
+            nn.Dropout(cfg.comm.dropout),
             nn.Linear(cfg.nn.hidden_size, output_size)
         )
 

@@ -44,13 +44,13 @@ class MLPRegressor(BaseRegressorFFNN):
         self.layers = nn.Sequential(
             nn.Linear(input_size, cfg.nn.hidden_size),   # [input_size] -> [hidden_size]
             nn.ReLU(),
-            nn.Dropout(cfg.shared.dropout),
+            nn.Dropout(cfg.comm.dropout),
             nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),  # [hidden_size] -> [hidden_size]
             nn.ReLU(),
-            nn.Dropout(cfg.shared.dropout),
+            nn.Dropout(cfg.comm.dropout),
             nn.Linear(cfg.nn.hidden_size, input_size),   # [hidden_size] -> [input_size]
             nn.ReLU(),
-            nn.Dropout(cfg.shared.dropout),
+            nn.Dropout(cfg.comm.dropout),
             nn.Linear(input_size, output_size),   # [input_size] -> [output_size]
         )
 
@@ -84,13 +84,13 @@ class MLPClassifier(BaseClassifierFFNN):
         self.layers = nn.Sequential(
             nn.Linear(input_size, cfg.nn.hidden_size),   # [input_size] -> [hidden_size]
             nn.ReLU(),
-            nn.Dropout(cfg.shared.dropout),
+            nn.Dropout(cfg.comm.dropout),
             nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),  # [hidden_size] -> [hidden_size]
             nn.ReLU(),
-            nn.Dropout(cfg.shared.dropout),
+            nn.Dropout(cfg.comm.dropout),
             nn.Linear(cfg.nn.hidden_size, input_size),   # [hidden_size] -> [input_size]
             nn.ReLU(),
-            nn.Dropout(cfg.shared.dropout),
+            nn.Dropout(cfg.comm.dropout),
             nn.Linear(input_size, output_size),   # [input_size] -> [output_size]
         )
 

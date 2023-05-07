@@ -16,7 +16,7 @@ class LSTMRegressor(BaseRegressorRNN):
     :param input_size: The number of input features for the LSTM model.
     :type input_size: int
     :param hidden_size: The number of hidden units in each LSTM layer.
-    :type hidden_size: int
+    :type hidden_size: intinput_size
     :param num_layers: The number of LSTM layers in the model.
     :type num_layers: int
     :param output_size: The number of output units for the LSTM model, corresponding to the predicted target variable(s).

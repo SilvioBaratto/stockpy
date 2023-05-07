@@ -25,7 +25,6 @@ from ..config import Config as cfg
 class BaseComponent(ABC):
     def __init__(self, model=None, **kwargs):
         for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
             setattr(cfg.nn, key, value)
             setattr(cfg.prob, key, value)
 

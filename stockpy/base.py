@@ -17,7 +17,7 @@ class Base(Trainer, Predict):
                  model = None,
                  **kwargs
                  ):
-    
+  
         super().__init__(model=model, **kwargs)
             
     def fit(self, 
@@ -53,7 +53,6 @@ class Base(Trainer, Predict):
 
         :return: None
         """
-        # Set attributes from kwargs
         for key, value in kwargs.items():
             setattr(cfg.training, key, value)
 
@@ -85,7 +84,7 @@ class Base(Trainer, Predict):
         This public method calls the internal `_predict()` method to generate predictions on the given test set. The test
         set can be provided as a NumPy array or a pandas DataFrame. The returned predictions are in the form of a NumPy
         array.
-
+        predictor
         Parameters:
             x_test (Union[np.ndarray, pd.core.frame.DataFrame]): The test set to make predictions on, either as a NumPy array or pandas DataFrame.
 
@@ -93,15 +92,20 @@ class Base(Trainer, Predict):
             np.ndarray: The predicted target values for the given test set, as a NumPy array.
         """
     
-        predictor = {
-            "regressor" : self._predictRegressor,
-            "classifier" : self._predictClassifier
-        }
+        X = self._sd._fit_transform(X, self._sd._get_x_scaler())
+        test_dl = self._sd.getTestDl(self.category, self.model_class, X, None)
+
+        return self._predict(test_dl).cpu().detach().numpy() * self._sd._std_y() + self._sd._mean_y()
+
+    def score(self, 
+                X: Union[np.ndarray, pd.core.frame.DataFrame],
+                y: Union[np.ndarray, pd.core.frame.DataFrame]
+                ) -> np.ndarray:
 
         X = self._sd._fit_transform(X, self._sd._get_x_scaler())
-        test_dl = self._sd.getTestDl(self.category, self.model_class, X)
+        test_dl = self._sd.getTestDl(self.category, self.model_class, X, y)
 
-        return predictor[self.category](test_dl).cpu().detach().numpy() * self._sd._std_y() + self._sd._mean_y()
+        return self._score(test_dl)
     
     def generate(self,
                  n_samples : int
@@ -120,4 +124,8 @@ class Base(Trainer, Predict):
         # using transformers models and reinforcement learning. 
 
         return self._generate(n_samples)
+
+    def load(self,
+            path: str) -> None:
+        pass
 

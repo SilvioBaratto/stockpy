@@ -34,9 +34,9 @@ class StockDataset():
                             category=category,
                             model_class=model_class)
     
-    def getTestDl(self, category, model_class, X):
+    def getTestDl(self, category, model_class, X, y=None):
         return self._initDl(X=X, 
-                            y=None, 
+                            y=y, 
                             category=category,
                             model_class=model_class)
     

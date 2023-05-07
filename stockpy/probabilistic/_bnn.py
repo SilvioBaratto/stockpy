@@ -57,11 +57,11 @@ class BayesianNNRegressor(BaseRegressorFFNN):
             PyroModule[nn.Linear](input_size, 
                                   cfg.prob.hidden_size), # [4] -> [8]
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Dropout](cfg.comm.dropout),
             PyroModule[nn.Linear](cfg.prob.hidden_size, 
                                   input_size), # [8] -> [4]
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Dropout](cfg.comm.dropout),
             PyroModule[nn.Linear](input_size, 
                                   output_size), # [4] -> [1]
         )
@@ -120,13 +120,13 @@ class BayesianNNClassifier(BaseRegressorFFNN):
         self.layers = PyroModule[nn.Sequential](
             PyroModule[PyroLinear](input_size, cfg.nn.hidden_size),
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Dropout](cfg.comm.dropout),
             PyroModule[PyroLinear](cfg.nn.hidden_size, cfg.nn.hidden_size),
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Dropout](cfg.comm.dropout),
             PyroModule[PyroLinear](cfg.nn.hidden_size, input_size),
             PyroModule[nn.ReLU](),
-            PyroModule[nn.Dropout](cfg.shared.dropout),
+            PyroModule[nn.Dropout](cfg.comm.dropout),
             PyroModule[PyroLinear](input_size, output_size),
             PyroModule[nn.Softmax](dim=1)
         )

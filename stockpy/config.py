@@ -7,6 +7,7 @@ class Common:
     num_filters: int = 32
     pool_size: int = 1
     kernel_size: int = 3
+    dropout: float = 0.2
 
 @dataclass
 class NN(Common):
@@ -21,8 +22,7 @@ class Prob(Common):
     variance: float = 0.1
 
 @dataclass
-class Shared:
-    dropout: float = 0.2
+class Training:
     lr: float = 0.001
     betas: tuple = (0.9, 0.999)
     lrd: float = 0.99996
@@ -33,9 +33,7 @@ class Shared:
     optim_args: float = 0.01
     gamma: float = 0.1
     step_size: float = 50
-
-@dataclass
-class Training:
+    # Loops
     epochs: int = 10
     batch_size: int = 24
     sequence_length: int = 30
@@ -56,6 +54,5 @@ class Config:
     comm: Common = Common()
     nn: NN = NN()
     prob: Prob = Prob()
-    shared: Shared = Shared()
     training: Training = Training()
 

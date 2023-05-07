@@ -105,18 +105,18 @@ class Model:
                 "file_format": type_str + '_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}.state',
             "args": (self._model.input_size, cfg.prob.hidden_size, self._model.output_size,
                     cfg.prob.rnn_dim, cfg.prob.z_dim, cfg.prob.emission_dim,
-                    cfg.prob.transition_dim, cfg.prob.variance, cfg.shared.dropout, 
-                    cfg.shared.lr, cfg.shared.weight_decay)
+                    cfg.prob.transition_dim, cfg.prob.variance, cfg.comm.dropout, 
+                    cfg.training.lr, cfg.training.weight_decay)
             },
             "neural_network": {
                 "file_format": type_str + '_{}_{}_{}_{}_{}_{}_{}.state',
                 "args": (self._model.input_size, cfg.nn.hidden_size, self._model.output_size,
-                        cfg.nn.num_layers, cfg.shared.dropout, cfg.shared.lr, cfg.shared.weight_decay)
+                        cfg.nn.num_layers, cfg.comm.dropout, cfg.training.lr, cfg.training.weight_decay)
             },
             "generative": {
                 "file_format": type_str + '_{}_{}_{}_{}_{}_{}.state',
                 "args": (self._model.input_size, cfg.nn.hidden_size, cfg.nn.num_layers,
-                        cfg.shared.dropout, cfg.shared.lr, cfg.shared.weight_decay)
+                        cfg.comm.dropout, cfg.training.lr, cfg.training.weight_decay)
             }
         }
 
@@ -163,18 +163,18 @@ class Model:
                 "file_format": self._model.name + '_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}.state',
                 "args": (self._model.input_size, cfg.prob.hidden_size, self._model.output_size,
                         cfg.prob.rnn_dim, cfg.prob.z_dim, cfg.prob.emission_dim,
-                        cfg.prob.transition_dim, cfg.prob.variance, cfg.shared.dropout, 
-                        cfg.shared.lr, cfg.shared.weight_decay)
+                        cfg.prob.transition_dim, cfg.prob.variance, cfg.comm.dropout, 
+                        cfg.training.lr, cfg.training.weight_decay)
             },
             "neural_network": {
                 "file_format": self._model.name + '_{}_{}_{}_{}_{}_{}_{}.state',
                 "args": (self._model.input_size, cfg.nn.hidden_size, self._model.output_size,
-                        cfg.nn.num_layers, cfg.shared.dropout, cfg.shared.lr, cfg.shared.weight_decay)
+                        cfg.nn.num_layers, cfg.comm.dropout, cfg.training.lr, cfg.training.weight_decay)
             },
             "generative": {
                 "file_format": self._model.name + '_{}_{}_{}_{}_{}_{}.state',
                 "args": (self._model.input_size, cfg.nn.hidden_size, cfg.nn.num_layers,
-                        cfg.shared.dropout, cfg.shared.lr, cfg.shared.weight_decay)
+                        cfg.comm.dropout, cfg.training.lr, cfg.training.weight_decay)
             }
         }
 

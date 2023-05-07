@@ -6,7 +6,8 @@ from torch.optim import SGD, Adam
 from torch.utils.data import DataLoader
 import torch.optim.lr_scheduler as lr_scheduler
 from sklearn.metrics import f1_score
-from typing import Union, Tuple, Callable
+from typing import Union, Tuple, Callable, List
+from sklearn.metrics import confusion_matrix
 
 import pyro
 from pyro.infer import (
@@ -42,10 +43,10 @@ class NeuralNetwork(Model):
             ValueError: If the model type is not recognized.
         """
         return torch.optim.Adam(self._model.parameters(), 
-                                lr=cfg.shared.lr, 
-                                betas=cfg.shared.betas, 
-                                eps=cfg.shared.eps, 
-                                weight_decay=cfg.shared.weight_decay, 
+                                lr=cfg.training.lr, 
+                                betas=cfg.training.betas, 
+                                eps=cfg.training.eps, 
+                                weight_decay=cfg.training.weight_decay, 
                                 amsgrad=False
                                 )
         
@@ -62,8 +63,8 @@ class NeuralNetwork(Model):
             Union[pyro.optim.ExponentialLR, torch.optim.lr_scheduler.StepLR]: The learning rate scheduler used to control the learning rate during training.
         """
         return torch.optim.lr_scheduler.StepLR(self._optimizer, 
-                                                step_size=cfg.shared.step_size, 
-                                                gamma=cfg.shared.gamma
+                                                step_size=cfg.training.step_size, 
+                                                gamma=cfg.training.gamma
                                                 )
         
     def _trainRegressor(self,
@@ -183,7 +184,7 @@ class NeuralNetwork(Model):
         
     def _doValidationClassifier(self,
                                 val_dl: torch.utils.data.DataLoader
-                                ) -> Tuple[float, float, float]:
+                                ) -> Tuple[float, float, float, List, List]:
         """
         Computes the validation loss and accuracy for the given validation DataLoader.
         Parameters:
@@ -222,7 +223,7 @@ class NeuralNetwork(Model):
         val_accuracy = correct_preds / total_preds
         val_f1_score = f1_score(true_labels, pred_labels, average='weighted')
 
-        return val_loss, val_accuracy * 100, val_f1_score * 100
+        return val_loss, val_accuracy * 100, val_f1_score * 100, true_labels, pred_labels
     
     def _earlyStopping(self,
                        total_loss: float,
@@ -256,9 +257,9 @@ class NeuralNetwork(Model):
         else:
             return False, best_loss, counter
         
-    def _predictRegressor(self,
-                          test_dl : torch.utils.data.DataLoader
-                          ) -> torch.Tensor:
+    def _predict(self,
+                test_dl : torch.utils.data.DataLoader
+                ) -> torch.Tensor:
         """
         Predict target values for the given validation DataLoader using a neural network model.
 
@@ -283,9 +284,9 @@ class NeuralNetwork(Model):
 
         return output
     
-    def _predictClassifier(self,
-                           test_dl : torch.utils.data.DataLoader
-                           ) -> torch.Tensor:
+    def _score(self,
+                test_dl : torch.utils.data.DataLoader
+                ) -> torch.Tensor:
         """
         Predict target values for the given validation DataLoader using a neural network model.
 
@@ -299,4 +300,7 @@ class NeuralNetwork(Model):
         Returns:
             torch.Tensor: The predicted target values as a torch.Tensor.
         """
-        pass
+        _, accuracy, f1_score, true_labels, pred_labels = self._doValidationClassifier(test_dl)
+        conf_matrix = confusion_matrix(true_labels, pred_labels)
+        
+        return accuracy, f1_score, conf_matrix

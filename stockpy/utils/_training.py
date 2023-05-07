@@ -89,7 +89,7 @@ class Trainer(BaseComponent):
                 tqdm.write(f"Epoch {epoch_ndx}, Train Loss: {train_loss}, Acc {train_acc}, F1_score {train_f1}", end='\r')
             else:
                 # calculate validation loss
-                val_loss, val_acc, val_f1 = self.component._doValidationClassifier(val_dl)
+                val_loss, val_acc, val_f1, _, _ = self.component._doValidationClassifier(val_dl)
                 tqdm.write(f"Epoch {epoch_ndx}, Val Loss {val_loss}, Acc {val_acc}, F1_score {val_f1}", end='\r')
                 # Early stopping
                 if cfg.training.early_stopping:

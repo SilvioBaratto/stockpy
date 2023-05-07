@@ -8,7 +8,7 @@ from ._cnn import BayesianCNNClassifier as _BayesianCNNClassifier
 from ..config import Config as cfg
 
 class BaseModel(Base):
-    def __init__(self, category, model_class):
+    def __init__(self, category, model_class, **kwargs):
         super().__init__()
         self._category = category
         self._model_class = model_class
@@ -22,16 +22,16 @@ class BaseModel(Base):
         return self._model_class
 
 class BaseRNN(BaseModel):
-    def __init__(self, category):
-        super().__init__(category, model_class="rnn")
+    def __init__(self, category, **kwargs):
+        super().__init__(category, model_class="rnn", **kwargs)
 
 class BaseFFNN(BaseModel):
-    def __init__(self, category):
-        super().__init__(category, model_class="ffnn")
+    def __init__(self, category, **kwargs):
+        super().__init__(category, model_class="ffnn", **kwargs)
 
 class BaseCNN(BaseModel):
-    def __init__(self, category):
-        super().__init__(category, model_class="cnn")
+    def __init__(self, category, **kwargs):
+        super().__init__(category, model_class="cnn", **kwargs)
 
 class BayesianNNRegressor(BaseFFNN):
     def __init__(self, **kwargs):
