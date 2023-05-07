@@ -31,11 +31,14 @@ class Emitter(nn.Module):
         )
     """
 
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
         # initialize the three linear transformations used in the neural network
         self.lin_z_to_hidden = nn.Linear(cfg.prob.z_dim, cfg.prob.emission_dim)
-        self.lin_x_to_hidden = nn.Linear(cfg.prob.input_size, cfg.prob.emission_dim)
+        self.lin_x_to_hidden = nn.Linear(input_size, cfg.prob.emission_dim)
         self.lin_hidden_to_mean = nn.Linear(cfg.prob.emission_dim, 1)
         # initialize the fixed variance hyperparameter
         self.variance = nn.Parameter(torch.tensor(cfg.prob.variance))
@@ -93,11 +96,14 @@ class GatedTransition(nn.Module):
           (sigmoid): Sigmoid()
         )
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
         # initialize the two linear transformations used in the neural network
         self.lin_z_to_hidden = nn.Linear(cfg.prob.z_dim, cfg.prob.transition_dim)
-        self.lin_x_to_hidden = nn.Linear(cfg.prob.input_size, cfg.prob.transition_dim)
+        self.lin_x_to_hidden = nn.Linear(input_size, cfg.prob.transition_dim)
         # initialize the two gated transformations used in the neural network
         self.lin_hidden_to_hidden1 = nn.Linear(cfg.prob.transition_dim, cfg.prob.transition_dim)
         self.lin_hidden_to_hidden2 = nn.Linear(cfg.prob.transition_dim, cfg.prob.transition_dim)
@@ -143,7 +149,10 @@ class Combiner(nn.Module):
     :ivar hidden_to_scale: a linear transformation from the hidden state to the pre-activation scale of the Gaussian distribution
     :vartype hidden_to_scale: torch.nn.Linear
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
         self.lin_z_to_hidden = nn.Linear(cfg.prob.z_dim, cfg.prob.emission_dim)
         self.lin_rnn_to_hidden = nn.Linear(cfg.prob.rnn_dim, cfg.prob.emission_dim)

@@ -3,9 +3,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Common:
-    input_size: int = 4
     hidden_size: int = 32
-    output_size: int = 10
     num_filters: int = 32
     pool_size: int = 1
     kernel_size: int = 3
@@ -25,7 +23,6 @@ class Prob(Common):
 @dataclass
 class Shared:
     dropout: float = 0.2
-    pretrained: bool = False
     lr: float = 0.001
     betas: tuple = (0.9, 0.999)
     lrd: float = 0.99996
@@ -48,6 +45,11 @@ class Training:
     validation_cadence: int = 5
     patience: int = 5
     prediction_window: int = 1
+    scheduler: bool = True
+    early_stopping: bool = True
+    metrics: bool = False
+    pretrained: bool = False
+    folder: str = None
 
 @dataclass
 class Config:

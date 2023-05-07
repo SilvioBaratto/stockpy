@@ -54,16 +54,22 @@ class DeepMarkovModelRegressor(BaseRegressorRNN):
         >>> from stockpy.probabilistic import DeepMarkovModel
         >>> deep_markov_model = DeepMarkovModel()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         
         super().__init__()
 
-        # instantiate PyTorch modules used in the model and guide below
-        self.emitter = Emitter()
-        self.transition = GatedTransition()
-        self.combiner = Combiner()
+        self.input_size = input_size
+        self.output_size = output_size
 
-        self.rnn = nn.GRU(input_size=cfg.prob.input_size, 
+        # instantiate PyTorch modules used in the model and guide below
+        self.emitter = Emitter(input_size=input_size, output_size=output_size)
+        self.transition = GatedTransition(input_size=input_size, output_size=output_size)
+        self.combiner = Combiner(input_size=input_size, output_size=output_size)
+
+        self.rnn = nn.GRU(input_size=input_size, 
                           hidden_size=cfg.prob.rnn_dim,
                           batch_first=True,
                           bidirectional=False, 

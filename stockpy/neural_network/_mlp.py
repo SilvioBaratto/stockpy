@@ -27,7 +27,10 @@ class MLPRegressor(BaseRegressorFFNN):
         >>> from stockpy.neural_network import MLP
         >>> mlp = MLP()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         """
         Initializes the MLP neural network model.
 
@@ -35,17 +38,20 @@ class MLPRegressor(BaseRegressorFFNN):
         :type args: ModelArgs
         """
         super().__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+
         self.layers = nn.Sequential(
-            nn.Linear(cfg.nn.input_size, cfg.nn.hidden_size),   # [input_size] -> [hidden_size]
+            nn.Linear(input_size, cfg.nn.hidden_size),   # [input_size] -> [hidden_size]
             nn.ReLU(),
             nn.Dropout(cfg.shared.dropout),
             nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),  # [hidden_size] -> [hidden_size]
             nn.ReLU(),
             nn.Dropout(cfg.shared.dropout),
-            nn.Linear(cfg.nn.hidden_size, cfg.nn.input_size),   # [hidden_size] -> [input_size]
+            nn.Linear(cfg.nn.hidden_size, input_size),   # [hidden_size] -> [input_size]
             nn.ReLU(),
             nn.Dropout(cfg.shared.dropout),
-            nn.Linear(cfg.nn.input_size, cfg.nn.output_size),   # [input_size] -> [output_size]
+            nn.Linear(input_size, output_size),   # [input_size] -> [output_size]
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -61,7 +67,10 @@ class MLPRegressor(BaseRegressorFFNN):
         return self.layers(x)
     
 class MLPClassifier(BaseClassifierFFNN):
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         """
         Initializes the MLP neural network model.
 
@@ -69,17 +78,20 @@ class MLPClassifier(BaseClassifierFFNN):
         :type args: ModelArgs
         """
         super().__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+        
         self.layers = nn.Sequential(
-            nn.Linear(cfg.nn.input_size, cfg.nn.hidden_size),
+            nn.Linear(input_size, cfg.nn.hidden_size),   # [input_size] -> [hidden_size]
             nn.ReLU(),
             nn.Dropout(cfg.shared.dropout),
-            nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),
+            nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),  # [hidden_size] -> [hidden_size]
             nn.ReLU(),
             nn.Dropout(cfg.shared.dropout),
-            nn.Linear(cfg.nn.hidden_size, cfg.nn.input_size),
+            nn.Linear(cfg.nn.hidden_size, input_size),   # [hidden_size] -> [input_size]
             nn.ReLU(),
             nn.Dropout(cfg.shared.dropout),
-            nn.Linear(cfg.nn.input_size, cfg.nn.output_size)
+            nn.Linear(input_size, output_size),   # [input_size] -> [output_size]
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

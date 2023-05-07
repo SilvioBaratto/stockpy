@@ -28,16 +28,22 @@ class StockDataset():
         self.X = self._fit_transform(X, self.X_scaler)
         self.y = self._fit_transform(y, self.y_scaler) if y is not None and scale_y else y
 
-    def getDl(self, model):
-        return self._initDl(X=self.X, y=self.y, model=model)
+    def getDl(self, category, model_class):
+        return self._initDl(X=self.X, 
+                            y=self.y, 
+                            category=category,
+                            model_class=model_class)
     
-    def getTestDl(self, model, X):
-        return self._initDl(X=X, y=None, model=model)
+    def getTestDl(self, category, model_class, X):
+        return self._initDl(X=X, 
+                            y=None, 
+                            category=category,
+                            model_class=model_class)
     
-    def getValDl(self, model):
+    def getValDl(self, category, model_class):
         X_val = self.X.iloc[int(len(self.X) * 0.8):]
         y_val = self.y.iloc[int(len(self.y) * 0.8):] if self.y is not None else None
-        return self._initDl(X=X_val, y=y_val, model=model)
+        return self._initDl(X=X_val, y=y_val, category=category, model_class=model_class)
 
     def _initScaler(self):
         return StandardScaler()
@@ -93,15 +99,16 @@ class StockDataset():
     def _initDl(self,
                 X: Union[np.ndarray, pd.core.frame.DataFrame],
                 y: Union[np.ndarray, pd.core.frame.DataFrame],
-                model) -> torch.utils.data.DataLoader:
+                category,
+                model_class) -> torch.utils.data.DataLoader:
                 
-        if model.category == "regressor":
+        if category == "regressor":
             dataloader = {
                 "rnn": TradingStockDatasetRNN,
                 "cnn": TradingStockDatasetCNN,
                 "ffnn": TradingStockDatasetFFNN
             }
-            return DataLoader(dataloader[model.model_class](X, y),
+            return DataLoader(dataloader[model_class](X, y),
                               batch_size=cfg.training.batch_size * (torch.cuda.device_count() \
                                                                             if cfg.training.use_cuda else 1),  
                               num_workers=cfg.training.num_workers,
@@ -109,13 +116,13 @@ class StockDataset():
                               shuffle=False
                               )
         
-        elif model.category == "classifier":
+        elif category == "classifier":
             dataloader = {
                 "rnn": ClassifierStockDatasetRNN,
                 "cnn": ClassifierStockDatasetCNN,
                 "ffnn": ClassifierStockDatasetFFNN
             }
-            return DataLoader(dataloader[model.model_class](X, y),
+            return DataLoader(dataloader[model_class](X, y),
                               batch_size=cfg.training.batch_size * (torch.cuda.device_count() \
                                                                             if cfg.training.use_cuda else 1),  
                               num_workers=cfg.training.num_workers,

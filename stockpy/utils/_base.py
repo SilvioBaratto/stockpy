@@ -19,10 +19,18 @@ from ._model import Model
 from ._dataloader import StockDataset as sd
 from ._probabilistic import Probabilistic
 from ._neural_network import NeuralNetwork
+from abc import ABC, abstractmethod
 from ..config import Config as cfg
 
-class Base:
+class BaseComponent(ABC):
     def __init__(self, model=None, **kwargs):
+        for key, value in kwargs.items():
+            setattr(cfg.shared, key, value)
+            setattr(cfg.nn, key, value)
+            setattr(cfg.prob, key, value)
+
+    def _initModel(self, input_size: int, output_size: int, **kwargs):
+        model = self._create_model(input_size=input_size, output_size=output_size)
         component = {
             "probabilistic": Probabilistic,
             "neural_network": NeuralNetwork
@@ -36,4 +44,9 @@ class Base:
         self.model = model
         self.name = model.name
         self.type = model_type
-        self.category = model.category
+        # self.category = model.category
+
+
+    @abstractmethod
+    def _create_model(self, input_size: int, output_size: int):
+        pass

@@ -26,16 +26,10 @@ class NeuralNetwork(Model):
                  ):
 
         super().__init__(model, **kwargs)
-        self.model = model
-        
-    def _initInputOutput(self, 
-                        dataloader: torch.utils.data.DataLoader,
-                        model: nn.Module) -> None:
-
-        cfg.comm.input_size = dataloader.dataset.input_size
-        cfg.comm.output_size = dataloader.dataset.output_size
         self._initModel(model=model)
-        
+        self._optimizer = self._initOptimizer()
+        self._scheduler = self._initScheduler()
+                
     def _initOptimizer(self) -> torch.optim.Optimizer:
         """
         Initializes the optimizer used to train the model.
@@ -71,26 +65,11 @@ class NeuralNetwork(Model):
                                                 step_size=cfg.shared.step_size, 
                                                 gamma=cfg.shared.gamma
                                                 )
-    
-    def _initComponent(self,
-                       train_dl : torch.utils.data.DataLoader,
-                       model : nn.Module) -> None:
-        """
-        Initializes the component.
-        This method initializes the component by setting the input and output size, initializing the model, optimizer, and scheduler.
-        Parameters:
-            train_dl (torch.utils.data.DataLoader): The training data loader.
-            model (nn.Module): The model to train.
-        """
-        self._initInputOutput(train_dl, model)
-        self._optimizer = self._initOptimizer()
-        self._scheduler = self._initScheduler()
-    
+        
     def _trainRegressor(self,
                         train_dl : torch.utils.data.DataLoader) -> float:
         
         train_loss = 0.0
-        self._initComponent(train_dl, self.model)
         self._model.train()
         for x_batch, y_batch in train_dl:
             loss = self._computeBatchLossRegressor(x_batch, y_batch)
@@ -148,9 +127,6 @@ class NeuralNetwork(Model):
     def _trainClassifier(self,
                         train_dl: torch.utils.data.DataLoader) -> float:
         
-        self._initComponent(train_dl, self.model)
-        assert self.category == "classifier", "Model is not a classification model"
-
         self._model.train()
         loss_function = nn.CrossEntropyLoss()
         train_loss = 0.0
@@ -196,7 +172,6 @@ class NeuralNetwork(Model):
         Returns:
             Tuple[torch.Tensor, torch.Tensor]: the loss and accuracy for the given batch of data
         """
-        assert self.category == "classifier", "Model is not a classification model"
         loss_function = nn.CrossEntropyLoss()
         x_batch = x_batch.to(cfg.training.device)
         y_batch = y_batch.to(cfg.training.device)
@@ -216,7 +191,6 @@ class NeuralNetwork(Model):
         Returns:
             Tuple[float, float]: the validation loss and accuracy
         """
-        assert self.category == "classifier", "Model is not a classification model"
         self._model.eval()  # Set the model to evaluation mode
         loss_function = nn.CrossEntropyLoss()
         val_loss = 0.0
@@ -253,7 +227,7 @@ class NeuralNetwork(Model):
     def _earlyStopping(self,
                        total_loss: float,
                        best_loss: float,
-                       counter: int
+                       counter: int,
                        ) -> Tuple[bool, float, int]:
         """
         Implements early stopping during training.

@@ -3,27 +3,17 @@ import torch
 import torch.nn as nn
 
 class BaseModel(nn.Module):
-    def __init__(self, category, model_class):
+    def __init__(self):
         super().__init__()
-        self._category = category
-        self._model_class = model_class
 
     @property
     def model_type(self) -> str:
         return os.path.basename(os.path.dirname(__file__))
 
     @property
-    def category(self) -> str:
-        return self._category
-
-    @property
     def name(self):
         return self.__class__.__name__
-    
-    @property
-    def model_class(self):
-        return self._model_class
-    
+        
     def to(self, device: torch.device) -> None:
         """
         Moves the model to the specified device.
@@ -35,24 +25,24 @@ class BaseModel(nn.Module):
 
 class BaseRegressorRNN(BaseModel):
     def __init__(self):
-        super().__init__(category="regressor", model_class="rnn")
+        super().__init__()
 
 class BaseRegressorFFNN(BaseModel):
     def __init__(self):
-        super().__init__(category="regressor", model_class="ffnn")
+        super().__init__()
 
 class BaseRegressorCNN(BaseModel):
     def __init__(self):
-        super().__init__(category="regressor", model_class="cnn")
+        super().__init__()
 
 class BaseClassifierRNN(BaseModel):
     def __init__(self):
-        super().__init__(category="classifier", model_class="rnn")
+        super().__init__()
 
 class BaseClassifierFFNN(BaseModel):
     def __init__(self):
-        super().__init__(category="classifier", model_class="ffnn")
+        super().__init__()
 
 class BaseClassifierCNN(BaseModel):
     def __init__(self):
-        super().__init__(category="classifier", model_class="cnn")
+        super().__init__()

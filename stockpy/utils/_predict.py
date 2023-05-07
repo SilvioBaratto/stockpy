@@ -17,10 +17,10 @@ from pyro.optim import ClippedAdam
 from tqdm.auto import tqdm
 from ._model import Model
 from ._dataloader import StockDataset as sd
-from ._base import Base
+from ._base import BaseComponent
 from ..config import Config as cfg
 
-class Predict(Base):
+class Predict(BaseComponent):
     def __init__(self, model=None, **kwargs):
         super().__init__(model=model, **kwargs)
 

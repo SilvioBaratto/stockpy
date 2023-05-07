@@ -30,16 +30,12 @@ class Probabilistic(Model):
                  ):
         
         super().__init__(model, **kwargs)        
-        self.model = model
-        
-    def _initInputOutput(self, 
-                        dataloader: torch.utils.data.DataLoader,
-                        model: nn.Module) -> None:
-
-        cfg.comm.input_size = dataloader.dataset.input_size
-        cfg.comm.output_size = dataloader.dataset.output_size
         self._initModel(model=model)
-        
+        pyro.clear_param_store()
+        self._optimizer = self._initOptimizer()
+        self._svi = self._initSVI()
+        self._scheduler = self._initScheduler()
+                
     def _initOptimizer(self) -> torch.optim.Optimizer:
         """
         Initializes the optimizer used to train the model.
@@ -75,9 +71,9 @@ class Probabilistic(Model):
         Returns:
             pyro.infer.svi.SVI: The SVI instance used to optimize the model and guide.
         """
-        model_to_use = self._model if self.name == 'BayesianNNRegressor' \
-                            or self.name == "BayesianCNNRegressor" \
-                            else self._model.model
+        allowed_names = ['BayesianNNRegressor', 'BayesianCNNRegressor', 
+                         'BayesianNNClassifier', 'BayesianCNNClassifier']
+        model_to_use = self._model if self.name in allowed_names else self._model.model
         
         return SVI(model_to_use, 
                 self._guide, 
@@ -104,27 +100,11 @@ class Probabilistic(Model):
                                         'optim_args': {'lr': cfg.shared.optim_args}, 
                                         'gamma': cfg.shared.gamma}
                                         )
-    def _initComponent(self,
-                       train_dl : torch.utils.data.DataLoader,
-                       model : nn.Module) -> None:
-        """
-        Initializes the component.
-        This method initializes the component by setting the input and output size, initializing the model, optimizer, and scheduler.
-        Parameters:
-            train_dl (torch.utils.data.DataLoader): The training data loader.
-            model (nn.Module): The model to train.
-        """
-        self._initInputOutput(train_dl, model)
-        pyro.clear_param_store()
-        self._optimizer = self._initOptimizer()
-        self._svi = self._initSVI()
-        self._scheduler = self._initScheduler()
     
     def _trainRegressor(self,
                         train_dl : torch.utils.data.DataLoader) -> float:
        
         train_loss = 0.0
-        self._initComponent(train_dl, self.model)
 
         if self.name == 'DeepMarkovModel':
             self._model.rnn.train()
@@ -173,6 +153,82 @@ class Probabilistic(Model):
                 val_loss += loss               
 
         return val_loss / len(val_dl)
+    
+    def _trainClassifier(self,
+                        train_dl: torch.utils.data.DataLoader) -> float:
+        
+        self._model.train()
+        train_loss = 0.0
+        train_accuracy = 0.0
+        correct_preds = 0
+        total_preds = 0
+        true_labels = []
+        pred_labels = []
+        for x_batch, y_batch in train_dl:
+            x_batch = x_batch.to(cfg.training.device)
+            y_batch = y_batch.to(cfg.training.device)
+            
+            # Calculate the ELBO loss and perform a gradient step
+            loss = self._svi.step(x_batch, y_batch)
+            train_loss += loss
+            
+            # Obtain logits and predictions from the guide
+            logits = self._model(x_batch)
+            _, predicted_labels = torch.max(logits, 1)
+            
+            correct_preds += (predicted_labels == y_batch).sum().item()
+            total_preds += y_batch.size(0)
+
+            true_labels.extend(y_batch.cpu().numpy())
+            pred_labels.extend(predicted_labels.cpu().numpy())
+
+        train_loss /= len(train_dl)
+        train_accuracy = correct_preds / total_preds
+        train_f1_score = f1_score(true_labels, pred_labels, average='weighted')
+
+        return train_loss, train_accuracy * 100, train_f1_score * 100
+    
+    def _doValidationClassifier(self,
+                                val_dl: torch.utils.data.DataLoader
+                                ) -> Tuple[float, float, float]:
+        """
+        Computes the validation loss and accuracy for the given validation DataLoader.
+        Parameters:
+            val_dl (torch.utils.data.DataLoader): the DataLoader for the validation set
+        Returns:
+            Tuple[float, float]: the validation loss and accuracy
+        """
+        self._model.eval()  # Set the model to evaluation mode
+        val_loss = 0.0
+        correct_preds = 0
+        total_preds = 0
+        true_labels = []
+        pred_labels = []
+
+        with torch.no_grad():
+            for x_batch, y_batch in val_dl:
+                x_batch = x_batch.to(cfg.training.device)
+                y_batch = y_batch.to(cfg.training.device)
+
+                # Obtain logits and predictions from the guide
+                loss = self._svi.evaluate_loss(x_batch, y_batch)
+                val_loss += loss
+
+                logits = self._model(x_batch)
+                # Calculate the number of correct predictions
+                _, predicted_labels = torch.max(logits, 1)
+
+                correct_preds += (predicted_labels == y_batch).sum().item()
+                total_preds += y_batch.size(0)
+
+                true_labels.extend(y_batch.cpu().numpy())
+                pred_labels.extend(predicted_labels.cpu().numpy())
+
+        val_loss /= len(val_dl)
+        val_accuracy = correct_preds / total_preds
+        val_f1_score = f1_score(true_labels, pred_labels, average='weighted')
+
+        return val_loss, val_accuracy * 100, val_f1_score * 100
     
     def _earlyStopping(self,
                        total_loss: float,

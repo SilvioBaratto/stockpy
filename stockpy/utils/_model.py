@@ -54,10 +54,11 @@ class Model:
         self._model = model
         self._model.to(cfg.training.device)
         
-        if cfg.shared.pretrained:
+        if cfg.training.pretrained:
             path = self._initModelPath()
+            print(f"Loading model from {path}")
             model_dict = torch.load(path)
-            model.load_state_dict(model_dict['model_state'])
+            self._model.load_state_dict(model_dict['model_state'])
 
         if cfg.training.use_cuda:
             if torch.cuda.device_count() > 1:
@@ -69,19 +70,19 @@ class Model:
         }
 
         self.type = model_type_map.get(self._model.model_type)
-        self.category = self._model.category
         self.name = self._model.name
 
         if self.type == "probabilistic":
-            if self._model.name == 'BayesianNNRegressor' \
-                or self._model.name == 'BayesianCNNRegressor':
+            allowed_names = ['BayesianNNRegressor', 'BayesianNNClassifier', 
+                             'BayesianCNNRegressor', 'BayesianCNNClassifier']
+            if self._model.name in allowed_names:
                 self._guide = AutoDiagonalNormal(self._model)
             else:
                 self._guide = self._model.guide
                     
     def _saveModel(self, 
                 type_str: str,
-                optimizer: torch.optim.Optimizer
+                optimizer: torch.optim.Optimizer,
                 ) -> None:
         """
         Saves the model to disk.
@@ -94,24 +95,27 @@ class Model:
         def build_file_path(file_format: str, *args) -> str:
             return os.path.join(lib_dir, 'save', self.type, self._model.name, file_format.format(*args))
 
-        lib_dir = os.path.dirname(os.path.abspath(__file__))  # directory of the library
+        if cfg.training.folder is None:
+            lib_dir = os.path.dirname(os.path.abspath(__file__))  # directory of the library
+        else:
+            lib_dir = cfg.training.folder
 
         file_path_configs = {
             "probabilistic": {
                 "file_format": type_str + '_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}.state',
-            "args": (cfg.prob.input_size, cfg.prob.hidden_size, cfg.prob.output_size,
+            "args": (self._model.input_size, cfg.prob.hidden_size, self._model.output_size,
                     cfg.prob.rnn_dim, cfg.prob.z_dim, cfg.prob.emission_dim,
                     cfg.prob.transition_dim, cfg.prob.variance, cfg.shared.dropout, 
                     cfg.shared.lr, cfg.shared.weight_decay)
             },
             "neural_network": {
                 "file_format": type_str + '_{}_{}_{}_{}_{}_{}_{}.state',
-                "args": (cfg.nn.input_size, cfg.nn.hidden_size, cfg.nn.output_size,
+                "args": (self._model.input_size, cfg.nn.hidden_size, self._model.output_size,
                         cfg.nn.num_layers, cfg.shared.dropout, cfg.shared.lr, cfg.shared.weight_decay)
             },
             "generative": {
                 "file_format": type_str + '_{}_{}_{}_{}_{}_{}.state',
-                "args": (cfg.nn.input_size, cfg.nn.hidden_size, cfg.nn.num_layers,
+                "args": (self._model.input_size, cfg.nn.hidden_size, cfg.nn.num_layers,
                         cfg.shared.dropout, cfg.shared.lr, cfg.shared.weight_decay)
             }
         }
@@ -144,7 +148,11 @@ class Model:
         def build_file_path(file_format: str, *args) -> str:
             return os.path.join(model_dir, file_format.format(*args))
 
-        lib_dir = os.path.dirname(os.path.abspath(__file__))  # directory of the library
+        if cfg.training.folder is None:
+            lib_dir = os.path.dirname(os.path.abspath(__file__))  # directory of the library
+        else:
+            lib_dir = cfg.training.folder
+
         model_dir = os.path.join(lib_dir, 'save', self._model.model_type, self._model.name)
 
         if not os.path.exists(model_dir):
@@ -153,19 +161,19 @@ class Model:
         file_path_configs = {
             "probabilistic": {
                 "file_format": self._model.name + '_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}_{}.state',
-                "args": (cfg.prob.input_size, cfg.prob.hidden_size, cfg.prob.output_size,
+                "args": (self._model.input_size, cfg.prob.hidden_size, self._model.output_size,
                         cfg.prob.rnn_dim, cfg.prob.z_dim, cfg.prob.emission_dim,
                         cfg.prob.transition_dim, cfg.prob.variance, cfg.shared.dropout, 
                         cfg.shared.lr, cfg.shared.weight_decay)
             },
             "neural_network": {
                 "file_format": self._model.name + '_{}_{}_{}_{}_{}_{}_{}.state',
-                "args": (cfg.nn.input_size, cfg.nn.hidden_size, cfg.nn.output_size,
+                "args": (self._model.input_size, cfg.nn.hidden_size, self._model.output_size,
                         cfg.nn.num_layers, cfg.shared.dropout, cfg.shared.lr, cfg.shared.weight_decay)
             },
             "generative": {
                 "file_format": self._model.name + '_{}_{}_{}_{}_{}_{}.state',
-                "args": (cfg.nn.input_size, cfg.nn.hidden_size, cfg.nn.num_layers,
+                "args": (self._model.input_size, cfg.nn.hidden_size, cfg.nn.num_layers,
                         cfg.shared.dropout, cfg.shared.lr, cfg.shared.weight_decay)
             }
         }

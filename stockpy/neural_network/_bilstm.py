@@ -28,16 +28,21 @@ class BiLSTMRegressor(BaseRegressorRNN):
         >>> from stockpy.neural_network import BiLSTM
         >>> bilstm = BiLSTM()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
+        self.input_size = input_size
+        self.output_size = output_size
 
-        self.lstm = nn.LSTM(input_size=cfg.nn.input_size,  # input_size is the number of features
+        self.lstm = nn.LSTM(input_size=input_size,  # input_size is the number of features
                             hidden_size=cfg.nn.hidden_size, 
                             num_layers=cfg.nn.num_layers, 
                             batch_first=True,
                             bidirectional=True)
                 
-        self.fc = nn.Linear(cfg.nn.hidden_size, cfg.nn.output_size)
+        self.fc = nn.Linear(cfg.nn.hidden_size, output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -61,7 +66,7 @@ class BiLSTMRegressor(BaseRegressorRNN):
         
         _, (hn, _) = self.lstm(x, (h0, c0))
         out = self.fc(hn[0])   
-        out = out.view(-1,1)
+        out = out.view(-1,self.output_size)
 
         return out
         
@@ -87,16 +92,21 @@ class BiLSTMClassifier(BaseClassifierRNN):
         >>> from stockpy.neural_network import BiLSTM
         >>> bilstm = BiLSTM()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
+        self.input_size = input_size
+        self.output_size = output_size
 
-        self.lstm = nn.LSTM(input_size=cfg.nn.input_size,  # input_size is the number of features
+        self.lstm = nn.LSTM(input_size=input_size,  # input_size is the number of features
                             hidden_size=cfg.nn.hidden_size, 
                             num_layers=cfg.nn.num_layers, 
                             batch_first=True,
                             bidirectional=True)
                 
-        self.fc = nn.Linear(cfg.nn.hidden_size, cfg.nn.output_size)
+        self.fc = nn.Linear(cfg.nn.hidden_size, output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -120,6 +130,6 @@ class BiLSTMClassifier(BaseClassifierRNN):
         
         _, (hn, _) = self.lstm(x, (h0, c0))
         out = self.fc(hn[0])   
-        out = out.view(-1,1)
+        out = out.view(-1,self.output_size)
 
         return out

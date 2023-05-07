@@ -40,13 +40,19 @@ class GaussianHMMRegressor(BaseRegressorRNN):
         >>> from stockpy.probabilistic import GaussianHMM
         >>> gaussian_hmm = GaussianHMM()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         
         super().__init__()
 
+        self.input_size = input_size
+        self.output_size = output_size
+
         # instantiate PyTorch modules used in the model and guide below
-        self.emitter = Emitter()
-        self.transition = GatedTransition()
+        self.emitter = Emitter(input_size=input_size, output_size=output_size)
+        self.transition = GatedTransition(input_size=input_size, output_size=output_size)
 
         if cfg.training.use_cuda:
             if torch.cuda.device_count() > 1:

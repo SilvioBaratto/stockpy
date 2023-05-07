@@ -1,4 +1,5 @@
 import torch
+import os
 import torch.nn as nn
 from typing import Union, Tuple
 import pandas as pd
@@ -18,10 +19,6 @@ class Base(Trainer, Predict):
                  ):
     
         super().__init__(model=model, **kwargs)
-        self.model = model
-
-    def _modelEval(self):
-        print(self.model.eval())
             
     def fit(self, 
             X: Union[np.ndarray, pd.core.frame.DataFrame],
@@ -60,17 +57,24 @@ class Base(Trainer, Predict):
         for key, value in kwargs.items():
             setattr(cfg.training, key, value)
 
+        input_size = X.shape[1]
+        output_size = len(np.unique(y)) if self.category == "classifier" \
+                        else (y.shape[1] if y.ndim > 1 else 1)
+
+        # Initialize the model
+        self._initModel(input_size, output_size, **kwargs)
+
         self._sd = StockDataset(X=X, y=y, scale_y=True if self.category == "regressor" else False)
 
-        train_dl = self._sd.getDl(self.model)
-        val_dl = self._sd.getValDl(self.model)
+        train_dl = self._sd.getDl(self.category, self.model_class)
+        val_dl = self._sd.getValDl(self.category, self.model_class)
 
         training = {
             "regressor" : self._trainRegressor,
             "classifier" : self._trainClassifier
         }
 
-        training[self.category](train_dl, val_dl)
+        return training[self.category](train_dl, val_dl)
                         
     def predict(self, 
                 X: Union[np.ndarray, pd.core.frame.DataFrame]
@@ -95,7 +99,7 @@ class Base(Trainer, Predict):
         }
 
         X = self._sd._fit_transform(X, self._sd._get_x_scaler())
-        test_dl = self._sd.getTestDl(self.model, X)
+        test_dl = self._sd.getTestDl(self.category, self.model_class, X)
 
         return predictor[self.category](test_dl).cpu().detach().numpy() * self._sd._std_y() + self._sd._mean_y()
     

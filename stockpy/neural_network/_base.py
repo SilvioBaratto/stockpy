@@ -13,147 +13,124 @@ from ._cnn import CNNRegressor as _CNNRegressor
 from ._cnn import CNNClassifier as _CNNClassifier
 from ..config import Config as cfg
 
-class GRURegressor(Base):
+class BaseModel(Base):
+    def __init__(self, category, model_class):
+        super().__init__()
+        self._category = category
+        self._model_class = model_class
+  
+    @property
+    def category(self) -> str:
+        return self._category
 
-    def __init__(self,
-                 **kwargs
-                ):
-        
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
+    @property
+    def model_class(self) -> str:
+        return self._model_class
 
-        super().__init__(model=_GRURegressor(), **kwargs)
+class BaseRNN(BaseModel):
+    def __init__(self, category):
+        super().__init__(category, model_class="rnn")
 
-class GRUClassifier(Base):
+class BaseFFNN(BaseModel):
+    def __init__(self, category):
+        super().__init__(category, model_class="ffnn")
 
-    def __init__(self,
-                 **kwargs
-                ):
-            
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
+class BaseCNN(BaseModel):
+    def __init__(self, category):
+        super().__init__(category, model_class="cnn")
 
-        super().__init__(model=_GRUClassifier(), **kwargs)
+class GRURegressor(BaseRNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="regressor", **kwargs)
 
-class BiGRURegressor(Base):
+    def _create_model(self, input_size: int, output_size: int):
+        return _GRURegressor(input_size=input_size, 
+                             output_size=output_size)
+
+class GRUClassifier(BaseRNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="classifier", **kwargs)
+
+    def _create_model(self, input_size: int, output_size: int):
+        return _GRUClassifier(input_size=input_size, 
+                              output_size=output_size)
     
-    def __init__(self,
-                **kwargs
-                ):
-            
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
+class BiGRURegressor(BaseRNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="regressor", **kwargs)
+
+    def _create_model(self, input_size: int, output_size: int):
+        return _BiGRURegressor(input_size=input_size, 
+                               output_size=output_size)
     
-        super().__init__(model=_BiGRURegressor(), **kwargs)
+class BiGRUClassifier(BaseRNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="classifier", **kwargs)
 
-class BiGRUClassifier(Base):
+    def _create_model(self, input_size: int, output_size: int):
+        return _BiGRUClassifier(input_size=input_size, 
+                                output_size=output_size)
+
+class BiLSTMRegressor(BaseRNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="regressor", **kwargs)
+
+    def _create_model(self, input_size: int, output_size: int):
+        return _BiLSTMRegressor(input_size=input_size, 
+                                output_size=output_size)
+
+class BiLSTMClassifier(BaseRNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="classifier", **kwargs)
+
+    def _create_model(self, input_size: int, output_size: int):
+        return _BiLSTMClassifier(input_size=input_size, 
+                                 output_size=output_size)
+
+class LSTMRegressor(BaseRNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="regressor", **kwargs)
+
+    def _create_model(self, input_size: int, output_size: int):
+        return _LSTMRegressor(input_size=input_size, 
+                              output_size=output_size)
+
+class LSTMClassifier(BaseRNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="classifier", **kwargs)
+
+    def _create_model(self, input_size: int, output_size: int):
+        return _LSTMClassifier(input_size=input_size, 
+                               output_size=output_size)
+
+class MLPRegressor(BaseFFNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="regressor", **kwargs)
+
+    def _create_model(self, input_size: int, output_size: int):
+        return _MLPRegressor(input_size=input_size, 
+                             output_size=output_size)
+
+class MLPClassifier(BaseFFNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="classifier", **kwargs)
+
+    def _create_model(self, input_size: int, output_size: int):
+        return _MLPClassifier(input_size=input_size, 
+                              output_size=output_size)
         
-    def __init__(self,
-                    **kwargs
-                    ):
-                
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-        
-        super().__init__(model=_BiGRUClassifier(), **kwargs)
+class CNNRegressor(BaseCNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="regressor", **kwargs)
 
-class BiLSTMRegressor(Base):
-        
-    def __init__(self,
-                **kwargs
-                ):
-                
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-        
-        super().__init__(model=_BiLSTMRegressor(), **kwargs)
+    def _create_model(self, input_size: int, output_size: int):
+        return _CNNRegressor(input_size=input_size, 
+                             output_size=output_size)  
+    
+class CNNClassifier(BaseCNN):
+    def __init__(self, **kwargs):
+        super().__init__(category="classifier", **kwargs)
 
-class BiLSTMClassifier(Base):
-            
-    def __init__(self,
-                **kwargs
-                ):
-                    
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-            
-        super().__init__(model=_BiLSTMClassifier(), **kwargs)
-
-class LSTMRegressor(Base):
-                
-    def __init__(self,
-                **kwargs
-                ):
-                        
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-                
-        super().__init__(model=_LSTMRegressor(), **kwargs)
-
-class LSTMClassifier(Base):
-                        
-    def __init__(self,
-                **kwargs
-                ):
-                                
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-                        
-        super().__init__(model=_LSTMClassifier(), **kwargs) 
-
-class MLPRegressor(Base):
-                                
-    def __init__(self,
-                **kwargs
-                ):
-                                        
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-                                
-        super().__init__(model=_MLPRegressor(), **kwargs)   
-
-class MLPClassifier(Base):
-                                        
-    def __init__(self,
-                **kwargs
-                ):
-                                                
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-                                        
-        super().__init__(model=_MLPClassifier(), **kwargs)  
-        
-
-class CNNRegressor(Base):
-                                
-    def __init__(self,
-                **kwargs
-                ):
-                                        
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-                                
-        super().__init__(model=_CNNRegressor(), **kwargs)   
-
-class CNNClassifier(Base):
-                                        
-    def __init__(self,
-                **kwargs
-                ):
-                                                
-        for key, value in kwargs.items():
-            setattr(cfg.shared, key, value)
-            setattr(cfg.nn, key, value)
-                                        
-        super().__init__(model=_CNNClassifier(), **kwargs)  
+    def _create_model(self, input_size: int, output_size: int):
+        return _CNNClassifier(input_size=input_size, 
+                              output_size=output_size) 

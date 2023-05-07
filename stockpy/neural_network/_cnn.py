@@ -28,17 +28,23 @@ class CNNRegressor(BaseRegressorCNN):
         >>> from stockpy.neural_network import CNN
         >>> cnn = CNN()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+
         self.layers = nn.Sequential(
             nn.Conv1d(1, cfg.nn.num_filters, cfg.nn.kernel_size),
             nn.ReLU(),
             nn.MaxPool1d(cfg.nn.pool_size),
             nn.Flatten(),
-            nn.Linear(cfg.nn.num_filters * (cfg.nn.input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size, cfg.nn.hidden_size),
+            nn.Linear(cfg.nn.num_filters * ((input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size), cfg.nn.hidden_size),
             nn.ReLU(),
             nn.Dropout(cfg.shared.dropout),
-            nn.Linear(cfg.nn.hidden_size, cfg.nn.output_size)
+            nn.Linear(cfg.nn.hidden_size, output_size)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -66,17 +72,23 @@ class CNNClassifier(BaseClassifierCNN):
         >>> from stockpy.neural_network import CNN
         >>> cnn = CNN()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
+        self.input_size = input_size
+        self.output_size = output_size
+
         self.layers = nn.Sequential(
             nn.Conv1d(1, cfg.nn.num_filters, cfg.nn.kernel_size),
             nn.ReLU(),
             nn.MaxPool1d(cfg.nn.pool_size),
             nn.Flatten(),
-            nn.Linear(cfg.nn.num_filters * ((cfg.nn.input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size), cfg.nn.hidden_size),
+            nn.Linear(cfg.nn.num_filters * ((input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size), cfg.nn.hidden_size),
             nn.ReLU(),
             nn.Dropout(cfg.shared.dropout),
-            nn.Linear(cfg.nn.hidden_size, cfg.nn.output_size)
+            nn.Linear(cfg.nn.hidden_size, output_size)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

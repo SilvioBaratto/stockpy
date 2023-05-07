@@ -28,15 +28,21 @@ class GRURegressor(BaseRegressorRNN):
         >>> from stockpy.neural_network import GRU
         >>> gru = GRU()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
-        self.gru = nn.GRU(input_size=cfg.nn.input_size, 
+        self.input_size = input_size
+        self.output_size = output_size
+
+        self.gru = nn.GRU(input_size=input_size, 
                           hidden_size=cfg.nn.hidden_size, 
                           num_layers=cfg.nn.num_layers, 
                           batch_first=True,
                           )
         
-        self.fc = nn.Linear(cfg.nn.hidden_size, cfg.nn.output_size)
+        self.fc = nn.Linear(cfg.nn.hidden_size, output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -56,7 +62,7 @@ class GRURegressor(BaseRegressorRNN):
         
         _, (hn) = self.gru(x, (h0))
         out = self.fc(hn[0])     
-        out = out.view(-1, 1)
+        out = out.view(-1, self.output_size)
 
         return out
 
@@ -82,15 +88,21 @@ class GRUClassifier(BaseClassifierRNN):
         >>> from stockpy.neural_network import GRU
         >>> gru = GRU()
     """
-    def __init__(self):
+    def __init__(self,
+                 input_size: int,
+                 output_size: int
+                 ):
         super().__init__()
-        self.gru = nn.GRU(input_size=cfg.nn.input_size, 
+        self.input_size = input_size
+        self.output_size = output_size
+
+        self.gru = nn.GRU(input_size=input_size, 
                           hidden_size=cfg.nn.hidden_size, 
                           num_layers=cfg.nn.num_layers, 
                           batch_first=True,
                           )
         
-        self.fc = nn.Linear(cfg.nn.hidden_size, cfg.nn.output_size)
+        self.fc = nn.Linear(cfg.nn.hidden_size, output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -109,6 +121,6 @@ class GRUClassifier(BaseClassifierRNN):
         
         _, (hn) = self.gru(x, (h0))
         out = self.fc(hn[0])       
-        out = out.view(-1, 1)
+        out = out.view(-1, self.output_size)
 
         return out
