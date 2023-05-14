@@ -1,19 +1,28 @@
+from abc import abstractmethod, ABCMeta
 import os
 import torch
 import torch.nn as nn
 
 import pyro
 import pyro.distributions as dist
-from pyro.nn import PyroModule
-import pyro.poutine as poutine
+from pyro.nn import PyroModule, PyroSample
+from pyro.infer.autoguide import AutoNormal
 import torch.nn.functional as F
-from typing import Tuple, Optional
-from ._base_model import BaseRegressorRNN
-from ._base_model import BaseClassifierRNN
-from ._hmm_utils import Emitter, GatedTransition, Combiner
+import pyro.poutine as poutine
+from pyro.infer import (
+    SVI,
+    Trace_ELBO,
+    Predictive,
+    TraceMeanField_ELBO
+)
+from typing import Union, Tuple, Optional
+import pandas as pd
+import numpy as np
+from ._base import RegressorProb
+from .utils import Emitter, Combiner, GatedTransition
 from ..config import Config as cfg
 
-class DeepMarkovModelRegressor(BaseRegressorRNN):
+class DeepMarkovModelRegressor(RegressorProb):
     """
     The DeepMarkovModel class implements a Deep Markov Model, which is a
     generative model for time series data that combines recurrent neural networks
@@ -54,22 +63,21 @@ class DeepMarkovModelRegressor(BaseRegressorRNN):
         >>> from stockpy.probabilistic import DeepMarkovModel
         >>> deep_markov_model = DeepMarkovModel()
     """
-    def __init__(self,
-                 input_size: int,
-                 output_size: int
-                 ):
-        
-        super().__init__()
+    model_type = "rnn"
+   
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        self.input_size = input_size
-        self.output_size = output_size
-
+    def _init_model(self):
         # instantiate PyTorch modules used in the model and guide below
-        self.emitter = Emitter(input_size=input_size, output_size=output_size)
-        self.transition = GatedTransition(input_size=input_size, output_size=output_size)
-        self.combiner = Combiner(input_size=input_size, output_size=output_size)
+        self.emitter = Emitter(input_size=self.input_size, 
+                               output_size=self.output_size)
+        self.transition = GatedTransition(input_size=self.input_size, 
+                                          output_size=self.output_size)
+        self.combiner = Combiner(input_size=self.input_size, 
+                                 output_size=self.output_size)
 
-        self.rnn = nn.GRU(input_size=input_size, 
+        self.rnn = nn.GRU(input_size=self.input_size, 
                           hidden_size=cfg.prob.rnn_dim,
                           batch_first=True,
                           bidirectional=False, 
@@ -232,3 +240,18 @@ class DeepMarkovModelRegressor(BaseRegressorRNN):
                 z_prev = z_t
 
             return z_t
+        
+    def _initSVI(self) -> pyro.infer.svi.SVI:
+        return SVI(model=self.model,
+                   guide=self.guide,
+                   optim=self.optimizer, 
+                   loss=TraceMeanField_ELBO())
+
+    def _predict(self,
+                test_dl : torch.utils.data.DataLoader
+                ) -> torch.Tensor:
+
+        return self._predictHMM(test_dl)
+    
+    def forward(self):
+        pass

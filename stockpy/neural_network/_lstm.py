@@ -1,106 +1,99 @@
+from abc import ABCMeta, abstractmethod
 import os
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
-from ._base_model import BaseRegressorRNN
-from ._base_model import BaseClassifierRNN
+from typing import Union, Tuple
+import pandas as pd
+import numpy as np
+from ._base import ClassifierNN
+from ._base import RegressorNN
 from ..config import Config as cfg
 
-class LSTMRegressor(BaseRegressorRNN):
-    """
-    A class representing a Long Short-Term Memory (LSTM) model for stock prediction.
+class LSTMClassifier(ClassifierNN):
 
-    The LSTM model is designed to capture long-range dependencies in time series data, such as stock prices.
-    It consists of an LSTM layer followed by a series of fully connected layers and activation functions.
+    model_type = "rnn"
+   
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-    :param input_size: The number of input features for the LSTM model.
-    :type input_size: int
-    :param hidden_size: The number of hidden units in each LSTM layer.
-    :type hidden_size: intinput_size
-    :param num_layers: The number of LSTM layers in the model.
-    :type num_layers: int
-    :param output_size: The number of output units for the LSTM model, corresponding to the predicted target variable(s).
-    :type output_size: int
-    :param dropout: The dropout percentage applied between layers for regularization, preventing overfitting.
-    :type dropout: float
-    :example:
-        >>> from stockpy.neural_network import LSTM
-        >>> lstm = LSTM()
-    """    
-    def __init__(self,
-                 input_size: int,
-                 output_size: int
-                 ):
-        super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
+    def _init_model(self):
+        # Check if hidden_sizes is a single integer and, if so, convert it to a list
+        if isinstance(cfg.nn.hidden_size, int):
+            self.hidden_sizes = [cfg.nn.hidden_size]
+        else:
+            self.hidden_sizes = cfg.nn.hidden_size
 
-        self.lstm = nn.LSTM(input_size=input_size,  # input_size is the number of features
-                            hidden_size=cfg.nn.hidden_size, 
-                            num_layers=cfg.nn.num_layers, 
-                            batch_first=True)
-        
-        self.fc = nn.Linear(cfg.nn.hidden_size, output_size)
+        self.lstms = nn.ModuleList()
+        input_size = self.input_size
+
+        for hidden_size in self.hidden_sizes:
+            self.lstms.append(nn.LSTM(input_size=input_size,  
+                                      hidden_size=hidden_size, 
+                                      num_layers=1, 
+                                      dropout=cfg.comm.dropout,
+                                      batch_first=True))
+            input_size = hidden_size
+
+        self.fc = nn.Linear(self.hidden_sizes[-1], self.output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Defines the forward pass of the LSTM model.
-
-        :param x: The input tensor.
-        :type x: torch.Tensor
-
-        :returns: The output tensor, corresponding to the predicted target variable(s).
-        :rtype: torch.Tensor
-        """
+        if not self.lstms:
+            raise RuntimeError("You must call fit before calling predict")
+        
         batch_size = x.size(0)
-        h0 = Variable(torch.zeros(cfg.nn.num_layers, 
-                                  batch_size, 
-                                  cfg.nn.hidden_size)).to(cfg.training.device)
-        c0 = Variable(torch.zeros(cfg.nn.num_layers, 
-                                  batch_size, 
-                                  cfg.nn.hidden_size)).to(cfg.training.device)
-        _, (hn, _) = self.lstm(x, (h0, c0))
-        out = self.fc(hn[0])   
+        output = x
+
+        for lstm in self.lstms:
+            h0 = Variable(torch.zeros(1, batch_size, lstm.hidden_size)).to(cfg.training.device)
+            c0 = Variable(torch.zeros(1, batch_size, lstm.hidden_size)).to(cfg.training.device)
+            output, (hn, _) = lstm(output, (h0, c0))
+
+        out = self.fc(output[:, -1, :])
         out = out.view(-1,self.output_size)
 
         return out
-
-class LSTMClassifier(BaseClassifierRNN):
-    def __init__(self,
-                 input_size: int,
-                 output_size: int
-                 ):
-        super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
-        
-        self.lstm = nn.LSTM(input_size=input_size,  # input_size is the number of features
-                            hidden_size=cfg.nn.hidden_size, 
-                            num_layers=cfg.nn.num_layers, 
-                            batch_first=True)
-        
-        self.fc = nn.Linear(cfg.nn.hidden_size, output_size)
     
-    # Write the forward pass
+class LSTMRegressor(RegressorNN):
+
+    model_type = "rnn"
+   
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def _init_model(self):
+        # Check if hidden_sizes is a single integer and, if so, convert it to a list
+        if isinstance(cfg.nn.hidden_size, int):
+            self.hidden_sizes = [cfg.nn.hidden_size]
+        else:
+            self.hidden_sizes = cfg.nn.hidden_size
+
+        self.lstms = nn.ModuleList()
+        input_size = self.input_size
+
+        for hidden_size in self.hidden_sizes:
+            self.lstms.append(nn.LSTM(input_size=input_size,  
+                                      hidden_size=hidden_size, 
+                                      num_layers=1, 
+                                      dropout=cfg.comm.dropout,
+                                      batch_first=True))
+            input_size = hidden_size
+
+        self.fc = nn.Linear(self.hidden_sizes[-1], self.output_size)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Defines the forward pass of the LSTM model.
-
-        :param x: The input tensor.
-        :type x: torch.Tensor
-
-        :returns: The output tensor, corresponding to the predicted target variable(s).
-        :rtype: torch.Tensor
-        """
+        if not self.lstms:
+            raise RuntimeError("You must call fit before calling predict")
+        
         batch_size = x.size(0)
-        h0 = Variable(torch.zeros(cfg.nn.num_layers, 
-                                  batch_size, 
-                                  cfg.nn.hidden_size)).to(cfg.training.device)
-        c0 = Variable(torch.zeros(cfg.nn.num_layers, 
-                                  batch_size, 
-                                  cfg.nn.hidden_size)).to(cfg.training.device)
-        _, (hn, _) = self.lstm(x, (h0, c0))
-        out = self.fc(hn[0]) 
-        out = out.view(-1, self.output_size)  # Reshape the output tensor to match the expected dimensions
+        output = x
+
+        for lstm in self.lstms:
+            h0 = Variable(torch.zeros(1, batch_size, lstm.hidden_size)).to(cfg.training.device)
+            c0 = Variable(torch.zeros(1, batch_size, lstm.hidden_size)).to(cfg.training.device)
+            output, (hn, _) = lstm(output, (h0, c0))
+
+        out = self.fc(output[:, -1, :])
+        out = out.view(-1,self.output_size)
 
         return out

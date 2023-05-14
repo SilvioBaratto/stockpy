@@ -1,95 +1,94 @@
+from abc import ABCMeta, abstractmethod
 import os
 import torch
 import torch.nn as nn
-from ._base_model import BaseRegressorCNN
-from ._base_model import BaseClassifierCNN
-import torch.nn.functional as F
+from typing import Union, Tuple
+import pandas as pd
+import numpy as np
+from ._base import ClassifierNN
+from ._base import RegressorNN
 from ..config import Config as cfg
 
-class CNNRegressor(BaseRegressorCNN):
-    """
-    A class representing a Convolutional Neural Network (CNN) model for stock prediction.
+class CNNClassifier(ClassifierNN):
 
-    The CNN model consists of a series of convolutional layers, each followed by a non-linear activation function,
-    such as ReLU, and pooling layers to downsample the feature maps. The model is designed to learn non-linear relationships
-    between input features and the target variable for predicting stock prices.
+    model_type = "cnn"
+   
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        """
+        Initializes the MLP neural network model.
 
-    :param input_size: The number of input features for the CNN model.
-    :type input_size: int
-    :param num_filters: The number of filters in the convolutional layer of the CNN model.
-    :type num_filters: int
-    :param filter_size: The size of the filters in the convolutional layer of the CNN model.
-    :type filter_size: int
-    :param output_dim: The number of output units for the CNN model, corresponding to the predicted target variable(s).
-    :type output_dim: int
-    :param dropout: The dropout percentage applied after the convolutional layer for regularization, preventing overfitting.
-    :type dropout: float
-    :example:
-        >>> from stockpy.neural_network import CNN
-        >>> cnn = CNN()
-    """
-    def __init__(self,
-                 input_size: int,
-                 output_size: int
-                 ):
-        super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
+        :param args: The arguments to configure the model.
+        :type args: ModelArgs
+        """
 
-        self.layers = nn.Sequential(
-            nn.Conv1d(1, cfg.nn.num_filters, cfg.nn.kernel_size),
-            nn.ReLU(),
-            nn.MaxPool1d(cfg.nn.pool_size),
-            nn.Flatten(),
-            nn.Linear(cfg.nn.num_filters * ((input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size), cfg.nn.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(cfg.comm.dropout),
-            nn.Linear(cfg.nn.hidden_size, output_size)
-        )
+    def _init_model(self):
+        # Create the convolutional layers
+        # Check if hidden_sizes is a single integer and, if so, convert it to a list
+        if isinstance(cfg.nn.hidden_size, int):
+            self.hidden_sizes = [cfg.nn.hidden_size]
+        else:
+            self.hidden_sizes = cfg.nn.hidden_size
+            
+        layers = [nn.Conv1d(1, cfg.nn.num_filters, cfg.nn.kernel_size),
+                  nn.ReLU(),
+                  nn.MaxPool1d(cfg.nn.pool_size),
+                  nn.Flatten()]
+        
+        current_input_size = cfg.nn.num_filters * ((self.input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size)
+
+        for hidden_size in self.hidden_sizes:
+            layers.append(nn.Linear(current_input_size, hidden_size))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(cfg.comm.dropout))
+            current_input_size = hidden_size
+
+        layers.append(nn.Linear(current_input_size, self.output_size))
+        self.layers = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.layers is None:
+            raise RuntimeError("You must call fit before calling predict")
         return self.layers(x)
     
-class CNNClassifier(BaseClassifierCNN):
-    """
-    A class representing a Convolutional Neural Network (CNN) model for stock prediction.
+class CNNRegressor(RegressorNN):
 
-    The CNN model consists of a series of convolutional layers, each followed by a non-linear activation function,
-    such as ReLU, and pooling layers to downsample the feature maps. The model is designed to learn non-linear relationships
-    between input features and the target variable for predicting stock prices.
+    model_type = "cnn"
+   
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        """
+        Initializes the MLP neural network model.
 
-    :param input_size: The number of input features for the CNN model.
-    :type input_size: int
-    :param num_filters: The number of filters in the convolutional layer of the CNN model.
-    :type num_filters: int
-    :param filter_size: The size of the filters in the convolutional layer of the CNN model.
-    :type filter_size: int
-    :param output_dim: The number of output units for the CNN model, corresponding to the predicted target variable(s).
-    :type output_dim: int
-    :param dropout: The dropout percentage applied after the convolutional layer for regularization, preventing overfitting.
-    :type dropout: float
-    :example:
-        >>> from stockpy.neural_network import CNN
-        >>> cnn = CNN()
-    """
-    def __init__(self,
-                 input_size: int,
-                 output_size: int
-                 ):
-        super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
+        :param args: The arguments to configure the model.
+        :type args: ModelArgs
+        """
 
-        self.layers = nn.Sequential(
-            nn.Conv1d(1, cfg.nn.num_filters, cfg.nn.kernel_size),
-            nn.ReLU(),
-            nn.MaxPool1d(cfg.nn.pool_size),
-            nn.Flatten(),
-            nn.Linear(cfg.nn.num_filters * ((input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size), cfg.nn.hidden_size),
-            nn.ReLU(),
-            nn.Dropout(cfg.comm.dropout),
-            nn.Linear(cfg.nn.hidden_size, output_size)
-        )
+    def _init_model(self):
+        # Create the convolutional layers
+        # Check if hidden_sizes is a single integer and, if so, convert it to a list
+        if isinstance(cfg.nn.hidden_size, int):
+            self.hidden_sizes = [cfg.nn.hidden_size]
+        else:
+            self.hidden_sizes = cfg.nn.hidden_size
+            
+        layers = [nn.Conv1d(1, cfg.nn.num_filters, cfg.nn.kernel_size),
+                  nn.ReLU(),
+                  nn.MaxPool1d(cfg.nn.pool_size),
+                  nn.Flatten()]
+        
+        current_input_size = cfg.nn.num_filters * ((self.input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size)
+
+        for hidden_size in self.hidden_sizes:
+            layers.append(nn.Linear(current_input_size, hidden_size))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(cfg.comm.dropout))
+            current_input_size = hidden_size
+
+        layers.append(nn.Linear(cfg.nn.hidden_size[-1], self.output_size))
+        self.layers = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.layers is None:
+            raise RuntimeError("You must call fit before calling predict")
         return self.layers(x)

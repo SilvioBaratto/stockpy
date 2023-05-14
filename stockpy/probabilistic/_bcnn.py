@@ -20,34 +20,43 @@ from ._base import ClassifierProb
 from ._base import RegressorProb
 from ..config import Config as cfg
 
-class BayesianNNClassifier(ClassifierProb):
+class BayesianCNNClassifier(ClassifierProb):
 
-    model_type = "ffnn"
+    model_type = "cnn"
    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        """
+        Initializes the MLP neural network model.
+
+        :param args: The arguments to configure the model.
+        :type args: ModelArgs
+        """
 
     def _init_model(self):
+        # Create the convolutional layers
         # Check if hidden_sizes is a single integer and, if so, convert it to a list
-        if isinstance(cfg.prob.hidden_size, int):
-            self.hidden_sizes = [cfg.prob.hidden_size]
+        if isinstance(cfg.nn.hidden_size, int):
+            self.hidden_sizes = [cfg.nn.hidden_size]
         else:
-            self.hidden_sizes = cfg.prob.hidden_size
+            self.hidden_sizes = cfg.nn.hidden_size
+            
+        layers = [PyroModule[nn.Conv1d](1, cfg.nn.num_filters, cfg.nn.kernel_size),
+                  PyroModule[nn.ReLU](),
+                  PyroModule[nn.MaxPool1d](cfg.nn.pool_size),
+                  PyroModule[nn.Flatten]()]
+        
+        current_input_size = cfg.nn.num_filters * ((self.input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size)
 
-        layers = []
-        input_size = self.input_size
         for hidden_size in self.hidden_sizes:
-            layer = PyroModule[nn.Linear](input_size, hidden_size)
-            layers.append(layer)
+            layers.append(PyroModule[nn.Linear](current_input_size, hidden_size))
             layers.append(PyroModule[nn.ReLU]())
             layers.append(PyroModule[nn.Dropout](cfg.comm.dropout))
-            input_size = hidden_size
+            current_input_size = hidden_size
 
-        output_layer = PyroModule[nn.Linear](input_size, self.output_size)
-        layers.append(output_layer)
-
+        layers.append(PyroModule[nn.Linear](current_input_size, self.output_size))
         self.layers = PyroModule[nn.Sequential](*layers)
-
+    
     def forward(self, x_data: torch.Tensor, 
                 y_data: torch.Tensor=None) -> torch.Tensor:
         """
@@ -80,36 +89,44 @@ class BayesianNNClassifier(ClassifierProb):
                    guide=self.guide,
                    optim=self.optimizer, 
                    loss=TraceMeanField_ELBO())
+    
+class BayesianCNNRegressor(RegressorProb):
 
-
-class BayesianNNRegressor(RegressorProb):
-
-    model_type = "ffnn"
+    model_type = "cnn"
    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        """
+        Initializes the MLP neural network model.
+
+        :param args: The arguments to configure the model.
+        :type args: ModelArgs
+        """
 
     def _init_model(self):
+        # Create the convolutional layers
         # Check if hidden_sizes is a single integer and, if so, convert it to a list
-        if isinstance(cfg.prob.hidden_size, int):
-            self.hidden_sizes = [cfg.prob.hidden_size]
+        if isinstance(cfg.nn.hidden_size, int):
+            self.hidden_sizes = [cfg.nn.hidden_size]
         else:
-            self.hidden_sizes = cfg.prob.hidden_size
+            self.hidden_sizes = cfg.nn.hidden_size
+            
+        layers = [PyroModule[nn.Conv1d](1, cfg.nn.num_filters, cfg.nn.kernel_size),
+                  PyroModule[nn.ReLU](),
+                  PyroModule[nn.MaxPool1d](cfg.nn.pool_size),
+                  PyroModule[nn.Flatten]()]
+        
+        current_input_size = cfg.nn.num_filters * ((self.input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size)
 
-        layers = []
-        input_size = self.input_size
         for hidden_size in self.hidden_sizes:
-            layer = PyroModule[nn.Linear](input_size, hidden_size)
-            layers.append(layer)
+            layers.append(PyroModule[nn.Linear](current_input_size, hidden_size))
             layers.append(PyroModule[nn.ReLU]())
             layers.append(PyroModule[nn.Dropout](cfg.comm.dropout))
-            input_size = hidden_size
+            current_input_size = hidden_size
 
-        output_layer = PyroModule[nn.Linear](input_size, self.output_size)
-        layers.append(output_layer)
-
+        layers.append(PyroModule[nn.Linear](current_input_size, self.output_size))
         self.layers = PyroModule[nn.Sequential](*layers)
-
+    
     def forward(self, x_data: torch.Tensor, 
                 y_data: torch.Tensor=None) -> torch.Tensor:
         """
@@ -123,7 +140,11 @@ class BayesianNNRegressor(RegressorProb):
         :returns: the output tensor of the model
         :rtype: torch.Tensor
         """
-        x =  self.layers(x_data)
+        if self.layers is None:
+            raise Exception("Model has not been initialized.")
+        
+        x = self.layers(x_data)
+        
         # use StudentT distribution instead of Normal
         df = pyro.sample("df", dist.Exponential(1.))
         scale = pyro.sample("scale", dist.HalfCauchy(2.5))
@@ -145,6 +166,3 @@ class BayesianNNRegressor(RegressorProb):
                 ) -> torch.Tensor:
 
         return self._predictNN(test_dl)
-    
-
-    

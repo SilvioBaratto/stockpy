@@ -1,13 +1,14 @@
 import torch
 from dataclasses import dataclass
+from typing import List, Union
 
 @dataclass
 class Common:
-    hidden_size: int = 32
+    hidden_size: Union[int, List[int]] = 32
     num_filters: int = 32
-    pool_size: int = 1
+    pool_size: int = 2
     kernel_size: int = 3
-    dropout: float = 0.2
+    dropout: float = 0.1
 
 @dataclass
 class NN(Common):
@@ -42,12 +43,14 @@ class Training:
     num_workers: int = 4
     validation_cadence: int = 5
     patience: int = 5
+    min_delta: int = 0.001
     prediction_window: int = 1
     scheduler: bool = True
     early_stopping: bool = True
     metrics: bool = False
     pretrained: bool = False
     folder: str = None
+    shuffle: bool = False
 
 @dataclass
 class Config:

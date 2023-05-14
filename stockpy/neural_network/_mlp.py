@@ -1,58 +1,43 @@
-import os
+from abc import ABCMeta, abstractmethod
 import torch
 import torch.nn as nn
-from ._base_model import BaseRegressorFFNN
-from ._base_model import BaseClassifierFFNN
+from typing import Union, Tuple
+import pandas as pd
+import numpy as np
+from ._base import ClassifierNN
+from ._base import RegressorNN
 from ..config import Config as cfg
 
-class MLPRegressor(BaseRegressorFFNN):
-    """
-    A class representing a Multilayer Perceptron (MLP) neural network model for stock prediction.
+class MLPClassifier(ClassifierNN):
 
-    The MLP model consists of a series of linear layers, each followed by a non-linear activation function,
-    such as ReLU, and dropout for regularization. The model is designed to learn non-linear relationships
-    between input features and the target variable for predicting stock prices.
-
-    :param input_size: The number of input features for the MLP model.
-    :type input_size: int
-    :param hidden_size: The number of hidden units in each hidden layer of the MLP model.
-    :type hidden_size: int
-    :param num_layers: The number of layers in the MLP model, including input, hidden, and output layers.
-    :type num_layers: int
-    :param output_dim: The number of output units for the MLP model, corresponding to the predicted target variable(s).
-    :type output_dim: int
-    :param dropout: The dropout percentage applied between layers for regularization, preventing overfitting.
-    :type dropout: float
-    :example:
-        >>> from stockpy.neural_network import MLP
-        >>> mlp = MLP()
-    """
-    def __init__(self,
-                 input_size: int,
-                 output_size: int
-                 ):
+    model_type = "ffnn"
+   
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         """
         Initializes the MLP neural network model.
 
         :param args: The arguments to configure the model.
         :type args: ModelArgs
         """
-        super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
 
-        self.layers = nn.Sequential(
-            nn.Linear(input_size, cfg.nn.hidden_size),   # [input_size] -> [hidden_size]
-            nn.ReLU(),
-            nn.Dropout(cfg.comm.dropout),
-            nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),  # [hidden_size] -> [hidden_size]
-            nn.ReLU(),
-            nn.Dropout(cfg.comm.dropout),
-            nn.Linear(cfg.nn.hidden_size, input_size),   # [hidden_size] -> [input_size]
-            nn.ReLU(),
-            nn.Dropout(cfg.comm.dropout),
-            nn.Linear(input_size, output_size),   # [input_size] -> [output_size]
-        )
+    def _init_model(self):
+        # Check if hidden_sizes is a single integer and, if so, convert it to a list
+        if isinstance(cfg.nn.hidden_size, int):
+            self.hidden_sizes = [cfg.nn.hidden_size]
+        else:
+            self.hidden_sizes = cfg.nn.hidden_size
+
+        layers = []
+        input_size = self.input_size
+        for hidden_size in self.hidden_sizes:
+            layers.append(nn.Linear(input_size, hidden_size))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(cfg.comm.dropout))
+            input_size = hidden_size
+
+        layers.append(nn.Linear(input_size, self.output_size))
+        self.layers = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -64,35 +49,40 @@ class MLPRegressor(BaseRegressorFFNN):
         :returns: The output tensor, corresponding to the predicted target variable(s).
         :rtype: torch.Tensor
         """
-        return self.layers(x)
+        if self.layers is None:
+            raise RuntimeError("You must call fit before calling predict")
+        return self.layers(x)  
     
-class MLPClassifier(BaseClassifierFFNN):
-    def __init__(self,
-                 input_size: int,
-                 output_size: int
-                 ):
+class MLPRegressor(RegressorNN):
+
+    model_type = "ffnn"
+   
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         """
         Initializes the MLP neural network model.
 
         :param args: The arguments to configure the model.
         :type args: ModelArgs
         """
-        super().__init__()
-        self.input_size = input_size
-        self.output_size = output_size
-        
-        self.layers = nn.Sequential(
-            nn.Linear(input_size, cfg.nn.hidden_size),   # [input_size] -> [hidden_size]
-            nn.ReLU(),
-            nn.Dropout(cfg.comm.dropout),
-            nn.Linear(cfg.nn.hidden_size, cfg.nn.hidden_size),  # [hidden_size] -> [hidden_size]
-            nn.ReLU(),
-            nn.Dropout(cfg.comm.dropout),
-            nn.Linear(cfg.nn.hidden_size, input_size),   # [hidden_size] -> [input_size]
-            nn.ReLU(),
-            nn.Dropout(cfg.comm.dropout),
-            nn.Linear(input_size, output_size),   # [input_size] -> [output_size]
-        )
+
+    def _init_model(self):
+        # Check if hidden_sizes is a single integer and, if so, convert it to a list
+        if isinstance(cfg.nn.hidden_size, int):
+            self.hidden_sizes = [cfg.nn.hidden_size]
+        else:
+            self.hidden_sizes = cfg.nn.hidden_size
+
+        layers = []
+        input_size = self.input_size
+        for hidden_size in self.hidden_sizes:
+            layers.append(nn.Linear(input_size, hidden_size))
+            layers.append(nn.ReLU())
+            layers.append(nn.Dropout(cfg.comm.dropout))
+            input_size = hidden_size
+
+        layers.append(nn.Linear(input_size, self.output_size))
+        self.layers = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -104,4 +94,7 @@ class MLPClassifier(BaseClassifierFFNN):
         :returns: The output tensor, corresponding to the predicted target variable(s).
         :rtype: torch.Tensor
         """
-        return self.layers(x)
+        if self.layers is None:
+            raise RuntimeError("You must call fit before calling predict")
+        return self.layers(x)        
+

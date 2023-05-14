@@ -61,7 +61,7 @@ def create_arg_parser():
     parser.add_argument('--patience', type=int, default=cfg.training.patience, help='Patience for early stopping')
     parser.add_argument('--prediction_window', type=int, default=cfg.training.prediction_window, help='Prediction window size')
     parser.add_argument('--scheduler', type=bool, default=cfg.training.scheduler, help='Use learning rate scheduler')
-
+    parser.add_argument('--early_stopping', type=bool, default=cfg.training.early_stopping, help='Use early stopping')
     parser.add_argument('--metrics', type=bool, default=cfg.training.metrics, help='Report metrics during training')
     parser.add_argument('--pretrained', type=bool, default=cfg.training.pretrained, help='Use pretrained model if available')
     parser.add_argument('--folder', type=str, default=cfg.training.folder, help='Folder for saving/loading model and training results')
@@ -107,6 +107,8 @@ class Trainer:
 
         if args.metrics:
             self.plot_training_metrics(model, train_losses, train_accuracies, train_f1_scores)
+        else:
+            exit()
 
     @staticmethod
     def plot_training_metrics(predictor, train_losses, train_accuracies, train_f1_scores):
@@ -155,10 +157,13 @@ def main(args):
         'patience': args.patience,
         'prediction_window': args.prediction_window,
         'scheduler': args.scheduler,
+        'early_stopping': args.early_stopping,
         'metrics': args.metrics,
         'pretrained': args.pretrained,
         'folder': args.folder,
     }
+
+    print(training_kwargs)
 
     model_dict = {
         'GRUClassifier': GRUClassifier,
@@ -184,7 +189,6 @@ def main(args):
     # Create an instance of Trainer and CNNClassifier
     trainer = Trainer()
     model = model_dict[args.model]()
-
     # Call the run method on the trainer instance
     trainer.run(model, args, **training_kwargs)
 
@@ -192,3 +196,11 @@ if __name__ == "__main__":
     parser = create_arg_parser()
     args = parser.parse_args()
     main(args)
+    
+    
+    
+    
+    
+    
+    
+    
