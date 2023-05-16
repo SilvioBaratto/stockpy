@@ -31,7 +31,6 @@ class LSTMClassifier(ClassifierNN):
             self.lstms.append(nn.LSTM(input_size=input_size,  
                                       hidden_size=hidden_size, 
                                       num_layers=1, 
-                                      dropout=cfg.comm.dropout,
                                       batch_first=True))
             input_size = hidden_size
 
@@ -75,7 +74,6 @@ class LSTMRegressor(RegressorNN):
             self.lstms.append(nn.LSTM(input_size=input_size,  
                                       hidden_size=hidden_size, 
                                       num_layers=1, 
-                                      dropout=cfg.comm.dropout,
                                       batch_first=True))
             input_size = hidden_size
 

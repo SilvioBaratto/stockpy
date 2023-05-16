@@ -35,6 +35,7 @@ class Training:
     gamma: float = 0.1
     step_size: float = 50
     # Loops
+    scaler_type: str = 'zscore'
     epochs: int = 10
     batch_size: int = 24
     sequence_length: int = 30

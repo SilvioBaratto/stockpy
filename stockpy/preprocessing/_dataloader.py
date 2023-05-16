@@ -6,29 +6,26 @@ import torch
 from ._dataset import StockDatasetRNN
 from ._dataset import StockDatasetFFNN
 from ._dataset import StockDatasetCNN
+from ._data import ZScoreNormalizer
+from ._data import MinMaxNormalizer
+from ._data import RobustScaler
 from ..config import Config as cfg
-
-class ZScoreNormalizer:
-    def __init__(self):
-        self.mean = None
-        self.std = None
-    
-    def fit(self, data: torch.Tensor):
-        self.mean = torch.mean(data, dim=0)
-        self.std = torch.std(data, dim=0)
-        # Ensure that the standard deviation is not zero
-        self.std = torch.where(self.std != 0, self.std, torch.ones_like(self.std))
-
-    def denormalize(self, data: torch.Tensor):
-        if self.mean is None or self.std is None:
-            raise RuntimeError('Must fit normalizer before denormalizing data.')
-        return data * self.std + self.mean
 
 class StockScaler:
     
-    def __init__(self):             
-        self.X_normalizer = ZScoreNormalizer()
-        self.y_normalizer = ZScoreNormalizer()
+    def __init__(self): 
+        self.scaler_type = cfg.training.scaler_type
+        scaler_classes = {
+            'zscore': ZScoreNormalizer,
+            'minmax': MinMaxNormalizer,
+            'robust': RobustScaler,
+        }
+
+        if self.scaler_type not in scaler_classes:
+            raise ValueError(f'Invalid scaler type: {self.scaler_type}')
+        
+        self.X_normalizer = scaler_classes[self.scaler_type]()
+        self.y_normalizer = scaler_classes[self.scaler_type]()
 
     def fit_transform(self, 
                       X_train: Union[np.ndarray, pd.core.frame.DataFrame],
@@ -37,17 +34,21 @@ class StockScaler:
         
         X_train = torch.tensor(X_train.values).float()
         self.X_normalizer.fit(X_train)
-        X_train = (X_train - self.X_normalizer.mean) / self.X_normalizer.std
+        X_train = self.X_normalizer.transform(X_train)
 
         if y_train is not None and task == 'regression':
             y_train = torch.tensor(y_train.values).reshape(-1, 1 if len(y_train.shape) == 1 \
                                                             or y_train.shape[1] == 1 \
                                                             else y_train.shape[1]).float()
             self.y_normalizer.fit(y_train)
-            y_train = (y_train - self.y_normalizer.mean) / self.y_normalizer.std
+            y_train = self.y_normalizer.transform(y_train)
 
         elif task == 'classification':
-            y_train = torch.tensor(y_train.values).squeeze().long() - 1
+            # If y_train contains label 0 don't subtract 1
+            if y_train.min() == 0:
+                y_train = torch.tensor(y_train.values).squeeze().long()
+            else:
+                y_train = torch.tensor(y_train.values).squeeze().long() - 1
 
         else:
             y_train = None
@@ -57,14 +58,14 @@ class StockScaler:
     def transform(self, 
                   X_test: torch.Tensor):
         
-        X_test = (X_test - self.X_normalizer.mean) / self.X_normalizer.std
+        X_test = self.X_normalizer.transform(X_test)
         
         return X_test
     
     def inverse_transform(self,
                           y_pred: torch.Tensor):
 
-        return y_pred * self.y_normalizer.std + self.y_normalizer.mean
+        return self.y_normalizer.inverse_transform(y_pred)
 
 class StockDataloader:
     def __init__(self,
