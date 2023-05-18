@@ -24,39 +24,54 @@ from ..config import Config as cfg
 
 class GaussianHMMRegressor(RegressorProb):
     """
-    This PyTorch Module encapsulates the model as well as the variational distribution (the guide)
-    for the Gaussian Hidden Markov Model.
+    A class used to represent a Gaussian Hidden Markov Model (GHMM) for regression tasks.
+    This class inherits from the `RegressorProb` class.
 
-    :param input_size: the number of input features
-    :type input_size: int
-    :param z_dim: The dimensionality of the latent variables z.
-    :type z_dim: int
-    :param emission_dim: The dimensionality of the hidden state in the Emitter network.
-    :type emission_dim: int
-    :param transition_dim: The dimensionality of the hidden state in the Gated Transition network.
-    :type transition_dim: int
-    :param variance: The initial variance value for the observation distribution.
-    :type variance: float
+    ...
 
-    :ivar emitter: the Emitter module which parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t)
-    :vartype emitter: Emitter
-    :ivar transition: the GatedTransition module which parameterizes the dynamics of the latent variables z_t
-    :vartype transition: GatedTransition
-    :ivar z_0: a trainable parameter representing the initial latent state
-    :vartype z_0: torch.nn.Parameter
-    :ivar z_q_0: a trainable parameter representing the initial latent state for the variational distribution
-    :vartype z_q_0: torch.nn.Parameter
-    :example:
-        >>> from stockpy.probabilistic import GaussianHMM
-        >>> gaussian_hmm = GaussianHMM()
+    Parameters
+    ----------
+    rnn_dim:
+        the dimension of the hidden state of the RNN
+    z_dim:
+        the dimension of the latent random variable z
+    emission_dim:
+        the dimension of the hidden state of the emission model
+    transition_dim:
+        the dimension of the hidden state of the transition model
+    variance:   
+        the variance of the observation noise
+
+    Attributes
+    ----------
+    model_type : str
+        a string that represents the type of the model (default is "rnn")
+
+    Methods
+    -------
+    __init__(self, **kwargs):
+        Initializes the GaussianHMMRegressor object with given or default parameters.
+
+    _init_model(self):
+        Initializes the GHMM modules (emitter, transition) and some trainable parameters.
+
+    model(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
+        Defines the generative model which describes the process of generating the data.
+
+    guide(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
+        Defines the variational guide (approximate posterior) that is used for inference.
     """
+
     model_type = "rnn"
    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def _init_model(self):
-        # instantiate PyTorch modules used in the model and guide below
+        # Initialize GHMM modules: emitter, transition
+        # Also define trainable parameters z_0, z_q_0, and h_0 that help define the 
+        # probability distributions p(z_1) and q(z_1)
+
         self.emitter = Emitter(input_size=self.input_size, 
                                output_size=self.output_size)
         self.transition = GatedTransition(input_size=self.input_size, 
@@ -82,22 +97,25 @@ class GaussianHMMRegressor(RegressorProb):
               annealing_factor: float = 1.0
               ) -> torch.Tensor:
         """
-        This function defines the generative process of the Gaussian Hidden Markov Model (GaussianHMM).
-        It takes a mini-batch of input sequences `x_data`, and if available, their corresponding
-        output sequences `y_data`, and generates a sequence of latent variables `z_t` at each time step.
-        It uses a DNN to model the emission probability distribution `p(y_t|z_t, x_t)` and 
-        another DNN to model the transition probability distribution `p(z_t|z_{t-1}, x_t)`.
-        It returns the final sampled latent variable `z_t`.
+        Implements the generative model p(y,z|x) which includes the observation 
+        model p(y|z) and transition model p(z_t | z_{t-1}). It also handles the 
+        computation of the parameters of these models.
 
-        :param x_data: input data of size (batch_size, num_time_steps, input_size)
-        :type x_data: torch.Tensor
-        :param y_data: output data of size (batch_size, num_time_steps, output_size), defaults to None
-        :type y_data: Optional[torch.Tensor], optional
-        :param annealing_factor: controls the weight of the KL divergence term, defaults to 1.0
-        :type annealing_factor: float, optional
+        Parameters
+        ----------
+        x_data : torch.Tensor
+            Input tensor for the model.
 
-        :returns: tensor of size (batch_size, latent_dim) representing the final sampled latent variable
-        :rtype: torch.Tensor
+        y_data : Optional[torch.Tensor]
+            Optional observed output tensor for the model.
+
+        annealing_factor : float, default = 1.0
+            Annealing factor used in poutine.scale to handle KL annealing.
+
+        Returns
+        -------
+        torch.Tensor
+            The sampled latent variable `z` from the last time step of the model.
         """
 
         T_max = x_data.size(1)
@@ -143,19 +161,27 @@ class GaussianHMMRegressor(RegressorProb):
               y_data: Optional[torch.Tensor] = None, 
               annealing_factor: float = 1.0
               ) -> torch.Tensor:
+        
         """
-        Defines the guide function for the Deep Markov Model. This function is used
-        for the variational inference procedure in Pyro.
+        Implements the guide (also called the inference model or variational distribution) q(z|x,y)
+        which is an approximation to the posterior p(z|x,y). It also handles the computation of the 
+        parameters of this guide.
 
-        :param x_data: The input data tensor of shape (batch_size, T_max, input_size)
-        :type x_data: torch.Tensor
-        :param y_data: The output data tensor of shape (batch_size, T_max, output_size), defaults to None
-        :type y_data: Optional[torch.Tensor], optional
-        :param annealing_factor: The scaling factor for the KL term in the loss function, defaults to 1.0
-        :type annealing_factor: float, optional
+        Parameters
+        ----------
+        x_data : torch.Tensor
+            Input tensor for the guide.
 
-        :returns: The latent variable tensor sampled at the final time step, of shape (batch_size, z_dim)
-        :rtype: torch.Tensor
+        y_data : Optional[torch.Tensor]
+            Optional observed output tensor for the guide.
+
+        annealing_factor : float, default = 1.0
+            Annealing factor used in poutine.scale to handle KL annealing.
+
+        Returns
+        -------
+        torch.Tensor
+            The sampled latent variable `z` from the last time step of the guide.
         """
         
         T_max = x_data.size(1)

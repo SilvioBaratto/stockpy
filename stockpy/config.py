@@ -2,6 +2,7 @@ import torch
 from dataclasses import dataclass
 from typing import List, Union
 
+# Basic settings for all neural networks
 @dataclass
 class Common:
     hidden_size: Union[int, List[int]] = 32
@@ -10,10 +11,12 @@ class Common:
     kernel_size: int = 3
     dropout: float = 0.1
 
+# Settings specific to standard neural networks
 @dataclass
 class NN(Common):
     num_layers: int = 2
 
+# Settings specific to probabilistic neural networks
 @dataclass
 class Prob(Common):
     rnn_dim: int = 32
@@ -22,37 +25,53 @@ class Prob(Common):
     transition_dim: int = 32
     variance: float = 0.1
 
+# Training settings
 @dataclass
 class Training:
+    # Print settings
+    eval: bool = False
+    
+    # Optimizer parameters
     lr: float = 0.001
     betas: tuple = (0.9, 0.999)
-    lrd: float = 0.99996
-    clip_norm: float = 10.0
     weight_decay: float = 0.001
     eps: float = 1e-8
     amsgrad: bool = False
-    optim_args: float = 0.01
+
+    # Scheduler parameters
     gamma: float = 0.1
     step_size: float = 50
-    # Loops
+    scheduler_patience: int = 5
+    min_delta: int = 0.001
+    scheduler: bool = True
+    scheduler_mode: str = 'min'
+    scheduler_factor: float = 0.1
+    scheduler_threshold: float = 0.0001
+    lrd: float = 0.99996
+    clip_norm: float = 10.0
+
+    # Training loop parameters
     scaler_type: str = 'zscore'
     epochs: int = 10
     batch_size: int = 24
     sequence_length: int = 30
-    use_cuda = torch.cuda.is_available()
-    device: str = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     num_workers: int = 4
     validation_cadence: int = 5
-    patience: int = 5
-    min_delta: int = 0.001
-    prediction_window: int = 1
-    scheduler: bool = True
+    optim_args: float = 0.01
+    shuffle: bool = False
+    val_size: float = 0.2
+
+    # CUDA settings
+    use_cuda = torch.cuda.is_available()
+    device: str = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # Miscellaneous settings
     early_stopping: bool = True
     metrics: bool = False
     pretrained: bool = False
     folder: str = None
-    shuffle: bool = False
 
+# The main configuration class that contains all other settings
 @dataclass
 class Config:
     comm: Common = Common()

@@ -24,52 +24,54 @@ from ..config import Config as cfg
 
 class DeepMarkovModelRegressor(RegressorProb):
     """
-    The DeepMarkovModel class implements a Deep Markov Model, which is a
-    generative model for time series data that combines recurrent neural networks
-    (RNNs) and hidden Markov models (HMMs). It consists of an RNN for encoding
-    input sequences, a Combiner module to combine the RNN hidden states with the
-    previous latent states, and an Emitter and GatedTransition module to model
-    the emission and transition probability distributions.
+    A class used to represent a Deep Markov Model (DMM) for regression tasks.
+    This class inherits from the `RegressorProb` class.
 
-    :param input_size: the number of input features
-    :type input_size: int
-    :param rnn_dim: The number of hidden units in the RNN used for encoding the input sequences.
-    :type rnn_dim: int
-    :param z_dim: The dimensionality of the latent variables z.
-    :type z_dim: int
-    :param emission_dim: The dimensionality of the hidden state in the Emitter network.
-    :type emission_dim: int
-    :param transition_dim: The dimensionality of the hidden state in the Gated Transition network.
-    :type transition_dim: int
-    :param variance: The initial variance value for the observation distribution.
-    :type variance: float
+    ...
 
-    :ivar emitter: Emitter module for modeling the emission probability distribution
-    :vartype emitter: Emitter
-    :ivar transition: GatedTransition module for modeling the transition probability distribution
-    :vartype transition: GatedTransition
-    :ivar combiner: Combiner module for combining RNN hidden states with previous latent states
-    :vartype combiner: Combiner
-    :ivar rnn: GRU-based RNN for encoding input sequences
-    :vartype rnn: nn.GRU
-    :ivar z_0: Initial latent state parameter
-    :vartype z_0: nn.Parameter
-    :ivar z_q_0: Initial variational latent state parameter
-    :vartype z_q_0: nn.Parameter
-    :ivar h_0: Initial RNN hidden state parameter
-    :vartype h_0: nn.Parameter
+    Parameters
+    ----------
+    rnn_dim:
+        the dimension of the hidden state of the RNN
+    z_dim:
+        the dimension of the latent random variable z
+    emission_dim:
+        the dimension of the hidden state of the emission model
+    transition_dim:
+        the dimension of the hidden state of the transition model
+    variance:   
+        the variance of the observation noise
 
-    :example:
-        >>> from stockpy.probabilistic import DeepMarkovModel
-        >>> deep_markov_model = DeepMarkovModel()
+    Attributes
+    ----------
+    model_type : str
+        a string that represents the type of the model (default is "rnn")
+
+    Methods
+    -------
+    __init__(self, **kwargs):
+        Initializes the DeepMarkovModelRegressor object with given or default parameters.
+
+    _init_model(self):
+        Initializes the DMM modules (emitter, transition, combiner, rnn) and some trainable parameters.
+
+    model(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
+        Defines the generative model which describes the process of generating the data.
+
+    guide(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
+        Defines the variational guide (approximate posterior) that is used for inference.
     """
+
     model_type = "rnn"
    
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def _init_model(self):
-        # instantiate PyTorch modules used in the model and guide below
+        # Initialize DMM modules: emitter, transition, combiner and GRU based RNN
+        # Also define trainable parameters z_0, z_q_0, and h_0 that help define the 
+        # probability distributions p(z_1) and q(z_1)
+
         self.emitter = Emitter(input_size=self.input_size, 
                                output_size=self.output_size)
         self.transition = GatedTransition(input_size=self.input_size, 
@@ -110,24 +112,25 @@ class DeepMarkovModelRegressor(RegressorProb):
               annealing_factor: float = 1.0
               ) -> torch.Tensor:
         """
-        This function defines the generative process of the Deep Markov Model (DMM). 
-        It takes a mini-batch of input sequences `x_data` and, if available, their corresponding
-        output sequences `y_data`, and generates a sequence of latent variables `z_t` at each time step.
-        It uses an RNN to encode the input sequences, and a Combiner module to combine the RNN hidden states
-        with the previous latent states. The Emitter and GatedTransition modules are then used to model the
-        emission and transition probability distributions, respectively. It returns the final sampled latent
-        variable `z_t`.
-        
-        :param x_data: input data of size (batch_size, num_time_steps, input_size)
-        :type x_data: torch.Tensor
-        :param y_data: output data of size (batch_size, num_time_steps, output_size), defaults to None
-        :type y_data: Optional[torch.Tensor], optional
-        :param annealing_factor: controls the weight of the KL divergence term, defaults to 1.0
-        :type annealing_factor: float, optional
+        Implements the generative model p(y,z|x) which includes the observation 
+        model p(y|z) and transition model p(z_t | z_{t-1}). It also handles the 
+        computation of the parameters of these models.
 
-        :returns: tensor of size (batch_size, latent_dim) representing the final sampled latent variable
-        :rtype: torch.Tensor
-        
+        Parameters
+        ----------
+        x_data : torch.Tensor
+            Input tensor for the model.
+
+        y_data : Optional[torch.Tensor]
+            Optional observed output tensor for the model.
+
+        annealing_factor : float, default = 1.0
+            Annealing factor used in poutine.scale to handle KL annealing.
+
+        Returns
+        -------
+        torch.Tensor
+            The sampled latent variable `z` from the last time step of the model.
         """
 
         # this is the number of time steps we need to process in the data
@@ -185,23 +188,25 @@ class DeepMarkovModelRegressor(RegressorProb):
               annealing_factor: float = 1.0
               ) -> torch.Tensor:
         """
-        This function defines the variational approximation (inference network) of the Deep Markov Model (DMM). 
-        It takes a mini-batch of input sequences `x_data` and, if available, their corresponding
-        output sequences `y_data`, and generates a sequence of latent variables `z_t` at each time step.
-        The guide function aims to approximate the true posterior distribution over the latent variables
-        given the input sequences. It uses an RNN to encode the input sequences, and a Combiner module to 
-        combine the RNN hidden states with the previous latent states. It returns the final sampled latent
-        variable `z_t`.
+        Implements the guide (also called the inference model or variational distribution) q(z|x,y)
+        which is an approximation to the posterior p(z|x,y). It also handles the computation of the 
+        parameters of this guide.
 
-        :param x_data: The input data tensor of shape (batch_size, T_max, input_size)
-        :type x_data: torch.Tensor
-        :param y_data: The output data tensor of shape (batch_size, T_max, output_size), defaults to None
-        :type y_data: Optional[torch.Tensor], optional
-        :param annealing_factor: The scaling factor for the KL term in the loss function, defaults to 1.0
-        :type annealing_factor: float, optional
+        Parameters
+        ----------
+        x_data : torch.Tensor
+            Input tensor for the guide.
 
-        :returns: The latent variable tensor sampled at the final time step, of shape (batch_size, z_dim)
-        :rtype: torch.Tensor
+        y_data : Optional[torch.Tensor]
+            Optional observed output tensor for the guide.
+
+        annealing_factor : float, default = 1.0
+            Annealing factor used in poutine.scale to handle KL annealing.
+
+        Returns
+        -------
+        torch.Tensor
+            The sampled latent variable `z` from the last time step of the guide.
         """
         
         # this is the number of time steps we need to process in the mini-batch

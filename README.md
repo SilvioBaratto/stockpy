@@ -17,23 +17,23 @@
 * [License](#license)
 
 ## Description
-**stockpy** is a Python Machine Learning library designed to facilitate stock market data analysis and predictions. It currently supports the following algorithms:
+**stockpy** is a versatile Python Machine Learning library initially designed for stock market data analysis and predictions. It has now evolved to handle a wider range of datasets, supporting tasks such as regression and classification. It currently supports the following algorithms, each with regression and classification implementations:
 
-- Deep Markov Model (DeepMarkovModel)
-- Gaussian Hidden Markov Models (GaussianHMM)
 - Bayesian Neural Networks (BayesianNN)
 - Long Short Term Memory (LSTM)
 - Bidirectional Long Short Term Memory (BiLSTM)
 - Gated Recurrent Unit (GRU)
 - Bidirectional Gated Recurrent Unit (BiGRU)
 - Multilayer Perceptron (MLP)
+- Deep Markov Model (DeepMarkovModel) `warning: only regression`
+- Gaussian Hidden Markov Models (GaussianHMM) `warning: only regression`
 
-**stockpy** can be used to perform a range of tasks such as detecting relevant trading patterns, making predictions and generating trading signals.
+Whether you are looking to perform predictions on stock market data or extract patterns from more general datasets, stockpy can cater to your requirements.
 
 ## Usage
-To use **stockpy** and perform predictions on stock market data, start by importing the relevant models from the `stockpy.neural_network` and `stockpy.probabilistic` modules. The library can be used with various types of input data, such as CSV files, pandas dataframes and numpy arrays.
+To use **stockpy**, start by importing the relevant models from the `stockpy.neural_network` and `stockpy.probabilistic` modules. The library can be used with various types of input data, such as CSV files, pandas dataframes and numpy arrays.
 
-To demonstrate the usage of stockpy, we can perform the following code to read a CSV file containing stock market data for Apple (AAPL), split the data into training and testing sets, fit an LSTM model to the training data, and use the model to make predictions on the test data:
+Here's an example to demonstrate the usage of stockpy for regression. In this example, we read a CSV file containing stock market data for Apple (AAPL), split the data into training and testing sets, fit an LSTM model to the training data, and use the model to make predictions on the test data:
 ```Python
 from sklearn.model_selection import train_test_split
 import pandas as pd
@@ -50,12 +50,46 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, shuffle
 
 # create model instance and fit to training data
 predictor = DeepMarkovModelRegressor()
-predictor.fit(X_train, y_train, batch_size=24, epochs=10)
+predictor.fit(X=X_train,
+               y=y_train, 
+               lr=0.001, 
+               batch_size=24,
+               sequence_length=22,
+               scaler_type='minmax',
+               epochs=10)
 
 # predictions on test data
 y_pred = predictor.predict(X_test)
 ```
+
+Here's an example to demonstrate the usage of stockpy for classification. In this example, we read a pickle file containing labeled data, split the data into training and testing sets, fit an LSTM model to the training data, and use the model to make classification on the test data:
+
+```Python
+from sklearn.model_selection import train_test_split
+import pandas as pd
+from stockpy.neural_network import LSTMClassifier
+
+data = pd.read_pickle('../../test/data.pickle')
+X = data.drop(['scenario'], axis=1)
+y = data['scenario']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+
+# create model instance and fit to training data
+predictor = LSTMClassifier(hidden_size=32)
+predictor.fit(X=X_train,
+               y=y_train, 
+               lr=0.001, 
+               batch_size=24,
+               sequence_length=22,
+               scaler_type='minmax',
+               epochs=10)
+
+# Append true labels and predicted labels to lists using the score method
+true_labels, pred_labels = predictor.score(X_test, y_test)
+```
+
 The above code can be applied to all models in the library, just make sure to import from the correct location, either `stockpy.neural_network` or `stockpy.probabilistic`.
+
 
 ## Dependencies and installation
 **stockpy** requires the modules `numpy, torch, pyro-ppl`. The code is tested for _Python 3_. It can be installed using `pip` or directly from the source cod.
@@ -120,8 +154,9 @@ python3 data.py --download --folder="../../example"
 
 ## TODOS
 - Implementing other functionalities as portfolio optimization
+- Implement test folder
+- Add more tutorials and code explanation
 - Implement transformers
-- Implement stockGPT to make long term predictions
 
 ## Authors and acknowledgements
 **stockpy** is currently developed and mantained by **Silvio Baratto**. You can contact me at:
