@@ -22,44 +22,34 @@ from ._base import RegressorProb
 from .utils._hmm_utils import Emitter, GatedTransition
 from ..config import Config as cfg
 
-class GaussianHMMRegressor(RegressorProb):
+class GHMMRegressor(RegressorProb):
     """
     A class used to represent a Gaussian Hidden Markov Model (GHMM) for regression tasks.
     This class inherits from the `RegressorProb` class.
 
-    ...
+    Attributes:
+        rnn_dim (int): 
+            The dimension of the hidden state of the RNN.
+        z_dim (int): 
+            The dimension of the latent random variable z.
+        emission_dim (int): 
+            The dimension of the hidden state of the emission model.
+        transition_dim (int): 
+            The dimension of the hidden state of the transition model.
+        variance (float): 
+            The variance of the observation noise.
+        model_type (str): 
+            A string representing the type of the model (default is "rnn").
 
-    Parameters
-    ----------
-    rnn_dim:
-        the dimension of the hidden state of the RNN
-    z_dim:
-        the dimension of the latent random variable z
-    emission_dim:
-        the dimension of the hidden state of the emission model
-    transition_dim:
-        the dimension of the hidden state of the transition model
-    variance:   
-        the variance of the observation noise
-
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "rnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the GaussianHMMRegressor object with given or default parameters.
-
-    _init_model(self):
-        Initializes the GHMM modules (emitter, transition) and some trainable parameters.
-
-    model(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
-        Defines the generative model which describes the process of generating the data.
-
-    guide(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
-        Defines the variational guide (approximate posterior) that is used for inference.
+    Methods:
+        __init__(self, **kwargs): 
+            Initializes the GaussianHMMRegressor object with given or default parameters.
+        _init_model(self): 
+            Initializes the GHMM modules (emitter, transition) and some trainable parameters.
+        model(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
+            Defines the generative model which describes the process of generating the data.
+        guide(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
+            Defines the variational guide (approximate posterior) that is used for inference.
     """
 
     model_type = "rnn"
@@ -101,21 +91,13 @@ class GaussianHMMRegressor(RegressorProb):
         model p(y|z) and transition model p(z_t | z_{t-1}). It also handles the 
         computation of the parameters of these models.
 
-        Parameters
-        ----------
-        x_data : torch.Tensor
-            Input tensor for the model.
+        Args:
+            x_data (torch.Tensor): Input tensor for the model.
+            y_data (Optional[torch.Tensor]): Optional observed output tensor for the model.
+            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
 
-        y_data : Optional[torch.Tensor]
-            Optional observed output tensor for the model.
-
-        annealing_factor : float, default = 1.0
-            Annealing factor used in poutine.scale to handle KL annealing.
-
-        Returns
-        -------
-        torch.Tensor
-            The sampled latent variable `z` from the last time step of the model.
+        Returns:
+            torch.Tensor: The sampled latent variable `z` from the last time step of the model.
         """
 
         T_max = x_data.size(1)
@@ -167,21 +149,13 @@ class GaussianHMMRegressor(RegressorProb):
         which is an approximation to the posterior p(z|x,y). It also handles the computation of the 
         parameters of this guide.
 
-        Parameters
-        ----------
-        x_data : torch.Tensor
-            Input tensor for the guide.
+        Args:
+            x_data (torch.Tensor): Input tensor for the guide.
+            y_data (Optional[torch.Tensor]): Optional observed output tensor for the guide.
+            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
 
-        y_data : Optional[torch.Tensor]
-            Optional observed output tensor for the guide.
-
-        annealing_factor : float, default = 1.0
-            Annealing factor used in poutine.scale to handle KL annealing.
-
-        Returns
-        -------
-        torch.Tensor
-            The sampled latent variable `z` from the last time step of the guide.
+        Returns:
+            torch.Tensor: The sampled latent variable `z` from the last time step of the guide.
         """
         
         T_max = x_data.size(1)
@@ -213,6 +187,12 @@ class GaussianHMMRegressor(RegressorProb):
             return z_t
         
     def _initSVI(self) -> pyro.infer.svi.SVI:
+        """
+        Initializes the Stochastic Variational Inference (SVI) for the GaussianHMMRegressor model.
+
+        Returns:
+            pyro.infer.svi.SVI: The initialized SVI object.
+        """
         return SVI(model=self.model,
                    guide=self.guide,
                    optim=self.optimizer, 

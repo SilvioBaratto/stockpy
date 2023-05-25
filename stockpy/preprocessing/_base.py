@@ -12,32 +12,25 @@ class BaseStockDataset(torch.utils.data.Dataset):
 
     This class represents a base dataset for stock data. It extends from PyTorch's Dataset class.
 
-    Parameters
-    ----------
-    X : torch.Tensor
-        The input data tensor.
-    y : torch.Tensor, optional
-        The target data tensor. Default is None.
-    task : str, optional
-        The type of task. Could be either 'regression' or 'classification'. Default is None.
+    Parameters:
+        X (torch.Tensor): The input data tensor.
+        y (torch.Tensor, optional): The target data tensor. Default is None.
+        task (str, optional): The type of task. Could be either 'regression' or 'classification'. Default is None.
 
-    Attributes
-    ----------
-    X : torch.Tensor
-        The input data tensor.
-    y : torch.Tensor
-        The target data tensor.
-    task : str
-        The type of task. Could be either 'regression' or 'classification'.
+    Attributes:
+        X (torch.Tensor): The input data tensor.
+        y (torch.Tensor): The target data tensor.
+        task (str): The type of task. Could be either 'regression' or 'classification'.
     """
 
-    def __init__(self,
-                 X: torch.Tensor,
-                 y: torch.Tensor = None,
-                 task: str = None
-                 ):
+    def __init__(self, X: torch.Tensor, y: torch.Tensor = None, task: str = None):
         """
         Initializes the BaseStockDataset instance.
+        
+        Args:
+            X (torch.Tensor): The input data tensor.
+            y (torch.Tensor, optional): The target data tensor. Default is None.
+            task (str, optional): The type of task. Could be either 'regression' or 'classification'. Default is None.
         """
         self.X = X
         self.y = y
@@ -47,10 +40,8 @@ class BaseStockDataset(torch.utils.data.Dataset):
         """
         Returns the number of samples in the dataset.
 
-        Returns
-        -------
-        int
-            The number of samples in the dataset.
+        Returns:
+            int: The number of samples in the dataset.
         """
         return self.X.shape[0]
 
@@ -59,10 +50,8 @@ class BaseStockDataset(torch.utils.data.Dataset):
         """
         The size of the input data.
 
-        Returns
-        -------
-        int
-            The number of features in the input data.
+        Returns:
+            int: The number of features in the input data.
         """
         return self.X.shape[1]
 
@@ -74,10 +63,8 @@ class BaseStockDataset(torch.utils.data.Dataset):
         If the task is 'regression', it returns the number of targets in the output data.
         If the task is 'classification', it returns the number of unique classes in the output data.
 
-        Returns
-        -------
-        int
-            The size of the output data.
+        Returns:
+            int: The size of the output data.
         """
         if self.task == 'regression':
             return self.y.shape[1]

@@ -47,6 +47,7 @@ extensions = [
     "sphinx.ext.graphviz",  #
     "sphinx.ext.autodoc",
     "sphinx.ext.doctest",
+    "sphinx.ext.napoleon",  # Add this line here
 ]
 
 # Disable documentation inheritance so as to avoid inheriting
@@ -76,7 +77,7 @@ author = u"Silvio Baratto"
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 
-version = "0.1.14"
+version = "0.1.8.1"
 
 # release version
 release = version

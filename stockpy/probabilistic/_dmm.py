@@ -22,49 +22,34 @@ from ._base import RegressorProb
 from .utils import Emitter, Combiner, GatedTransition
 from ..config import Config as cfg
 
-class DeepMarkovModelRegressor(RegressorProb):
+class DeepMarkovRegressor(RegressorProb):
     """
     A class used to represent a Deep Markov Model (DMM) for regression tasks.
     This class inherits from the `RegressorProb` class.
 
-    ...
+    Attributes:
+        rnn_dim (int): The dimension of the hidden state of the RNN.
+        z_dim (int): The dimension of the latent random variable z.
+        emission_dim (int): The dimension of the hidden state of the emission model.
+        transition_dim (int): The dimension of the hidden state of the transition model.
+        variance (float): The variance of the observation noise.
+        model_type (str): A string representing the type of the model (default is "rnn").
 
-    Parameters
-    ----------
-    rnn_dim:
-        the dimension of the hidden state of the RNN
-    z_dim:
-        the dimension of the latent random variable z
-    emission_dim:
-        the dimension of the hidden state of the emission model
-    transition_dim:
-        the dimension of the hidden state of the transition model
-    variance:   
-        the variance of the observation noise
-
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "rnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the DeepMarkovModelRegressor object with given or default parameters.
-
-    _init_model(self):
-        Initializes the DMM modules (emitter, transition, combiner, rnn) and some trainable parameters.
-
-    model(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
-        Defines the generative model which describes the process of generating the data.
-
-    guide(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
-        Defines the variational guide (approximate posterior) that is used for inference.
+    Methods:
+        __init__(self, **kwargs): Initializes the DeepMarkovModelRegressor object with given or default parameters.
+        _init_model(self): Initializes the DMM modules (emitter, transition, combiner, rnn) and some trainable parameters.
+        model(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
+            Defines the generative model which describes the process of generating the data.
+        guide(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
+            Defines the variational guide (approximate posterior) that is used for inference.
     """
 
     model_type = "rnn"
    
     def __init__(self, **kwargs):
+        """
+        Initializes the DeepMarkovModelRegressor object with given or default parameters.
+        """
         super().__init__(**kwargs)
 
     def _init_model(self):
@@ -112,25 +97,17 @@ class DeepMarkovModelRegressor(RegressorProb):
               annealing_factor: float = 1.0
               ) -> torch.Tensor:
         """
-        Implements the generative model p(y,z|x) which includes the observation 
+        Defines the generative model p(y,z|x) which includes the observation 
         model p(y|z) and transition model p(z_t | z_{t-1}). It also handles the 
         computation of the parameters of these models.
 
-        Parameters
-        ----------
-        x_data : torch.Tensor
-            Input tensor for the model.
+        Args:
+            x_data (torch.Tensor): Input tensor for the model.
+            y_data (Optional[torch.Tensor]): Optional observed output tensor for the model.
+            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
 
-        y_data : Optional[torch.Tensor]
-            Optional observed output tensor for the model.
-
-        annealing_factor : float, default = 1.0
-            Annealing factor used in poutine.scale to handle KL annealing.
-
-        Returns
-        -------
-        torch.Tensor
-            The sampled latent variable `z` from the last time step of the model.
+        Returns:
+            torch.Tensor: The sampled latent variable `z` from the last time step of the model.
         """
 
         # this is the number of time steps we need to process in the data
@@ -188,25 +165,17 @@ class DeepMarkovModelRegressor(RegressorProb):
               annealing_factor: float = 1.0
               ) -> torch.Tensor:
         """
-        Implements the guide (also called the inference model or variational distribution) q(z|x,y)
+        Defines the guide (also called the inference model or variational distribution) q(z|x,y)
         which is an approximation to the posterior p(z|x,y). It also handles the computation of the 
         parameters of this guide.
 
-        Parameters
-        ----------
-        x_data : torch.Tensor
-            Input tensor for the guide.
+        Args:
+            x_data (torch.Tensor): Input tensor for the guide.
+            y_data (Optional[torch.Tensor]): Optional observed output tensor for the guide.
+            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
 
-        y_data : Optional[torch.Tensor]
-            Optional observed output tensor for the guide.
-
-        annealing_factor : float, default = 1.0
-            Annealing factor used in poutine.scale to handle KL annealing.
-
-        Returns
-        -------
-        torch.Tensor
-            The sampled latent variable `z` from the last time step of the guide.
+        Returns:
+            torch.Tensor: The sampled latent variable `z` from the last time step of the guide.
         """
         
         # this is the number of time steps we need to process in the mini-batch
@@ -247,6 +216,12 @@ class DeepMarkovModelRegressor(RegressorProb):
             return z_t
         
     def _initSVI(self) -> pyro.infer.svi.SVI:
+        """
+        Initializes the Stochastic Variational Inference (SVI) for the DeepMarkovModelRegressor model.
+
+        Returns:
+            pyro.infer.svi.SVI: The initialized SVI object.
+        """
         return SVI(model=self.model,
                    guide=self.guide,
                    optim=self.optimizer, 

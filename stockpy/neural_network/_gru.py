@@ -12,43 +12,35 @@ from ..config import Config as cfg
 
 class GRUClassifier(ClassifierNN):
     """
-    A class used to represent a Gated Recurrent Unit (GRU) network for classification tasks. 
+    A class used to represent a Gated Recurrent Unit (GRU) network for classification tasks.
     This class inherits from the `ClassifierNN` class.
 
-    ...
+    Attributes:
+        model_type (str): A string that represents the type of the model (default is "rnn").
 
-    Parameters
-    ----------
-    hidden_size:
-        a list of integers that represents the number of nodes in each hidden layer or 
-        a single integer that represents the number of nodes in a single hidden layer
-    num_layers:
-        the number of recurrent layers (default is 1)
+    Args:
+        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
+                                              a single integer that represents the number of nodes in a single hidden layer.
+        num_layers (int): The number of recurrent layers (default is 1).
 
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "rnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the GRUClassifier object with given or default parameters.
-
-    _init_model(self):
-        Initializes the GRU and fully connected layers of the model based on configuration.
-
-    forward(x: torch.Tensor) -> torch.Tensor:
-        Defines the forward pass of the GRU network.
+    Methods:
+        __init__(self, **kwargs): Initializes the GRUClassifier object with given or default parameters.
+        _init_model(self): Initializes the GRU and fully connected layers of the model based on configuration.
+        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the GRU network.
     """
 
     model_type = "rnn"
 
     def __init__(self, **kwargs):
+        """
+        Initializes the GRUClassifier object with given or default parameters.
+        """
         super().__init__(**kwargs)
-        # Initializes the GRU neural network model with given or default parameters
 
     def _init_model(self):
+        """
+        Initializes the GRU and fully connected layers of the model based on configuration.
+        """
         # Checks if hidden_sizes is a single integer and, if so, converts it to a list
         if isinstance(cfg.nn.hidden_size, int):
             self.hidden_sizes = [cfg.nn.hidden_size]
@@ -98,46 +90,39 @@ class GRUClassifier(ClassifierNN):
 
         # Returns the output of the forward pass of the GRU network
         return out
-    
+
+
 class GRURegressor(RegressorNN):
     """
-    A class used to represent a Gated Recurrent Unit (GRU) network for regression tasks. 
+    A class used to represent a Gated Recurrent Unit (GRU) network for regression tasks.
     This class inherits from the `RegressorNN` class.
 
-    ...
+    Attributes:
+        model_type (str): A string that represents the type of the model (default is "rnn").
 
-    Parameters
-    ----------
-    hidden_size:
-        a list of integers that represents the number of nodes in each hidden layer or 
-        a single integer that represents the number of nodes in a single hidden layer
-    num_layers:
-        the number of recurrent layers (default is 1)
+    Args:
+        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
+                                              a single integer that represents the number of nodes in a single hidden layer.
+        num_layers (int): The number of recurrent layers (default is 1).
 
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "rnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the GRURegressor object with given or default parameters.
-
-    _init_model(self):
-        Initializes the GRU and fully connected layers of the model based on configuration.
-
-    forward(x: torch.Tensor) -> torch.Tensor:
-        Defines the forward pass of the GRU network.
+    Methods:
+        __init__(self, **kwargs): Initializes the GRURegressor object with given or default parameters.
+        _init_model(self): Initializes the GRU and fully connected layers of the model based on configuration.
+        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the GRU network.
     """
 
     model_type = "rnn"
 
     def __init__(self, **kwargs):
+        """
+        Initializes the GRURegressor object with given or default parameters.
+        """
         super().__init__(**kwargs)
-        # Initializes the GRU neural network model with given or default parameters
 
     def _init_model(self):
+        """
+        Initializes the GRU and fully connected layers of the model based on configuration.
+        """
         # Checks if hidden_sizes is a single integer and, if so, converts it to a list
         if isinstance(cfg.nn.hidden_size, int):
             self.hidden_sizes = [cfg.nn.hidden_size]
@@ -165,7 +150,6 @@ class GRURegressor(RegressorNN):
         :param x: The input tensor.
         :returns: The output tensor, corresponding to the predicted target variable(s).
         """
-
         # Ensures the model has been fitted before making predictions
         if not self.grus:
             raise RuntimeError("You must call fit before calling predict")

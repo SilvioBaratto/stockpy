@@ -15,6 +15,7 @@ class Common:
 @dataclass
 class NN(Common):
     num_layers: int = 2
+    nhead: int = 2
 
 # Settings specific to probabilistic neural networks
 @dataclass

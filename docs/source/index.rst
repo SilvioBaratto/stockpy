@@ -5,13 +5,15 @@
 
 :github_url: https://github.com/SilvioBaratto/stockpy
 
-stockpy Documentation
-======================
+StockPy Documentation
+=====================
 
 .. toctree::
    :glob:
    :maxdepth: 2
-   :caption: stockpy Core:
+   :caption: Contents:
 
-   Module
-   Functions
+   functions
+   regression
+   classification
+   dataset_transformation

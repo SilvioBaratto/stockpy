@@ -17,89 +17,131 @@ class BaseEstimator(metaclass=ABCMeta):
     This class serves as the base class for all estimators. It defines the common interface that all estimators should
     follow. The actual behavior of the methods is defined in the subclasses.
 
-    Methods
-    -------
-    __init__(**kwargs):
-        Initializes the BaseEstimator instance. It sets the attributes from the keyword arguments to the
-        configuration.
+    Attributes:
+        None
 
-    forward(x):
-        The forward pass of the model. It is an abstract method.
-
-    _init_model():
-        Initializes the model. It is an abstract method.
-
-    _initOptimizer() -> torch.optim.Optimizer:
-        Initializes the optimizer. It is an abstract method.
-
-    _initScheduler() -> torch.optim.lr_scheduler.StepLR:
-        Initializes the learning rate scheduler. It is an abstract method.
-
-    _initComponent():
-        Initializes the components. It is an abstract method.
-
-    _doTraining():
-        Performs the training. It is an abstract method.
-
-    _doValidation():
-        Performs the validation. It is an abstract method.
-
-    fit(X, y, **kwargs):
-        Fits the model to the data. It initializes the dataloader, the model, and then starts the training.
-
-    _train(train_dl, val_dl):
-        Trains the model using the training dataloader and validates using the validation dataloader. It performs
-        early stopping if enabled.
-
-    _saveModel():
-        Saves the model to a file.
-
-    _loadModel():
-        Loads the model from a file.
-
-    _earlyStopping(total_loss, best_loss, counter):
-        Implements early stopping during training.
-
-    to(device):
-        Moves the model to the specified device.
-
-    name:
-        Returns the name of the class.
+    Methods:
+        __init__(**kwargs):
+            Initializes the BaseEstimator instance. It sets the attributes from the keyword arguments to the
+            configuration.
+        forward(x):
+            The forward pass of the model. It is an abstract method.
+        _init_model():
+            Initializes the model. It is an abstract method.
+        _initOptimizer() -> torch.optim.Optimizer:
+            Initializes the optimizer. It is an abstract method.
+        _initScheduler() -> torch.optim.lr_scheduler.StepLR:
+            Initializes the learning rate scheduler. It is an abstract method.
+        _initComponent():
+            Initializes the components. It is an abstract method.
+        _doTraining():
+            Performs the training. It is an abstract method.
+        _doValidation():
+            Performs the validation. It is an abstract method.
+        fit(X, y, **kwargs):
+            Fits the model to the data. It initializes the dataloader, the model, and then starts the training.
+        _train(train_dl, val_dl):
+            Trains the model using the training dataloader and validates using the validation dataloader. It performs
+            early stopping if enabled.
+        _saveModel():
+            Saves the model to a file.
+        _loadModel():
+            Loads the model from a file.
+        _earlyStopping(total_loss, best_loss, counter):
+            Implements early stopping during training.
+        to(device):
+            Moves the model to the specified device.
+        name:
+            Returns the name of the class.
     """
 
     @abstractmethod
     def __init__(self, **kwargs):
+        """
+        Initializes the BaseEstimator instance. It sets the attributes from the keyword arguments to the
+        configuration.
+
+        Args:
+            **kwargs: Additional keyword arguments to be set as attributes in the Training configuration.
+
+        Returns:
+            None
+        """
         for key, value in kwargs.items():
             setattr(cfg.nn, key, value)
             setattr(cfg.prob, key, value)
 
     @abstractmethod
     def forward(self, x):
-        # Your code here
+        """
+        The forward pass of the model.
+
+        Args:
+            x: The input tensor.
+
+        Returns:
+            None
+        """
         pass  
 
     @abstractmethod
     def _init_model(self):
+        """
+        Initializes the model.
+
+        Returns:
+            None
+        """
         pass
 
     @abstractmethod
     def _initOptimizer(self) -> torch.optim.Optimizer:
+        """
+        Initializes the optimizer.
+
+        Returns:
+            torch.optim.Optimizer: The initialized optimizer.
+        """
         pass
 
     @abstractmethod
     def _initScheduler(self) -> torch.optim.lr_scheduler.StepLR:
+        """
+        Initializes the learning rate scheduler.
+
+        Returns:
+            torch.optim.lr_scheduler.StepLR: The initialized learning rate scheduler.
+        """
         pass
 
     @abstractmethod
     def _initComponent(self):
+        """
+        Initializes the components.
+
+        Returns:
+            None
+        """
         pass
 
     @abstractmethod
     def _doTraining(self):
+        """
+        Performs the training.
+
+        Returns:
+            None
+        """
         pass
 
     @abstractmethod
     def _doValidation(self):
+        """
+        Performs the validation.
+
+        Returns:
+            None
+        """
         pass
 
     def fit(self, 
@@ -112,52 +154,43 @@ class BaseEstimator(metaclass=ABCMeta):
 
         This method initializes the data loader, the model, and then starts the training process.
 
-        Parameters
-        ----------
-        X : Union[np.ndarray, pd.core.frame.DataFrame]
-            The input data. This could be either a numpy array or a pandas DataFrame.
-        y : Union[np.ndarray, pd.core.frame.DataFrame]
-            The target data. This could be either a numpy array or a pandas DataFrame.
+        Args:
+            X (Union[np.ndarray, pd.core.frame.DataFrame]): The input data.
+            y (Union[np.ndarray, pd.core.frame.DataFrame]): The target data.
 
-        **kwargs : dict, optional
-            Additional keyword arguments to be set as attributes in the Training configuration. The possible arguments are:
-            - eval (bool): Print settings.
-            - lr (float): Learning rate for the optimizer.
-            - betas (tuple): Coefficients used for computing running averages of gradient and its square.
-            - weight_decay (float): Weight decay (L2 penalty).
-            - eps (float): Term added to the denominator to improve numerical stability.
-            - amsgrad (bool): Whether to use the AMSGrad variant of the Adam optimizer.
-            - gamma (float): Multiplicative factor of learning rate decay.
-            - step_size (float): Period of learning rate decay.
-            - scheduler_patience (int): The number of epochs to wait for improvement before stopping early.
-            - min_delta (int): Minimum change in the monitored quantity to qualify as an improvement.
-            - scheduler (bool): Whether to use a learning rate scheduler.
-            - scheduler_mode (str): The mode for the learning rate scheduler.
-            - scheduler_factor (float): The factor for reducing the learning rate.
-            - scheduler_threshold (float): The threshold for reducing the learning rate.
-            - lrd (float): Learning rate decay.
-            - clip_norm (float): Gradient clipping threshold.
-            - scaler_type (str): The type of scaler to use.
-            - epochs (int): The number of epochs to train for.
-            - batch_size (int): The size of the batches for training.
-            - sequence_length (int): The length of the sequence for training.
-            - num_workers (int): The number of worker threads to use for data loading.
-            - validation_cadence (int): The number of epochs between validation checks.
-            - optim_args (float): Additional arguments for the optimizer.
-            - shuffle (bool): Whether to shuffle the data before each epoch.
-            - val_size (float): The size of the validation set.
-            - use_cuda (bool): Whether to use CUDA for training.
-            - device (str): The device to use for training.
-            - early_stopping (bool): Whether to use early stopping.
-            - metrics (bool): Whether to compute metrics during training.
-            - pretrained (bool): Whether to load a pre-trained model.
-            - folder (str): The folder to save the model to.
+            Optional keyword arguments:
+            eval (bool): Print settings.
+            lr (float): Learning rate for the optimizer.
+            betas (tuple): Coefficients used for computing running averages of gradient and its square.
+            weight_decay (float): Weight decay (L2 penalty).
+            eps (float): Term added to the denominator to improve numerical stability.
+            amsgrad (bool): Whether to use the AMSGrad variant of the Adam optimizer.
+            gamma (float): Multiplicative factor of learning rate decay.
+            step_size (float): Period of learning rate decay.
+            scheduler_patience (int): The number of epochs to wait for improvement before stopping early.
+            min_delta (int): Minimum change in the monitored quantity to qualify as an improvement.
+            scheduler (bool): Whether to use a learning rate scheduler.
+            scheduler_mode (str): The mode for the learning rate scheduler.
+            scheduler_factor (float): The factor for reducing the learning rate.
+            scheduler_threshold (float): The threshold for reducing the learning rate.
+            lrd (float): Learning rate decay.
+            clip_norm (float): Gradient clipping threshold.
+            scaler_type (str): The type of scaler to use.
+            epochs (int): The number of epochs to train for.
+            batch_size (int): The size of the batches for training.
+            sequence_length (int): The length of the sequence for training.
+            num_workers (int): The number of worker threads to use for data loading.
+            validation_cadence (int): The number of epochs between validation checks.
+            optim_args (float): Additional arguments for the optimizer.
+            shuffle (bool): Whether to shuffle the data before each epoch.
+            val_size (float): The size of the validation set.
+            early_stopping (bool): Whether to use early stopping.
+            pretrained (bool): Whether to load a pre-trained model.
+            folder (str): The folder to save the model to.
 
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
-
         for key, value in kwargs.items():
             setattr(cfg.training, key, value)
 
@@ -189,18 +222,13 @@ class BaseEstimator(metaclass=ABCMeta):
         """
         Train the model with the given training and validation data loaders.
 
-        Parameters
-        ----------
-        train_dl : torch.utils.data.DataLoader
-            The data loader for the training data.
-        val_dl : torch.utils.data.DataLoader
-            The data loader for the validation data.
+        Args:
+            train_dl (torch.utils.data.DataLoader): The data loader for the training data.
+            val_dl (torch.utils.data.DataLoader): The data loader for the validation data.
 
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
-
         best_loss = np.inf
         counter = 0
         self._initComponent()
@@ -228,14 +256,9 @@ class BaseEstimator(metaclass=ABCMeta):
         """
         Save the current state of the model.
 
-        This method saves the current state of the model to a file. The file path is 
-        determined by the `cfg.training.folder` attribute and the `_log_build_file_path` method.
-
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
-
         # Define a helper function to build the file path
         def build_file_path(file_format: str, *args) -> str:
             return os.path.join(lib_dir, 'save', file_format.format(*args))
@@ -266,15 +289,9 @@ class BaseEstimator(metaclass=ABCMeta):
         """
         Load a previously saved state of the model.
 
-        This method loads a previously saved state of the model from a file. The file path is 
-        determined by the `cfg.training.folder` attribute and the `_log_build_file_path` method. 
-        If the file does not exist, it raises a ValueError.
-
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
-
         # Define a helper function to build the file path
         def build_file_path(file_format: str, *args) -> str:
             return os.path.join(lib_dir, 'save', file_format.format(*args))
@@ -312,29 +329,16 @@ class BaseEstimator(metaclass=ABCMeta):
         """
         Implements early stopping.
 
-        This method checks whether the total loss has improved compared to the best loss seen so far. 
-        If there is improvement, it saves the model and resets the counter. If there is no improvement, 
-        it increments the counter. If the counter reaches `cfg.training.patience`, it stops the training early.
+        Args:
+            total_loss (float): The total loss for the current epoch.
+            best_loss (float): The best loss seen so far.
+            counter (int): The number of epochs without improvement.
 
-        Parameters
-        ----------
-        total_loss : float
-            The total loss for the current epoch.
-        best_loss : float
-            The best loss seen so far.
-        counter : int
-            The number of epochs without improvement.
-
-        Returns
-        -------
-        stop : bool
-            Whether to stop the training early.
-        best_loss : float
-            The updated best loss.
-        counter : int
-            The updated counter.
+        Returns:
+            stop (bool): Whether to stop the training early.
+            best_loss (float): The updated best loss.
+            counter (int): The updated counter.
         """
-
         if total_loss < best_loss - cfg.training.min_delta:
             best_loss = total_loss
             self._saveModel()
@@ -352,14 +356,11 @@ class BaseEstimator(metaclass=ABCMeta):
         """
         Moves the model to the specified device.
 
-        Parameters
-        ----------
-        device : torch.device
-            The device to move the model to.
+        Args:
+            device (torch.device): The device to move the model to.
 
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
         super().to(device)
     
@@ -368,10 +369,8 @@ class BaseEstimator(metaclass=ABCMeta):
         """
         Returns the name of the class.
 
-        Returns
-        -------
-        name : str
-            The name of the class.
+        Returns:
+            str: The name of the class.
         """
         return self.__class__.__name__
 
@@ -380,23 +379,29 @@ class ClassifierMixin(BaseEstimator, metaclass=ABCMeta):
     This class is a mixin for classification tasks. It extends the BaseEstimator class and implements additional methods
     specific to classification.
 
-    Methods
-    -------
-    _log_train_progress(epoch_ndx, train_results):
-        Logs the training progress.
-    _log_validation_progress(epoch_ndx, train_results, val_results):
-        Logs the validation progress.
-    score(X, y):
-        Computes the score of the classifier on the given test data and labels.
-    task:
-        Returns the task type as a string.
-
+    Methods:
+        __init__(**kwargs):
+            Initializes the classifier. This method is abstract and must be overridden in subclasses.
+        _log_train_progress(epoch_ndx, train_results):
+            Logs the training progress.
+        _log_validation_progress(epoch_ndx, train_results, val_results):
+            Logs the validation progress.
+        score(X, y):
+            Computes the score of the classifier on the given test data and labels.
+        task:
+            Returns the task type as a string ('classification').
     """
 
     @abstractmethod
     def __init__(self, **kwargs):
         """
         Initializes the classifier. This method is abstract and must be overridden in subclasses.
+
+        Args:
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            None
         """
 
         super().__init__(**kwargs)
@@ -405,16 +410,12 @@ class ClassifierMixin(BaseEstimator, metaclass=ABCMeta):
         """
         Logs the training progress.
 
-        Parameters
-        ----------
-        epoch_ndx : int
-            The current epoch index.
-        train_results : tuple
-            A tuple containing the training results.
+        Args:
+            epoch_ndx (int): The current epoch index.
+            train_results (tuple): A tuple containing the training results.
 
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
 
         train_loss, train_acc, true_labels, pred_labels = train_results
@@ -424,58 +425,45 @@ class ClassifierMixin(BaseEstimator, metaclass=ABCMeta):
         """
         Logs the validation progress.
 
-        Parameters
-        ----------
-        epoch_ndx : int
-            The current epoch index.
-        train_results : tuple
-            A tuple containing the training results.
-        val_results : tuple
-            A tuple containing the validation results.
+        Args:
+            epoch_ndx (int): The current epoch index.
+            train_results (tuple): A tuple containing the training results.
+            val_results (tuple): A tuple containing the validation results.
 
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
         
         val_loss, val_acc, true_labels, pred_labels = val_results
         tqdm.write(f"Epoch {epoch_ndx}, Val Loss: {val_loss} Val F1: {val_acc}", end='\r')
 
     def score(self,
-              X: Union[np.ndarray, pd.core.frame.DataFrame],
-              y: Union[np.ndarray, pd.core.frame.DataFrame]):
+            X: Union[np.ndarray, pd.core.frame.DataFrame],
+            y: Union[np.ndarray, pd.core.frame.DataFrame]):
         """
         Computes the score of the classifier on the given test data and labels.
 
-        Parameters
-        ----------
-        X : Union[np.ndarray, pd.core.frame.DataFrame]
-            The test data.
-        y : Union[np.ndarray, pd.core.frame.DataFrame]
-            The true labels for the test data.
+        Args:
+            X (Union[np.ndarray, pd.core.frame.DataFrame]): The test data.
+            y (Union[np.ndarray, pd.core.frame.DataFrame]): The true labels for the test data.
 
-        Returns
-        -------
-        true_labels : np.ndarray
-            The true labels.
-        pred_labels : np.ndarray
-            The predicted labels.
+        Returns:
+            true_labels (np.ndarray): The true labels.
+            pred_labels (np.ndarray): The predicted labels.
         """
 
-        test_dl = self.dataloader.get_loader(X, y, mode = 'test')
+        test_dl = self.dataloader.get_loader(X, y, mode='test')
         _, _, true_labels, pred_labels = self._doValidation(test_dl)
         
         return true_labels, pred_labels
-    
+
     @property
     def task(self) -> str:
         """
         Returns the task type as a string.
 
-        Returns
-        -------
-        task : str
-            The task type ('classification').
+        Returns:
+            task (str): The task type ('classification').
         """
 
         return 'classification'
@@ -485,23 +473,29 @@ class RegressorMixin(BaseEstimator, metaclass=ABCMeta):
     This class is a mixin for regression tasks. It extends the BaseEstimator class and implements additional methods
     specific to regression.
 
-    Methods
-    -------
-    _log_train_progress(epoch_ndx, train_results):
-        Logs the training progress.
-    _log_validation_progress(epoch_ndx, train_results, val_results):
-        Logs the validation progress.
-    predict(X):
-        Predicts the targets for the given data.
-    task:
-        Returns the task type as a string.
-
+    Methods:
+        __init__(**kwargs):
+            Initializes the regressor. This method is abstract and must be overridden in subclasses.
+        _log_train_progress(epoch_ndx, train_results):
+            Logs the training progress.
+        _log_validation_progress(epoch_ndx, train_results, val_results):
+            Logs the validation progress.
+        predict(X):
+            Predicts the targets for the given data.
+        task:
+            Returns the task type as a string ('regression').
     """
-    
+
     @abstractmethod
     def __init__(self, **kwargs):
         """
         Initializes the regressor. This method is abstract and must be overridden in subclasses.
+
+        Args:
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            None
         """
 
         super().__init__(**kwargs)
@@ -510,16 +504,12 @@ class RegressorMixin(BaseEstimator, metaclass=ABCMeta):
         """
         Logs the training progress.
 
-        Parameters
-        ----------
-        epoch_ndx : int
-            The current epoch index.
-        train_results : tuple
-            A tuple containing the training results.
+        Args:
+            epoch_ndx (int): The current epoch index.
+            train_results (tuple): A tuple containing the training results.
 
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
 
         train_loss, _, _, _ = train_results
@@ -529,59 +519,52 @@ class RegressorMixin(BaseEstimator, metaclass=ABCMeta):
         """
         Logs the validation progress.
 
-        Parameters
-        ----------
-        epoch_ndx : int
-            The current epoch index.
-        train_results : tuple
-            A tuple containing the training results.
-        val_results : tuple
-            A tuple containing the validation results.
+        Args:
+            epoch_ndx (int): The current epoch index.
+            train_results (tuple): A tuple containing the training results.
+            val_results (tuple): A tuple containing the validation results.
 
-        Returns
-        -------
-        None
+        Returns:
+            None
         """
 
         train_loss, _, _, _ = train_results
         val_loss, _, _, _ = val_results
         tqdm.write(f"Epoch {epoch_ndx}, Train Loss: {train_loss}, Val Loss: {val_loss}", end='\r')
 
-    
+
     def predict(self, 
                 X: Union[np.ndarray, pd.core.frame.DataFrame]
                 ) -> np.ndarray:
         """
-        Computes the prediction of the regressor on the given test data and target.
+        Computes the prediction of the regressor on the given test data.
 
-        Parameters
-        ----------
-        X : Union[np.ndarray, pd.core.frame.DataFrame]
-            The test data.
-        y : Union[np.ndarray, pd.core.frame.DataFrame]
-            The true labels for the test data.
+        Args:
+            X (Union[np.ndarray, pd.core.frame.DataFrame]): The test data.
 
-        Returns
-        -------
-        output : np.ndarray
-            The predicted target.
+        Returns:
+            output (np.ndarray): The predicted target.
         """
 
-        test_dl = self.dataloader.get_loader(X, y=None, mode = 'test')
+        test_dl = self.dataloader.get_loader(X, y=None, mode='test')
         output = self._predict(test_dl)
         output = self.dataloader.inverse_transform_output(output).cpu().detach().numpy()
         
         return output
-    
+
     @property
     def task(self) -> str:
         """
         Returns the task type as a string.
 
-        Returns
-        -------
-        task : str
-            The task type ('regression').
+        Returns:
+            task (str): The task type ('regression').
         """
 
         return 'regression'
+    
+class MetaEstimatorMixin:
+    _required_parameters = ['model_type', 'task']
+    """
+    Mixin class for all meta estimators in stockpy.
+    """

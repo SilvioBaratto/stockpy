@@ -16,23 +16,15 @@ from ..config import Config as cfg
 class BaseNN(BaseEstimator, nn.Module, metaclass=ABCMeta):
     """
     This class is an abstract base class for all neural network models.
-    It extends both the BaseEstimator and torch.nn.Module classes to provide the basic functionalities required by any model.
+    It extends both the `BaseEstimator` and `torch.nn.Module` classes to provide the basic functionalities required by any model.
 
-    Methods
-    -------
-    _initComponent():
-        Initializes the optimizer and the learning rate scheduler.
-    _initOptimizer() -> torch.optim.Optimizer:
-        Initializes the optimizer.
-    _initScheduler() -> torch.optim.lr_scheduler.ReduceLROnPlateau:
-        Initializes the learning rate scheduler.
-    _initLoss():
-        Initializes the loss function. This method is abstract and must be overridden in subclasses.
-    _log_build_file_path():
-        Builds the file path for saving the model state.
-    _log_model_state():
-        Logs the state of the model, including the model's parameters and the state of the optimizer.
-
+    Methods:
+        _initComponent(): Initializes the optimizer and the learning rate scheduler.
+        _initOptimizer() -> torch.optim.Optimizer: Initializes the optimizer.
+        _initScheduler() -> torch.optim.lr_scheduler.ReduceLROnPlateau: Initializes the learning rate scheduler.
+        _initLoss(): Initializes the loss function. This method is abstract and must be overridden in subclasses.
+        _log_build_file_path(): Builds the file path for saving the model state.
+        _log_model_state(): Logs the state of the model, including the model's parameters and the state of the optimizer.
     """
 
     @abstractmethod
@@ -41,10 +33,8 @@ class BaseNN(BaseEstimator, nn.Module, metaclass=ABCMeta):
         Initializes the neural network model.
         This method is abstract and must be overridden in subclasses.
 
-        Parameters
-        ----------
-        kwargs : dict
-            A dictionary of keyword arguments.
+        Args:
+            kwargs (dict): A dictionary of keyword arguments.
         """
 
         nn.Module.__init__(self)
@@ -53,10 +43,6 @@ class BaseNN(BaseEstimator, nn.Module, metaclass=ABCMeta):
     def _initComponent(self):
         """
         Initializes the optimizer and the learning rate scheduler.
-
-        Returns
-        -------
-        None
         """
 
         self.optimizer = self._initOptimizer()
@@ -66,10 +52,8 @@ class BaseNN(BaseEstimator, nn.Module, metaclass=ABCMeta):
         """
         Initializes the optimizer.
 
-        Returns
-        -------
-        optimizer : torch.optim.Optimizer
-            The initialized optimizer.
+        Returns:
+            optimizer (torch.optim.Optimizer): The initialized optimizer.
         """
 
         return torch.optim.Adam(self.parameters(), 
@@ -77,36 +61,29 @@ class BaseNN(BaseEstimator, nn.Module, metaclass=ABCMeta):
                                 betas=cfg.training.betas, 
                                 eps=cfg.training.eps, 
                                 weight_decay=cfg.training.weight_decay, 
-                                amsgrad=False
-                                )
+                                amsgrad=False)
 
     def _initScheduler(self) -> torch.optim.lr_scheduler.ReduceLROnPlateau:
         """
         Initializes the learning rate scheduler.
 
-        Returns
-        -------
-        scheduler : torch.optim.lr_scheduler.ReduceLROnPlateau
-            The initialized learning rate scheduler.
+        Returns:
+            scheduler (torch.optim.lr_scheduler.ReduceLROnPlateau): The initialized learning rate scheduler.
         """
 
         return torch.optim.lr_scheduler.ReduceLROnPlateau(
-                    self.optimizer, 
-                    mode=cfg.training.scheduler_mode,
-                    factor=cfg.training.scheduler_factor,
-                    patience=cfg.training.scheduler_patience,
-                    threshold=cfg.training.scheduler_threshold
-                )
+            self.optimizer, 
+            mode=cfg.training.scheduler_mode,
+            factor=cfg.training.scheduler_factor,
+            patience=cfg.training.scheduler_patience,
+            threshold=cfg.training.scheduler_threshold
+        )
 
     @abstractmethod
     def _initLoss(self):
         """
         Initializes the loss function.
         This method is abstract and must be overridden in subclasses.
-
-        Returns
-        -------
-        None
         """
 
         pass
@@ -115,10 +92,8 @@ class BaseNN(BaseEstimator, nn.Module, metaclass=ABCMeta):
         """
         Builds the file path for saving the model state.
 
-        Returns
-        -------
-        file_path_configs : dict
-            A dictionary containing the file format and arguments to be used for building the file path.
+        Returns:
+            file_path_configs (dict): A dictionary containing the file format and arguments to be used for building the file path.
         """
 
         file_path_configs = {
@@ -133,10 +108,8 @@ class BaseNN(BaseEstimator, nn.Module, metaclass=ABCMeta):
         """
         Logs the state of the model, including the model's parameters and the state of the optimizer.
 
-        Returns
-        -------
-        state : dict
-            A dictionary containing the state of the model and the optimizer.
+        Returns:
+            state (dict): A dictionary containing the state of the model and the optimizer.
         """
 
         state = {
@@ -152,17 +125,12 @@ class BaseNN(BaseEstimator, nn.Module, metaclass=ABCMeta):
 class ClassifierNN(BaseNN, ClassifierMixin, metaclass=ABCMeta):
     """
     This class is an abstract base class for all neural network models for classification tasks.
-    It extends both the BaseNN and ClassifierMixin classes to provide the basic functionalities required by any classification model.
+    It extends both the `BaseNN` and `ClassifierMixin` classes to provide the basic functionalities required by any classification model.
 
-    Methods
-    -------
-    _initLoss():
-        Initializes the loss function.
-    _doTraining(train_dl: torch.utils.data.DataLoader) -> float:
-        Trains the model on the training data.
-    _doValidation(val_dl: torch.utils.data.DataLoader):
-        Validates the model on the validation data.
-
+    Methods:
+        _initLoss(): Initializes the loss function.
+        _doTraining(train_dl: torch.utils.data.DataLoader) -> float: Trains the model on the training data.
+        _doValidation(val_dl: torch.utils.data.DataLoader): Validates the model on the validation data.
     """
 
     @abstractmethod
@@ -171,10 +139,8 @@ class ClassifierNN(BaseNN, ClassifierMixin, metaclass=ABCMeta):
         Initializes the neural network model for classification.
         This method is abstract and must be overridden in subclasses.
 
-        Parameters
-        ----------
-        kwargs : dict
-            A dictionary of keyword arguments.
+        Args:
+            kwargs (dict): A dictionary of keyword arguments.
         """
 
         super().__init__(**kwargs)
@@ -184,35 +150,26 @@ class ClassifierNN(BaseNN, ClassifierMixin, metaclass=ABCMeta):
         """
         Initializes the loss function.
 
-        Returns
-        -------
-        loss : torch.nn.CrossEntropyLoss
-            The initialized loss function.
+        Returns:
+            loss (torch.nn.CrossEntropyLoss): The initialized loss function.
         """
 
         return torch.nn.CrossEntropyLoss()
 
-    def _doTraining(self,
-                    train_dl: torch.utils.data.DataLoader) -> float:
+    def _doTraining(self, train_dl: torch.utils.data.DataLoader) -> float:
         """
         Trains the model on the training data for the specified number of epochs.
 
-        Parameters
-        ----------
-        train_dl : torch.utils.data.DataLoader
-            The training data.
+        Args:
+            train_dl (torch.utils.data.DataLoader): The training data.
 
-        Returns
-        -------
-        train_loss : float
-            The training loss.
-        train_f1 : float
-            The F1-score of the training data.
-        true_labels : list
-            The true labels of the training data.
-        pred_labels : list
-            The predicted labels of the training data.
+        Returns:
+            train_loss (float): The training loss.
+            train_f1 (float): The F1-score of the training data.
+            true_labels (list): The true labels of the training data.
+            pred_labels (list): The predicted labels of the training data.
         """
+
         # Initialize variables for tracking loss, correct predictions, total samples, and labels
         train_loss = 0.0
         correct = 0
@@ -256,27 +213,20 @@ class ClassifierNN(BaseNN, ClassifierMixin, metaclass=ABCMeta):
         # Return the training loss, F1 score, true labels, and predicted labels
         return train_loss, train_f1, true_labels, pred_labels
 
-    def _doValidation(self,
-                    val_dl: torch.utils.data.DataLoader):
+    def _doValidation(self, val_dl: torch.utils.data.DataLoader):
         """
         Validates the model on the validation data.
 
-        Parameters
-        ----------
-        val_dl : torch.utils.data.DataLoader
-            The validation data.
+        Args:
+            val_dl (torch.utils.data.DataLoader): The validation data.
 
-        Returns
-        -------
-        val_loss : float
-            The validation loss.
-        val_f1 : float
-            The F1-score of the validation data.
-        true_labels : list
-            The true labels of the validation data.
-        pred_labels : list
-            The predicted labels of the validation data.
+        Returns:
+            val_loss (float): The validation loss.
+            val_f1 (float): The F1-score of the validation data.
+            true_labels (list): The true labels of the validation data.
+            pred_labels (list): The predicted labels of the validation data.
         """
+
         # Initialize variables for tracking loss, correct predictions, total samples, and labels
         val_loss = 0.0
         correct = 0
@@ -306,7 +256,7 @@ class ClassifierNN(BaseNN, ClassifierMixin, metaclass=ABCMeta):
                 # Extend the true and predicted labels lists
                 true_labels.extend(y_batch.tolist())
                 pred_labels.extend(predicted.tolist())
-        
+
         # Compute the average validation loss
         val_loss /= len(val_dl)
         # Calculate the weighted F1 score for the true and predicted labels
@@ -318,18 +268,13 @@ class ClassifierNN(BaseNN, ClassifierMixin, metaclass=ABCMeta):
 class RegressorNN(BaseNN, RegressorMixin, metaclass=ABCMeta):
     """
     This class is an abstract base class for all neural network models for regression tasks.
-    It extends both the BaseNN and RegressorMixin classes to provide the basic functionalities required by any regression model.
+    It extends both the `BaseNN` and `RegressorMixin` classes to provide the basic functionalities required by any regression model.
 
-    Methods
-    -------
-    _initLoss():
-        Initializes the loss function.
-    _doTraining(train_dl: torch.utils.data.DataLoader) -> float:
-        Trains the model on the training data.
-    _doValidation(val_dl: torch.utils.data.DataLoader) -> float:
-        Validates the model on the validation data.
-    _predict(test_dl: torch.utils.data.DataLoader) -> torch.Tensor:
-        Makes predictions on the test data.
+    Methods:
+        _initLoss(): Initializes the loss function.
+        _doTraining(train_dl: torch.utils.data.DataLoader) -> float: Trains the model on the training data.
+        _doValidation(val_dl: torch.utils.data.DataLoader) -> float: Validates the model on the validation data.
+        _predict(test_dl: torch.utils.data.DataLoader) -> torch.Tensor: Makes predictions on the test data.
     """
 
     @abstractmethod
@@ -338,10 +283,8 @@ class RegressorNN(BaseNN, RegressorMixin, metaclass=ABCMeta):
         Initializes the neural network model for regression.
         This method is abstract and must be overridden in subclasses.
 
-        Parameters
-        ----------
-        kwargs : dict
-            A dictionary of keyword arguments.
+        Args:
+            kwargs (dict): A dictionary of keyword arguments.
         """
 
         super().__init__(**kwargs)
@@ -351,35 +294,28 @@ class RegressorNN(BaseNN, RegressorMixin, metaclass=ABCMeta):
         """
         Initializes the loss function.
 
-        Returns
-        -------
-        loss : torch.nn.MSELoss
-            The initialized loss function.
+        Returns:
+            loss (torch.nn.MSELoss): The initialized loss function.
         """
 
         return torch.nn.MSELoss()
-    
-    def _doTraining(self,
-                    train_dl: torch.utils.data.DataLoader) -> float:
+
+    def _doTraining(self, train_dl: torch.utils.data.DataLoader) -> float:
         """
         Trains the model on the training data for the specified number of epochs.
 
-        Parameters
-        ----------
-        train_dl : torch.utils.data.DataLoader
-            The training data.
+        Args:
+            train_dl (torch.utils.data.DataLoader): The training data.
 
-        Returns
-        -------
-        train_loss : float
-            The training loss.
+        Returns:
+            train_loss (float): The training loss.
         """
 
         # Initialize the variable for tracking the training loss
         train_loss = 0.0
         # Set the model to training mode (enables gradient computation and dropout)
         self.train()
-        
+
         # Iterate over the training data loader
         for x_batch, y_batch in train_dl:
             # Clear the gradients of the optimizer
@@ -400,20 +336,15 @@ class RegressorNN(BaseNN, RegressorMixin, metaclass=ABCMeta):
         # Return the training loss and None values for additional metrics
         return train_loss, None, None, None
 
-    def _doValidation(self,
-                      val_dl: torch.utils.data.DataLoader) -> float:
+    def _doValidation(self, val_dl: torch.utils.data.DataLoader) -> float:
         """
         Validates the model on the validation data.
 
-        Parameters
-        ----------
-        val_dl : torch.utils.data.DataLoader
-            The validation data.
+        Args:
+            val_dl (torch.utils.data.DataLoader): The validation data.
 
-        Returns
-        -------
-        val_loss : float
-            The validation loss.
+        Returns:
+            val_loss (float): The validation loss.
         """
 
         # Initialize the variable for tracking the validation loss
@@ -435,22 +366,16 @@ class RegressorNN(BaseNN, RegressorMixin, metaclass=ABCMeta):
         val_loss /= len(val_dl)
         # Return the validation loss and None values for additional metrics
         return val_loss, None, None, None
-    
-    def _predict(self,
-                 test_dl : torch.utils.data.DataLoader
-                 ) -> torch.Tensor:
+
+    def _predict(self, test_dl: torch.utils.data.DataLoader) -> torch.Tensor:
         """
         Makes predictions on the test data.
 
-        Parameters
-        ----------
-        test_dl : torch.utils.data.DataLoader
-            The test data.
+        Args:
+            test_dl (torch.utils.data.DataLoader): The test data.
 
-        Returns
-        -------
-        output : torch.Tensor
-            The predicted output.
+        Returns:
+            output (torch.Tensor): The predicted output.
         """
 
         # Initialize an empty tensor to store the predicted output

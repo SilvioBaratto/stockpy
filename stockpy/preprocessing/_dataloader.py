@@ -7,9 +7,9 @@ from enum import Enum
 from ._dataset import StockDatasetRNN
 from ._dataset import StockDatasetFFNN
 from ._dataset import StockDatasetCNN
-from ._data import ZScoreNormalizer
-from ._data import MinMaxNormalizer
-from ._data import RobustScaler
+from ._scaler import ZScoreNormalizer
+from ._scaler import MinMaxNormalizer
+from ._scaler import RobustScaler
 from ..config import Config as cfg
 
 class StockScaler:
@@ -19,14 +19,10 @@ class StockScaler:
     This class is responsible for normalizing and denormalizing the features and targets of stock data. 
     It supports Z-score, Min-Max, and Robust scaling.
 
-    Attributes
-    ----------
-    scaler_type : ScalerType
-        The type of scaler to use. It is set during initialization.
-    X_normalizer : TransformMixin
-        The normalizer for the features. It is set during initialization.
-    y_normalizer : TransformMixin
-        The normalizer for the targets. It is set during initialization.
+    Attributes:
+        scaler_type (str): The type of scaler to use. It is set during initialization.
+        X_normalizer (TransformMixin): The normalizer for the features. It is set during initialization.
+        y_normalizer (TransformMixin): The normalizer for the targets. It is set during initialization.
     """
 
     def __init__(self): 
@@ -61,24 +57,16 @@ class StockScaler:
         The task parameter determines the type of task (regression or classification) and adjusts the normalization 
         process accordingly.
 
-        Parameters
-        ----------
-        X_train : Union[np.ndarray, pd.core.frame.DataFrame]
-            The training features to fit the normalizer to and then transform.
-        y_train : Union[np.ndarray, pd.core.frame.DataFrame], optional
-            The training targets to fit the normalizer to and then transform, by default None
-        task : str, optional
-            The type of task ('regression' or 'classification'), by default None
+        Args:
+            X_train (Union[np.ndarray, pd.core.frame.DataFrame]): The training features to fit the normalizer to and then transform.
+            y_train (Union[np.ndarray, pd.core.frame.DataFrame], optional): The training targets to fit the normalizer to and then transform. Default is None.
+            task (str, optional): The type of task ('regression' or 'classification'). Default is None.
 
-        Returns
-        -------
-        Tuple[torch.Tensor, Optional[torch.Tensor]]
-            The transformed training features and targets. The targets are None if y_train is None.
+        Returns:
+            Tuple[torch.Tensor, Optional[torch.Tensor]]: The transformed training features and targets. The targets are None if y_train is None.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before the transform method.
+        Raises:
+            RuntimeError: If the fit method has not been called before the transform method.
         """
 
         X_train = torch.tensor(X_train.values).float()
@@ -105,20 +93,14 @@ class StockScaler:
         """
         Applies the feature normalizer to the test data.
 
-        Parameters
-        ----------
-        X_test : torch.Tensor
-            The test features to apply the normalizer to.
+        Args:
+            X_test (torch.Tensor): The test features to apply the normalizer to.
 
-        Returns
-        -------
-        torch.Tensor
-            The transformed test features.
+        Returns:
+            torch.Tensor: The transformed test features.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
 
         return self.X_normalizer.transform(X_test)
@@ -131,20 +113,14 @@ class StockScaler:
         This method transforms the predictions by multiplying by the standard deviation and adding the mean. 
         The fit and transform methods must be called before this method.
 
-        Parameters
-        ----------
-        y_pred : torch.Tensor
-            The predictions to apply the inverse normalizer to.
+        Args:
+            y_pred (torch.Tensor): The predictions to apply the inverse normalizer to.
 
-        Returns
-        -------
-        torch.Tensor
-            The rescaled predictions.
+        Returns:
+            torch.Tensor: The rescaled predictions.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
 
         return self.y_normalizer.inverse_transform(y_pred)
@@ -157,22 +133,11 @@ class StockDataloader:
     different types of models (RNN, FFNN, CNN) and tasks (regression, classification). The data is loaded in
     batches, and the training data can be split into a training set and a validation set.
 
-    Attributes
-    ----------
-    scaler : StockScaler
-        The StockScaler instance to normalize and denormalize the data.
-    task : str
-        The type of task (regression or classification). It is set during initialization.
-    X_train : torch.Tensor
-        The normalized training features.
-    y_train : torch.Tensor
-        The normalized training targets.
-    model_type : str
-        The type of model (RNN, FFNN, CNN). It is set during initialization.
-    datasets : dict
-        The mapping from model types to Dataset classes.
-    dataset : Dataset
-        The Dataset instance for the training data.
+    Attributes:
+        X_train (torch.Tensor): The normalized training features.
+        y_train (torch.Tensor): The normalized training targets.
+        model_type (str): The type of model (RNN, FFNN, CNN). It is set during initialization.
+        task (str): The type of task (regression or classification). It is set during initialization.
     """
 
     def __init__(self,
@@ -186,16 +151,11 @@ class StockDataloader:
 
         The data is fit-transformed using the scaler. The Dataset instance is created based on the model type.
 
-        Parameters
-        ----------
-        X : Union[np.ndarray, pd.core.frame.DataFrame]
-            The features of the data.
-        y : Union[np.ndarray, pd.core.frame.DataFrame], optional
-            The targets of the data, by default None
-        model_type : str, optional
-            The type of model (RNN, FFNN, CNN), by default None
-        task : str, optional
-            The type of task (regression or classification), by default None
+        Args:
+            X (Union[np.ndarray, pd.core.frame.DataFrame]): The features of the data.
+            y (Union[np.ndarray, pd.core.frame.DataFrame], optional): The targets of the data. Default is None.
+            model_type (str, optional): The type of model (RNN, FFNN, CNN). Default is None.
+            task (str, optional): The type of task (regression or classification). Default is None.
         """
 
         self.scaler = StockScaler()
@@ -222,26 +182,16 @@ class StockDataloader:
         For the training and validation modes, the data is split based on the validation size. For the testing mode,
         the features and targets are transformed and then loaded.
 
-        Parameters
-        ----------
-        X : Union[np.ndarray, pd.core.frame.DataFrame], optional
-            The features of the test data, by default None
-        y : Union[np.ndarray, pd.core.frame.DataFrame], optional
-            The targets of the test data, by default None
-        mode : str, optional
-            The mode ('train', 'val', 'test'), by default 'train'
-        val_size : float, optional
-            The size of the validation set as a proportion of the training data, by default 0.2
+        Args:
+            X (Union[np.ndarray, pd.core.frame.DataFrame], optional): The features of the test data. Default is None.
+            y (Union[np.ndarray, pd.core.frame.DataFrame], optional): The targets of the test data. Default is None.
+            mode (str, optional): The mode ('train', 'val', 'test'). Default is 'train'.
 
-        Returns
-        -------
-        DataLoader
-            The DataLoader instance for the given mode.
+        Returns:
+            DataLoader: The DataLoader instance for the given mode.
 
-        Raises
-        ------
-        ValueError
-            If the mode or task is invalid.
+        Raises:
+            ValueError: If the mode or task is invalid.
         """
 
         if mode == 'train':
@@ -275,7 +225,7 @@ class StockDataloader:
         else:
             raise ValueError(f"Invalid mode: {mode}. Accepted modes: 'train', 'val', 'test'.")
 
-        
+    
         return DataLoader(subset,
                           batch_size=cfg.training.batch_size,
                           shuffle=cfg.training.shuffle
@@ -288,15 +238,11 @@ class StockDataloader:
 
         This method is used to denormalize the output of the model.
 
-        Parameters
-        ----------
-        y_pred : torch.Tensor
-            The output of the model.
+        Args:
+            y_pred (torch.Tensor): The output of the model.
 
-        Returns
-        -------
-        torch.Tensor
-            The denormalized output.
+        Returns:
+            torch.Tensor: The denormalized output.
         """
 
         return self.scaler.inverse_transform(y_pred)

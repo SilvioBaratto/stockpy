@@ -11,47 +11,37 @@ from ..config import Config as cfg
 
 class CNNClassifier(ClassifierNN):
     """
-    A class used to represent a Convolutional Neural Network (CNN) for classification tasks. 
+    A class used to represent a Convolutional Neural Network (CNN) for classification tasks.
     This class inherits from the `ClassifierNN` class.
 
-    ...
+    Attributes:
+        model_type (str): A string that represents the type of the model (default is "cnn").
 
-    Parameters
-    ----------
-    hidden_size:
-        a list of integers that represents the number of nodes in each hidden layer or 
-        a single integer that represents the number of nodes in a single hidden layer
-    num_filters:
-        the number of filters in the convolutional layer
-    kernel_size:
-        the size of the kernel in the convolutional layer
-    pool_size:
-        the size of the pooling layer
+    Args:
+        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
+                                              a single integer that represents the number of nodes in a single hidden layer.
+        num_filters (int): The number of filters in the convolutional layer.
+        kernel_size (int): The size of the kernel in the convolutional layer.
+        pool_size (int): The size of the pooling layer.
 
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "cnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the CNNClassifier object with given or default parameters.
-
-    _init_model(self):
-        Initializes the convolutional and fully connected layers of the model based on configuration.
-
-    forward(x: torch.Tensor) -> torch.Tensor:
-        Defines the forward pass of the CNN.
+    Methods:
+        __init__(self, **kwargs): Initializes the CNNClassifier object with given or default parameters.
+        _init_model(self): Initializes the convolutional and fully connected layers of the model based on configuration.
+        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the CNN.
     """
 
     model_type = "cnn"
-    
+
     def __init__(self, **kwargs):
+        """
+        Initializes the CNNClassifier object with given or default parameters.
+        """
         super().__init__(**kwargs)
-        # Initializes the CNN neural network model with given or default parameters
 
     def _init_model(self):
+        """
+        Initializes the convolutional and fully connected layers of the model based on configuration.
+        """
         # Create the convolutional layers
 
         # Check if hidden_sizes is a single integer and, if so, converts it to a list
@@ -93,50 +83,41 @@ class CNNClassifier(ClassifierNN):
         if self.layers is None:
             raise RuntimeError("You must call fit before calling predict")
         return self.layers(x)
-    
+
+
 class CNNRegressor(RegressorNN):
     """
-    A class used to represent a Convolutional Neural Network (CNN) for regression tasks. 
+    A class used to represent a Convolutional Neural Network (CNN) for regression tasks.
     This class inherits from the `RegressorNN` class.
 
-    ...
+    Attributes:
+        model_type (str): A string that represents the type of the model (default is "cnn").
 
-    Parameters
-    ----------
-    hidden_size:
-        a list of integers that represents the number of nodes in each hidden layer or 
-        a single integer that represents the number of nodes in a single hidden layer
-    num_filters:
-        the number of filters in the convolutional layer
-    kernel_size:
-        the size of the kernel in the convolutional layer
-    pool_size:
-        the size of the pooling layer
+    Args:
+        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
+                                              a single integer that represents the number of nodes in a single hidden layer.
+        num_filters (int): The number of filters in the convolutional layer.
+        kernel_size (int): The size of the kernel in the convolutional layer.
+        pool_size (int): The size of the pooling layer.
 
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "cnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the CNNRegressor object with given or default parameters.
-
-    _init_model(self):
-        Initializes the convolutional and fully connected layers of the model based on configuration.
-
-    forward(x: torch.Tensor) -> torch.Tensor:
-        Defines the forward pass of the CNN.
+    Methods:
+        __init__(self, **kwargs): Initializes the CNNRegressor object with given or default parameters.
+        _init_model(self): Initializes the convolutional and fully connected layers of the model based on configuration.
+        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the CNN.
     """
 
     model_type = "cnn"
-    
+
     def __init__(self, **kwargs):
+        """
+        Initializes the CNNRegressor object with given or default parameters.
+        """
         super().__init__(**kwargs)
-        # Initializes the CNN neural network model with given or default parameters
 
     def _init_model(self):
+        """
+        Initializes the convolutional and fully connected layers of the model based on configuration.
+        """
         # Create the convolutional layers
 
         # Check if hidden_sizes is a single integer and, if so, converts it to a list

@@ -99,43 +99,35 @@ class BiLSTMClassifier(ClassifierNN):
     
 class BiLSTMRegressor(RegressorNN):
     """
-    A class used to represent a Bidirectional Long Short-Term Memory (BiLSTM) network for regression tasks. 
+    A class used to represent a Bidirectional Long Short-Term Memory (BiLSTM) network for regression tasks.
     This class inherits from the `RegressorNN` class.
 
-    ...
+    Attributes:
+        model_type (str): A string that represents the type of the model (default is "rnn").
 
-    Parameters
-    ----------
-    hidden_size:
-        a list of integers that represents the number of nodes in each hidden layer or 
-        a single integer that represents the number of nodes in a single hidden layer
-    num_layers:
-        the number of recurrent layers (default is 1)
+    Args:
+        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
+                                              a single integer that represents the number of nodes in a single hidden layer.
+        num_layers (int): The number of recurrent layers (default is 1).
 
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "rnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the BiLSTMRegressor object with given or default parameters.
-
-    _init_model(self):
-        Initializes the BiLSTM layers and fully connected layer of the model based on configuration.
-
-    forward(x: torch.Tensor) -> torch.Tensor:
-        Defines the forward pass of the BiLSTM network.
+    Methods:
+        __init__(self, **kwargs): Initializes the BiLSTMRegressor object with given or default parameters.
+        _init_model(self): Initializes the BiLSTM layers and fully connected layer of the model based on configuration.
+        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the BiLSTM network.
     """
 
     model_type = "rnn"
-   
+
     def __init__(self, **kwargs):
+        """
+        Initializes the BiLSTMRegressor object with given or default parameters.
+        """
         super().__init__(**kwargs)
-        # Initializes the BiLSTM object with given or default parameters.
 
     def _init_model(self):
+        """
+        Initializes the BiLSTM layers and fully connected layer of the model based on configuration.
+        """
         # Check if hidden_sizes is a single integer and, if so, converts it to a list
         if isinstance(cfg.nn.hidden_size, int):
             self.hidden_sizes = [cfg.nn.hidden_size]
@@ -148,19 +140,31 @@ class BiLSTMRegressor(RegressorNN):
 
         # Iterates through the hidden sizes and creates BiLSTM layers accordingly
         for hidden_size in self.hidden_sizes:
-            self.bilstms.append(nn.LSTM(input_size=input_size,  
-                                        hidden_size=hidden_size, 
-                                        num_layers=cfg.nn.num_layers, 
-                                        bidirectional=True, 
+            self.bilstms.append(nn.LSTM(input_size=input_size,
+                                        hidden_size=hidden_size,
+                                        num_layers=cfg.nn.num_layers,
+                                        bidirectional=True,
                                         batch_first=True))
-            
+
             # Multiplies by 2 for the next input size because the LSTM is bidirectional
-            input_size = hidden_size * 2 
+            input_size = hidden_size * 2
 
         # The final fully connected layer's input size is also doubled because the LSTM is bidirectional
         self.fc = nn.Linear(self.hidden_sizes[-1] * 2, self.output_size)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Defines the forward pass of the BiLSTM network.
+
+        Args:
+            x (torch.Tensor): The input tensor.
+
+        Returns:
+            torch.Tensor: The output tensor.
+
+        Raises:
+            RuntimeError: If the model has not been initialized by calling the fit method before calling predict.
+        """
         # Ensures that the model has been initialized
         if not self.bilstms:
             raise RuntimeError("You must call fit before calling predict")

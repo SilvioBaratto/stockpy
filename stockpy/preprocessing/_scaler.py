@@ -8,6 +8,7 @@ class TransformMixin(metaclass=ABCMeta):
     This class defines the interface for transformation mixins, which are classes that can be used to normalize or 
     denormalize data. The transformations that a subclass must implement are defined as abstract methods.
     """
+
     @abstractmethod
     def __init__(self):
         """
@@ -22,10 +23,8 @@ class TransformMixin(metaclass=ABCMeta):
         
         This method computes and stores any necessary statistics from the data needed to perform the transformation.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to fit the transformation to.
+        Args:
+            data (torch.Tensor): The data to fit the transformation to.
         """
         pass
 
@@ -37,15 +36,11 @@ class TransformMixin(metaclass=ABCMeta):
         This method transforms the data based on the statistics computed in the fit method. It should be called after 
         the fit method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the transformation to.
+        Args:
+            data (torch.Tensor): The data to apply the transformation to.
 
-        Returns
-        -------
-        torch.Tensor
-            The transformed data.
+        Returns:
+            torch.Tensor: The transformed data.
         """
         pass
 
@@ -57,15 +52,11 @@ class TransformMixin(metaclass=ABCMeta):
         This method undoes the transformation applied in the transform method, returning the data to its original state.
         It should be called after the transform method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the inverse transformation to.
+        Args:
+            data (torch.Tensor): The data to apply the inverse transformation to.
 
-        Returns
-        -------
-        torch.Tensor
-            The inverse-transformed data.
+        Returns:
+            torch.Tensor: The inverse-transformed data.
         """
         pass
 
@@ -76,12 +67,9 @@ class ZScoreNormalizer(TransformMixin):
     This class normalizes and denormalizes data using Z-score normalization, which scales the data to have a mean of 0 
     and a standard deviation of 1. It inherits from the TransformMixin class.
 
-    Attributes
-    ----------
-    mean : torch.Tensor or None
-        The mean of the data. Calculated when fit method is called.
-    std : torch.Tensor or None
-        The standard deviation of the data. Calculated when fit method is called.
+    Attributes:
+        mean (torch.Tensor or None): The mean of the data. Calculated when fit method is called.
+        std (torch.Tensor or None): The standard deviation of the data. Calculated when fit method is called.
     """
 
     def __init__(self):
@@ -99,10 +87,8 @@ class ZScoreNormalizer(TransformMixin):
 
         This method computes and stores the mean and standard deviation of the data. 
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to fit the normalizer to.
+        Args:
+            data (torch.Tensor): The data to fit the normalizer to.
         """
         self.mean = torch.mean(data, dim=0)
         self.std = torch.std(data, dim=0)
@@ -116,20 +102,14 @@ class ZScoreNormalizer(TransformMixin):
         This method transforms the data by subtracting the mean and dividing by the standard deviation. The fit method 
         must be called before this method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the normalizer to.
+        Args:
+            data (torch.Tensor): The data to apply the normalizer to.
 
-        Returns
-        -------
-        torch.Tensor
-            The normalized data.
+        Returns:
+            torch.Tensor: The normalized data.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
         if self.mean is None or self.std is None:
             raise RuntimeError('Must fit normalizer before transforming data.')
@@ -142,20 +122,14 @@ class ZScoreNormalizer(TransformMixin):
         This method transforms the data by multiplying by the standard deviation and adding the mean. The fit and 
         transform methods must be called before this method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the inverse normalizer to.
+        Args:
+            data (torch.Tensor): The data to apply the inverse normalizer to.
 
-        Returns
-        -------
-        torch.Tensor
-            The denormalized data.
+        Returns:
+            torch.Tensor: The denormalized data.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
         if self.mean is None or self.std is None:
             raise RuntimeError('Must fit normalizer before inverse transforming data.')
@@ -168,12 +142,9 @@ class MinMaxNormalizer(TransformMixin):
     This class normalizes and denormalizes data using Min-Max normalization, which scales the data to fit within a 
     specified range. It inherits from the TransformMixin class.
 
-    Attributes
-    ----------
-    min : torch.Tensor or None
-        The minimum value of the data. Calculated when fit method is called.
-    max : torch.Tensor or None
-        The maximum value of the data. Calculated when fit method is called.
+    Attributes:
+        min (torch.Tensor or None): The minimum value of the data. Calculated when fit method is called.
+        max (torch.Tensor or None): The maximum value of the data. Calculated when fit method is called.
     """
 
     def __init__(self):
@@ -191,10 +162,8 @@ class MinMaxNormalizer(TransformMixin):
 
         This method computes and stores the minimum and maximum values of the data. 
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to fit the normalizer to.
+        Args:
+            data (torch.Tensor): The data to fit the normalizer to.
         """
         self.min = torch.min(data, dim=0)[0]
         self.max = torch.max(data, dim=0)[0]
@@ -208,20 +177,14 @@ class MinMaxNormalizer(TransformMixin):
         This method transforms the data by subtracting the minimum and dividing by the range of the data. The fit 
         method must be called before this method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the normalizer to.
+        Args:
+            data (torch.Tensor): The data to apply the normalizer to.
 
-        Returns
-        -------
-        torch.Tensor
-            The normalized data.
+        Returns:
+            torch.Tensor: The normalized data.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
         if self.min is None or self.max is None:
             raise RuntimeError('Must fit normalizer before transforming data.')
@@ -234,25 +197,20 @@ class MinMaxNormalizer(TransformMixin):
         This method transforms the data by multiplying by the range of the data and adding the minimum. The fit and 
         transform methods must be called before this method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the inverse normalizer to.
+        Args:
+            data (torch.Tensor): The data to apply the inverse normalizer to.
 
-        Returns
-        -------
-        torch.Tensor
-            The denormalized data.
+        Returns:
+            torch.Tensor: The denormalized data.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
         if self.min is None or self.max is None:
             raise RuntimeError('Must fit normalizer before inverse transforming data.')
         return data * (self.max - self.min) + self.min
-    
+
+
 class RobustScaler(TransformMixin):
     """
     Robust Scaler.
@@ -260,12 +218,9 @@ class RobustScaler(TransformMixin):
     This class normalizes and denormalizes data using Robust Scaling, which scales data using statistics that are 
     robust to outliers. It inherits from the TransformMixin class.
 
-    Attributes
-    ----------
-    median : torch.Tensor or None
-        The median of the data. Calculated when fit method is called.
-    iqr : torch.Tensor or None
-        The interquartile range of the data. Calculated when fit method is called.
+    Attributes:
+        median (torch.Tensor or None): The median of the data. Calculated when fit method is called.
+        iqr (torch.Tensor or None): The interquartile range of the data. Calculated when fit method is called.
     """
 
     def __init__(self):
@@ -283,10 +238,8 @@ class RobustScaler(TransformMixin):
 
         This method computes and stores the median and interquartile range of the data.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to fit the scaler to.
+        Args:
+            data (torch.Tensor): The data to fit the scaler to.
         """
         self.median = torch.median(data, dim=0).values
         self.iqr = torch.quantile(data, 0.75, dim=0) - torch.quantile(data, 0.25, dim=0)
@@ -298,20 +251,14 @@ class RobustScaler(TransformMixin):
         This method transforms the data by subtracting the median and dividing by the interquartile range. The fit 
         method must be called before this method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the scaler to.
+        Args:
+            data (torch.Tensor): The data to apply the scaler to.
 
-        Returns
-        -------
-        torch.Tensor
-            The scaled data.
+        Returns:
+            torch.Tensor: The scaled data.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
         if self.median is None or self.iqr is None:
             raise RuntimeError('Must fit scaler before transforming data.')
@@ -324,20 +271,14 @@ class RobustScaler(TransformMixin):
         This method transforms the data by multiplying by the interquartile range and adding the median. The fit and 
         transform methods must be called before this method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the inverse scaler to.
+        Args:
+            data (torch.Tensor): The data to apply the inverse scaler to.
 
-        Returns
-        -------
-        torch.Tensor
-            The rescaled data.
+        Returns:
+            torch.Tensor: The rescaled data.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
         if self.median is None or self.iqr is None:
             raise RuntimeError('Must fit scaler before inverse transforming data.')
@@ -350,10 +291,8 @@ class MaxAbsScaler(TransformMixin):
     This class normalizes and denormalizes data using Max Absolute Scaling, which scales data to lie within the range 
     [-1,1] by dividing each sample by its maximum absolute value. It inherits from the TransformMixin class.
 
-    Attributes
-    ----------
-    max_abs : torch.Tensor or None
-        The maximum absolute value of the data. Calculated when fit method is called.
+    Attributes:
+        max_abs (torch.Tensor or None): The maximum absolute value of the data. Calculated when fit method is called.
     """
 
     def __init__(self):
@@ -370,10 +309,8 @@ class MaxAbsScaler(TransformMixin):
 
         This method computes and stores the maximum absolute value of the data.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to fit the scaler to.
+        Args:
+            data (torch.Tensor): The data to fit the scaler to.
         """
         self.max_abs = torch.max(torch.abs(data), dim=0).values
 
@@ -384,20 +321,14 @@ class MaxAbsScaler(TransformMixin):
         This method transforms the data by dividing by the maximum absolute value. The fit method must be called before 
         this method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the scaler to.
+        Args:
+            data (torch.Tensor): The data to apply the scaler to.
 
-        Returns
-        -------
-        torch.Tensor
-            The scaled data.
+        Returns:
+            torch.Tensor: The scaled data.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
         if self.max_abs is None:
             raise RuntimeError('Must fit scaler before transforming data.')
@@ -410,20 +341,14 @@ class MaxAbsScaler(TransformMixin):
         This method transforms the data by multiplying by the maximum absolute value. The fit and transform methods must 
         be called before this method.
 
-        Parameters
-        ----------
-        data : torch.Tensor
-            The data to apply the inverse scaler to.
+        Args:
+            data (torch.Tensor): The data to apply the inverse scaler to.
 
-        Returns
-        -------
-        torch.Tensor
-            The rescaled data.
+        Returns:
+            torch.Tensor: The rescaled data.
 
-        Raises
-        ------
-        RuntimeError
-            If the fit method has not been called before this method.
+        Raises:
+            RuntimeError: If the fit method has not been called before this method.
         """
         if self.max_abs is None:
             raise RuntimeError('Must fit scaler before inverse transforming data.')

@@ -12,43 +12,35 @@ from ..config import Config as cfg
 
 class LSTMClassifier(ClassifierNN):
     """
-    A class used to represent a Long Short-Term Memory (LSTM) network for classification tasks. 
+    A class used to represent a Long Short-Term Memory (LSTM) network for classification tasks.
     This class inherits from the `ClassifierNN` class.
 
-    ...
+    Attributes:
+        model_type (str): A string that represents the type of the model (default is "rnn").
 
-    Parameters
-    ----------
-    hidden_size:
-        a list of integers that represents the number of nodes in each hidden layer or 
-        a single integer that represents the number of nodes in a single hidden layer
-    num_layers:
-        the number of recurrent layers (default is 1)
+    Args:
+        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
+                                              a single integer that represents the number of nodes in a single hidden layer.
+        num_layers (int): The number of recurrent layers (default is 1).
 
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "rnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the LSTMClassifier object with given or default parameters.
-
-    _init_model(self):
-        Initializes the LSTM and fully connected layers of the model based on configuration.
-
-    forward(x: torch.Tensor) -> torch.Tensor:
-        Defines the forward pass of the LSTM network.
+    Methods:
+        __init__(self, **kwargs): Initializes the LSTMClassifier object with given or default parameters.
+        _init_model(self): Initializes the LSTM and fully connected layers of the model based on configuration.
+        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the LSTM network.
     """
 
     model_type = "rnn"
 
     def __init__(self, **kwargs):
+        """
+        Initializes the LSTMClassifier object with given or default parameters.
+        """
         super().__init__(**kwargs)
-        # Initializes the LSTM neural network model with given or default parameters
 
     def _init_model(self):
+        """
+        Initializes the LSTM and fully connected layers of the model based on configuration.
+        """
         # Checks if hidden_sizes is a single integer and, if so, converts it to a list
         if isinstance(cfg.nn.hidden_size, int):
             self.hidden_sizes = [cfg.nn.hidden_size]
@@ -102,46 +94,39 @@ class LSTMClassifier(ClassifierNN):
 
         # Returns the output of the forward pass of the LSTM network
         return out
-    
+
+
 class LSTMRegressor(RegressorNN):
     """
-    A class used to represent a Long Short-Term Memory (LSTM) network for regression tasks. 
+    A class used to represent a Long Short-Term Memory (LSTM) network for regression tasks.
     This class inherits from the `RegressorNN` class.
 
-    ...
+    Attributes:
+        model_type (str): A string that represents the type of the model (default is "rnn").
 
-    Parameters
-    ----------
-    hidden_size:
-        a list of integers that represents the number of nodes in each hidden layer or 
-        a single integer that represents the number of nodes in a single hidden layer
-    num_layers:
-        the number of recurrent layers (default is 1)
+    Args:
+        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
+                                              a single integer that represents the number of nodes in a single hidden layer.
+        num_layers (int): The number of recurrent layers (default is 1).
 
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "rnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the LSTMRegressor object with given or default parameters.
-
-    _init_model(self):
-        Initializes the LSTM and fully connected layers of the model based on configuration.
-
-    forward(x: torch.Tensor) -> torch.Tensor:
-        Defines the forward pass of the LSTM network.
+    Methods:
+        __init__(self, **kwargs): Initializes the LSTMRegressor object with given or default parameters.
+        _init_model(self): Initializes the LSTM and fully connected layers of the model based on configuration.
+        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the LSTM network.
     """
 
     model_type = "rnn"
 
     def __init__(self, **kwargs):
+        """
+        Initializes the LSTMRegressor object with given or default parameters.
+        """
         super().__init__(**kwargs)
-        # Initializes the LSTM neural network model with given or default parameters
 
     def _init_model(self):
+        """
+        Initializes the LSTM and fully connected layers of the model based on configuration.
+        """
         # Checks if hidden_sizes is a single integer and, if so, converts it to a list
         if isinstance(cfg.nn.hidden_size, int):
             self.hidden_sizes = [cfg.nn.hidden_size]
