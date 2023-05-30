@@ -12,7 +12,7 @@
 
 ## Table of contents
 * [Description](#description)
-* [Documentation](#documentation)
+* [Documentation](https://stockpy.readthedocs.io/) 
 * [Data Downloader](#data-downloader)
 * [License](#license)
 
