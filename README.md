@@ -7,7 +7,7 @@
 ![Python package](https://github.com/SilvioBaratto/stockpy/workflows/Python%20package/badge.svg?branch=master)
 [![GitHub license](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)](https://github.com/Naereen/StrapDown.js/blob/master/LICENSE)
 <img src='https://img.shields.io/badge/Code%20style-Black-%23000000'/>
-[![Documentation Status](https://readthedocs.org/projects/bispy-bisimulation-in-python/badge/?version=latest)](https://bispy-bisimulation-in-python.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/stockpy/badge/?version=latest)](https://stockpy.readthedocs.io/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/stockpy.svg)](https://badge.fury.io/py/stockpy)
 
 ## Table of contents
