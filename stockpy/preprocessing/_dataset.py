@@ -1,62 +1,26 @@
 import numpy as np
-import pandas as pd
-from torch.utils.data import DataLoader
-from typing import Union, Tuple, List
 import torch
-from sklearn.preprocessing import StandardScaler
-from ._base import BaseStockDataset
-from ..config import Config as cfg
+import torch.utils.data
 
-class StockDatasetRNN(BaseStockDataset):
+from stockpy.utils import multi_indexing
+from stockpy.preprocessing import StockpyDataset
+
+def unpack_data(data):
+    """Unpack data returned by the net's iterator into a 2-tuple.
+
+    If the wrong number of items is returned, raise a helpful error
+    message.
+
     """
-    Class for Stock Dataset used for Recurrent Neural Networks (RNNs).
+    # Note: This function cannot detect it when a user only returns 1
+    # item that is exactly of length 2 (e.g. because the batch size is
+    # 2). In that case, the item will be erroneously split into X and
+    # y.
+    X, y = data
 
-    This class extends the BaseStockDataset class and implements the __getitem__ method for RNNs.
+    return X, y
 
-    Attributes:
-        Inherits all attributes from the BaseStockDataset class.
-    """
-
-    def __getitem__(self, i):
-        """
-        Get the i-th item in the dataset for RNN models.
-        
-        This method implements logic to ensure the sequence length is maintained for RNNs.
-        
-        Args:
-            i (int): The index of the item.
-
-        Returns:
-            tuple: A tuple containing the i-th input data and target, if targets exist. If targets don't exist, it returns only the input data.
-        """
-
-        if i >= cfg.training.sequence_length - 1:
-            # If the index i is greater than or equal to the sequence length minus one 
-            # (defined in cfg.training.sequence_length), it selects a sequence of data 
-            # from the dataset self.X starting from i_start to i (both inclusive). 
-            # The sequence length is defined in the configuration.
-
-            i_start = i - cfg.training.sequence_length + 1
-            x = self.X[i_start:(i + 1), :]
-        else:
-            # If i is less than the sequence length minus one, it creates a zero padding for 
-            # the missing data to ensure that the input always has the same shape. 
-            # This is done by creating a tensor of zeros with the appropriate shape using torch.zeros(), 
-            # then concatenating this padding with the actual data using torch.cat(). 
-            # This is a common practice in machine learning when working with sequences of varying length, 
-            # especially for RNNs.
-
-            padding = torch.zeros((cfg.training.sequence_length - i - 1, self.X.size(1)), dtype=torch.float32)
-            x = self.X[0:(i + 1), :]
-            x = torch.cat((padding, x), 0)
-
-        if self.y is None:
-            return x
-        else:
-            return x, self.y[i]
-        
-
-class StockDatasetFFNN(BaseStockDataset):
+class StockDatasetFFNN(StockpyDataset):
     """
     Class for Stock Dataset used for Feedforward Neural Networks (FFNNs).
 
@@ -68,27 +32,89 @@ class StockDatasetFFNN(BaseStockDataset):
 
     def __getitem__(self, i):
         """
-        Get the i-th item in the dataset for FFNN models.
-        
-        Args:
-            i (int): The index of the item.
+        Retrieve the i-th item from the dataset.
 
-        Returns:
-            tuple: A tuple containing the i-th input data and target, if targets exist. If targets don't exist, it returns only the input data.
+        Parameters
+        ----------
+        i : int
+            The index of the item to be retrieved.
+
+        Returns
+        -------
+        tuple
+            The i-th input data and target (if available).
+
         """
-        # returns the ith element from the dataset self.X. If the targets self.y exist, it returns a 
-        # tuple of the input data and the corresponding target. If they don't exist, it only returns 
-        # the input data.
+        # Extract the data and target for the specified index.
+        X, y = self.X, self.y
 
-        x = self.X[i, :]
+        # If X is a pandas NDFrame, reshape its values.
+        if self.X_is_ndframe:
+            X = {k: X[k].values.reshape(-1, 1) for k in X}
 
-        if self.y is None:
-            return x
+        # Extract the i-th data and target using proper indexing methods.
+        Xi = multi_indexing(X, i, self.X_indexing)
+        yi = multi_indexing(y, i, self.y_indexing)
+
+        return self.transform(Xi, yi)
+    
+class StockDatasetRNN(StockpyDataset):
+
+    def __init__(
+            self,
+            X,
+            y,
+            length,
+            seq_len
+    ):
+        
+        super(StockDatasetRNN, self).__init__(X, y, length)
+
+        self.seq_len = seq_len
+
+    def __getitem__(self, i):
+        """
+        Retrieve the i-th item from the dataset.
+
+        Parameters
+        ----------
+        i : int
+            The index of the item to be retrieved.
+
+        Returns
+        -------
+        tuple
+            The i-th input data and target (if available).
+
+        """
+        # Extract the data and target for the specified index.
+        X, y = self.X, self.y
+
+        # If X is a pandas NDFrame, reshape its values.
+        if self.X_is_ndframe:
+            X = {k: X[k].values.reshape(-1, 1) for k in X}
+
+        if i >= self.seq_len - 1:
+            i_start = i - self.seq_len + 1
+            X = self.X[i_start:(i + 1), :]
+
         else:
-            return x, self.y[i]
+            padding_shape = (self.seq_len - i - 1, self.X.shape[1])
+            padding = np.zeros(padding_shape, dtype=np.float32)
+            X = self.X[0:(i + 1), :]
+            X = np.concatenate((padding, X), axis=0)
 
+        # Now X contains either a sequence from the dataset or a zero-padded sequence
+        # Use multi_indexing to get the data at index i (or slice)
+        Xi = multi_indexing(X, slice(0, self.seq_len), self.X_indexing)
 
-class StockDatasetCNN(BaseStockDataset):
+        # Use multi_indexing to get the target at index i
+        yi = multi_indexing(y, i, self.y_indexing)
+
+        # Transform the indexed data and return
+        return self.transform(Xi, yi)
+    
+class StockDatasetCNN(StockpyDataset):
     """
     Class for Stock Dataset used for Convolutional Neural Networks (CNNs).
 
@@ -98,52 +124,121 @@ class StockDatasetCNN(BaseStockDataset):
         Inherits all attributes from the BaseStockDataset class.
     """
 
-    def __init__(self,
-                 X: Union[np.ndarray, pd.core.frame.DataFrame],
-                 y: Union[np.ndarray, pd.core.frame.DataFrame] = None,
-                 task: str = 'regression'
-                 ):
+    def __getitem__(self, i):
         """
-        Initializes the StockDatasetCNN instance.
-        
-        This method adds an extra dimension to X to accommodate the channel dimension required by CNNs.
-        
-        Args:
-            X (np.ndarray or pd.core.frame.DataFrame): The input data.
-            y (np.ndarray or pd.core.frame.DataFrame, optional): The target data. Default is None.
-            task (str, optional): The type of task. Could be either 'regression' or 'classification'. Default is 'regression'.
-        """
-        
-        super().__init__(X, y, task)
-        # add an extra dimension to X using unsqueeze(1), which is necessary because 
-        # CNNs expect input data to have a specific shape (including a channel dimension).
+        Retrieve the i-th item from the dataset.
 
-        self.X = X.unsqueeze(1).float()  # Add channel dimension
+        Parameters
+        ----------
+        i : int
+            The index of the item to be retrieved.
+
+        Returns
+        -------
+        tuple
+            The i-th input data and target (if available).
+
+        """
+        # Extract the data and target for the specified index.
+        X, y = self.X, self.y
+
+        # If X is a pandas NDFrame, reshape its values.
+        if self.X_is_ndframe:
+            X = {k: X[k].values.reshape(-1, 1) for k in X}
+
+        # if tensor unsqueeze if numpy reshape
+        if isinstance(X, torch.Tensor):
+            X = X.unsqueeze(1).float()
+        else:
+            X = np.expand_dims(X, axis=1).astype(np.float32)
+
+        # Extract the i-th data and target using proper indexing methods.
+        Xi = multi_indexing(X, i, self.X_indexing)
+        yi = multi_indexing(y, i, self.y_indexing)
+
+        return self.transform(Xi, yi)
+
+class StockDatasetSeq2Seq(StockpyDataset):
+
+    def __init__(
+            self,
+            X,
+            y,
+            length,
+            seq_len
+    ):
+        
+        super(StockDatasetSeq2Seq, self).__init__(X, y, length)
+
+        self.seq_len = seq_len
 
     def __getitem__(self, i):
         """
-        Get the i-th item in the dataset for CNN models.
-        
-        Args:
-            i (int): The index of the item.
+        Retrieve the i-th item from the dataset.
 
-        Returns:
-            tuple: A tuple containing the i-th input data and target, if targets exist. If targets don't exist, it returns only the input data.
+        Parameters
+        ----------
+        i : int
+            The index of the item to be retrieved.
+
+        Returns
+        -------
+        tuple
+            The i-th input data and target (if available).
+
         """
+        # Extract the data and target for the specified index.
+        X, y = self.X, self.y
 
-        x = self.X[i, :, :]
+        # If X is a pandas NDFrame, reshape its values.
+        if self.X_is_ndframe:
+            X = {k: X[k].values.reshape(-1, 1) for k in X}
 
-        if self.y is None:
-            return x
+        is_torch_tensor = isinstance(X, torch.Tensor)
+
+        if i >= self.seq_len - 1:
+            # If the index i is greater than or equal to the sequence length minus one 
+            # (defined in cfg.training.seq_len), it selects a sequence of data 
+            # from the dataset self.X starting from i_start to i (both inclusive). 
+            # The sequence length is defined in the configuration.
+
+            i_start = i - self.seq_len + 1
+            X = multi_indexing(self.X, slice(i_start, i+1), self.X_indexing)
         else:
-            return x, self.y[i]
+            # If i is less than the sequence length minus one, it creates a zero padding for 
+            # the missing data to ensure that the input always has the same shape. 
+            # This is done by creating a tensor of zeros with the appropriate shape using torch.zeros(), 
+            # then concatenating this padding with the actual data using torch.cat(). 
+            # This is a common practice in machine learning when working with sequences of varying length, 
+            # especially for RNNs.
 
-    @property
-    def input_size(self):
-        """
-        The size of the input data for CNN models.
+            if is_torch_tensor:
+                padding = torch.zeros((self.seq_len - i - 1, self.X.shape[1]), dtype=torch.float32)
+            else:
+                padding = np.zeros((self.seq_len - i - 1, self.X.shape[1]), dtype=np.float32)
+                
+            X = multi_indexing(self.X, slice(0, i + 1), self.X_indexing)
 
-        Returns:
-            int: The number of features in the input data.
-        """
-        return self.X.shape[2]  # Changed from shape[1] to shape[2]
+            if is_torch_tensor:
+                X = torch.cat((padding, X), 0)
+            else:
+                X = np.concatenate((padding, X), axis=0)
+
+        # Handle y
+        if y is not None:
+            if i >= self.seq_len - 1:
+                i_start = i - self.seq_len + 1
+                y = multi_indexing(self.y, slice(i_start, i + 1), self.y_indexing)
+            else:
+                # Create a padding tensor for y
+                padding_y_shape = (self.seq_len - i - 1, self.y.shape[1])
+                padding_y = torch.zeros(padding_y_shape, dtype=torch.float32) if is_torch_tensor else np.zeros(padding_y_shape, dtype=np.float32)
+                
+                # Extract the relevant slice of y
+                y = multi_indexing(self.y, slice(0, i + 1), self.y_indexing)
+
+                # Concatenate the padding tensor and y
+                y = torch.cat((padding_y, y), 0) if is_torch_tensor else np.concatenate((padding_y, y), axis=0)
+
+
+        return self.transform(X, y)

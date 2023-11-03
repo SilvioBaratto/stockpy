@@ -1,189 +1,165 @@
-from abc import ABCMeta, abstractmethod
-import os
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd import Variable
-from typing import Union, Tuple
-import pandas as pd
-import numpy as np
-from ._base import ClassifierNN
-from ._base import RegressorNN
-from ..config import Config as cfg
+from stockpy.base import Regressor
+from stockpy.base import Classifier 
+from stockpy.utils import get_activation_function
 
-class BiLSTMClassifier(ClassifierNN):
-    """
-    A class used to represent a Bidirectional Long Short-Term Memory (BiLSTM) network for classification tasks. 
-    This class inherits from the `ClassifierNN` class.
+class BiLSTM(nn.Module):
 
-    ...
-
-    Parameters
-    ----------
-    hidden_size:
-        a list of integers that represents the number of nodes in each hidden layer or 
-        a single integer that represents the number of nodes in a single hidden layer
-    num_layers:
-        the number of recurrent layers (default is 1)
-
-    Attributes
-    ----------
-    model_type : str
-        a string that represents the type of the model (default is "rnn")
-
-    Methods
-    -------
-    __init__(self, **kwargs):
-        Initializes the BiLSTMClassifier object with given or default parameters.
-
-    _init_model(self):
-        Initializes the BiLSTM layers and fully connected layer of the model based on configuration.
-
-    forward(x: torch.Tensor) -> torch.Tensor:
-        Defines the forward pass of the BiLSTM network.
-    """
-
-    model_type = "rnn"
-   
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Initializes the BiLSTM object with given or default parameters.
-
-    def _init_model(self):
-        # Check if hidden_sizes is a single integer and, if so, converts it to a list
-        if isinstance(cfg.nn.hidden_size, int):
-            self.hidden_sizes = [cfg.nn.hidden_size]
-        else:
-            self.hidden_sizes = cfg.nn.hidden_size
-
-        # Initializes an empty module list for the BiLSTM layers
-        self.bilstms = nn.ModuleList()
-        input_size = self.input_size
-
-        # Iterates through the hidden sizes and creates BiLSTM layers accordingly
-        for hidden_size in self.hidden_sizes:
-            self.bilstms.append(nn.LSTM(input_size=input_size,  
-                                        hidden_size=hidden_size, 
-                                        num_layers=cfg.nn.num_layers, 
-                                        bidirectional=True, 
-                                        batch_first=True))
-            
-            # Multiplies by 2 for the next input size because the LSTM is bidirectional
-            input_size = hidden_size * 2 
-
-        # The final fully connected layer's input size is also doubled because the LSTM is bidirectional
-        self.fc = nn.Linear(self.hidden_sizes[-1] * 2, self.output_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Ensures that the model has been initialized
-        if not self.bilstms:
-            raise RuntimeError("You must call fit before calling predict")
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
         
-        batch_size = x.size(0)
-        output = x
+        """
+        Constructor for the LSTM class.
 
-        # Applies each BiLSTM layer on the input tensor
-        for bilstm in self.bilstms:
-            h0 = Variable(torch.zeros(cfg.nn.num_layers * 2, 
-                                      batch_size, 
-                                      bilstm.hidden_size)).to(cfg.training.device)  # times 2 because of bidirectional
-            c0 = Variable(torch.zeros(cfg.nn.num_layers * 2, 
-                                      batch_size, 
-                                      bilstm.hidden_size)).to(cfg.training.device)  # times 2 because of bidirectional
-            output, (hn, _) = bilstm(output, (h0, c0))
+        Initializes a new instance of LSTM with the specified configuration for sequence processing tasks. 
+        It constructs an LSTM layer followed by a series of fully connected layers based on the given arguments.
+        """
+        super().__init__()
 
-        # Applies the final fully connected layer
-        out = self.fc(output[:, -1, :])
-        out = out.view(-1, self.output_size)
+        self.rnn_size = rnn_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.activation = activation
+        self.bias = bias
+        self.seq_len = seq_len
+
+    def initialize_module(self):
+        """
+        Initializes the layers of the neural network based on configuration.
+        """
+        # Checks if hidden_sizes is a single integer and, if so, converts it to a list
+        if isinstance(self.hidden_size, int):
+            self.hidden_sizes = [self.hidden_size]
+        else:
+            self.hidden_sizes = self.hidden_size
+
+        if isinstance(self, Classifier):
+            self.output_size = self.n_classes_
+        elif isinstance(self, Regressor):
+            self.output_size = self.n_outputs_
+
+        self.bilstm = nn.LSTM(input_size=self.n_features_in_,
+                             hidden_size=self.rnn_size,
+                             num_layers=self.num_layers,
+                             bidirectional=True,
+                             batch_first=True,
+                             bias=self.bias)
+        
+        layers = []
+
+        fc_input_size = self.rnn_size * 2
+        # Creates the layers of the neural network
+        for hidden_size in self.hidden_sizes:
+            layers.append(nn.Linear(fc_input_size, hidden_size, bias=self.bias))
+            layers.append(get_activation_function(self.activation))
+            layers.append(nn.Dropout(self.dropout))
+
+            fc_input_size = hidden_size
+
+        # Appends the output layer to the neural network
+        layers.append(nn.Linear(fc_input_size, self.output_size)) 
+
+        self.layers = nn.Sequential(*layers)
+
+    @property
+    def model_type(self):
+        return "rnn"
+
+class BiLSTMClassifier(Classifier, BiLSTM):
+
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
+        """
+        Initializes the MLPClassifier object with given or default parameters.
+        """
+        Classifier.__init__(self, classes=None, **kwargs)
+        BiLSTM.__init__(self,
+                        rnn_size=rnn_size,
+                        hidden_size=hidden_size,
+                        num_layers=num_layers,
+                        dropout=dropout,
+                        activation=activation,
+                        seq_len=seq_len,
+                        bias=bias,
+                        **kwargs
+                        )
+
+        self.criterion = nn.NLLLoss()
+
+    def forward(self, x):
+        """
+        Forward pass through the model.
+        """        
+        h_0 = Variable(torch.zeros(self.num_layers * 2, x.size(0), self.rnn_size))
+
+        c_0 = Variable(torch.zeros(self.num_layers * 2, x.size(0), self.rnn_size))
+
+        out, (hn, cn) = self.bilstm(x, (h_0, c_0))
+        
+        # Concat the final forward and backward hidden states
+        out = self.layers(out[:, -1, :])
+        
+        out = F.softmax(out, dim=-1)
 
         return out
-    
-class BiLSTMRegressor(RegressorNN):
-    """
-    A class used to represent a Bidirectional Long Short-Term Memory (BiLSTM) network for regression tasks.
-    This class inherits from the `RegressorNN` class.
 
-    Attributes:
-        model_type (str): A string that represents the type of the model (default is "rnn").
+class BiLSTMRegressor(Regressor, BiLSTM):
 
-    Args:
-        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
-                                              a single integer that represents the number of nodes in a single hidden layer.
-        num_layers (int): The number of recurrent layers (default is 1).
-
-    Methods:
-        __init__(self, **kwargs): Initializes the BiLSTMRegressor object with given or default parameters.
-        _init_model(self): Initializes the BiLSTM layers and fully connected layer of the model based on configuration.
-        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the BiLSTM network.
-    """
-
-    model_type = "rnn"
-
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
         """
-        Initializes the BiLSTMRegressor object with given or default parameters.
+        Initializes the MLPClassifier object with given or default parameters.
         """
-        super().__init__(**kwargs)
+        Regressor.__init__(self, **kwargs)
+        BiLSTM.__init__(self, 
+                     rnn_size=rnn_size,
+                     hidden_size=hidden_size, 
+                     num_layers=num_layers,
+                     dropout=dropout, 
+                     activation=activation, 
+                     seq_len=seq_len,
+                     bias=bias, 
+                     **kwargs
+                     )
 
-    def _init_model(self):
+        self.criterion = nn.MSELoss()
+
+    def forward(self, x):
         """
-        Initializes the BiLSTM layers and fully connected layer of the model based on configuration.
-        """
-        # Check if hidden_sizes is a single integer and, if so, converts it to a list
-        if isinstance(cfg.nn.hidden_size, int):
-            self.hidden_sizes = [cfg.nn.hidden_size]
-        else:
-            self.hidden_sizes = cfg.nn.hidden_size
+        Forward pass through the model.
+        """        
+        h_0 = Variable(torch.zeros(self.num_layers * 2, x.size(0), self.rnn_size))
 
-        # Initializes an empty module list for the BiLSTM layers
-        self.bilstms = nn.ModuleList()
-        input_size = self.input_size
+        c_0 = Variable(torch.zeros(self.num_layers * 2, x.size(0), self.rnn_size))
 
-        # Iterates through the hidden sizes and creates BiLSTM layers accordingly
-        for hidden_size in self.hidden_sizes:
-            self.bilstms.append(nn.LSTM(input_size=input_size,
-                                        hidden_size=hidden_size,
-                                        num_layers=cfg.nn.num_layers,
-                                        bidirectional=True,
-                                        batch_first=True))
-
-            # Multiplies by 2 for the next input size because the LSTM is bidirectional
-            input_size = hidden_size * 2
-
-        # The final fully connected layer's input size is also doubled because the LSTM is bidirectional
-        self.fc = nn.Linear(self.hidden_sizes[-1] * 2, self.output_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Defines the forward pass of the BiLSTM network.
-
-        Args:
-            x (torch.Tensor): The input tensor.
-
-        Returns:
-            torch.Tensor: The output tensor.
-
-        Raises:
-            RuntimeError: If the model has not been initialized by calling the fit method before calling predict.
-        """
-        # Ensures that the model has been initialized
-        if not self.bilstms:
-            raise RuntimeError("You must call fit before calling predict")
+        out, (hn, cn) = self.bilstm(x, (h_0, c_0))
         
-        batch_size = x.size(0)
-        output = x
-
-        # Applies each BiLSTM layer on the input tensor
-        for bilstm in self.bilstms:
-            h0 = Variable(torch.zeros(cfg.nn.num_layers * 2, 
-                                      batch_size, 
-                                      bilstm.hidden_size)).to(cfg.training.device)  # times 2 because of bidirectional
-            c0 = Variable(torch.zeros(cfg.nn.num_layers * 2, 
-                                      batch_size, 
-                                      bilstm.hidden_size)).to(cfg.training.device)  # times 2 because of bidirectional
-            output, (hn, _) = bilstm(output, (h0, c0))
-
-        # Applies the final fully connected layer
-        out = self.fc(output[:, -1, :])
-        out = out.view(-1, self.output_size)
+        # Concat the final forward and backward hidden states
+        out = self.layers(out[:, -1, :])
 
         return out

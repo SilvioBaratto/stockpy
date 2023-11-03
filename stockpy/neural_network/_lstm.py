@@ -1,182 +1,330 @@
-from abc import ABCMeta, abstractmethod
-import os
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd import Variable
-from typing import Union, Tuple
-import pandas as pd
-import numpy as np
-from ._base import ClassifierNN
-from ._base import RegressorNN
-from ..config import Config as cfg
+from stockpy.base import Regressor
+from stockpy.base import Classifier 
+from stockpy.utils import get_activation_function
 
-class LSTMClassifier(ClassifierNN):
+class LSTM(nn.Module):
+
     """
-    A class used to represent a Long Short-Term Memory (LSTM) network for classification tasks.
-    This class inherits from the `ClassifierNN` class.
+    LSTM is a recurrent neural network architecture that uses LSTM (Long Short-Term Memory) cells to 
+    process sequences of data. It's designed to remember long-range dependencies and is often used in 
+    time-series prediction, natural language processing, and other sequence-related tasks.
+
+    Parameters:
+        rnn_size : int
+            The number of features in the hidden state h of the LSTM. It's also the output feature dimension 
+            after processing the input sequence.
+        hidden_size : int or list of int
+            The size of each hidden layer in the fully connected layers after the LSTM layer. If it is an integer, 
+            it is the size of a single hidden layer; if it is a list, each element is the size of a layer.
+        num_layers : int
+            The number of recurrent layers (i.e., number of LSTM layers stacked on each other).
+        dropout : float
+            The dropout rate used for regularization in both LSTM (if `num_layers` > 1) and fully connected layers.
+        activation : str
+            The activation function to use after each fully connected layer except for the output layer.
+        bias : bool
+            If True, layers will use bias terms.
+        seq_len : int
+            The length of the input sequence.
+        **kwargs
+            Additional keyword arguments that might be required for the base class `nn.Module`.
 
     Attributes:
-        model_type (str): A string that represents the type of the model (default is "rnn").
-
-    Args:
-        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
-                                              a single integer that represents the number of nodes in a single hidden layer.
-        num_layers (int): The number of recurrent layers (default is 1).
+        lstm : torch.nn.LSTM
+            The LSTM layer of the network.
+        layers : torch.nn.Sequential
+            The Sequential container of fully connected layers following the LSTM layer.
 
     Methods:
-        __init__(self, **kwargs): Initializes the LSTMClassifier object with given or default parameters.
-        _init_model(self): Initializes the LSTM and fully connected layers of the model based on configuration.
-        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the LSTM network.
+        initialize_module()
+            Initializes the LSTM layer and fully connected layers of the neural network.
+
     """
 
-    model_type = "rnn"
-
-    def __init__(self, **kwargs):
-        """
-        Initializes the LSTMClassifier object with given or default parameters.
-        """
-        super().__init__(**kwargs)
-
-    def _init_model(self):
-        """
-        Initializes the LSTM and fully connected layers of the model based on configuration.
-        """
-        # Checks if hidden_sizes is a single integer and, if so, converts it to a list
-        if isinstance(cfg.nn.hidden_size, int):
-            self.hidden_sizes = [cfg.nn.hidden_size]
-        else:
-            self.hidden_sizes = cfg.nn.hidden_size
-
-        # Initializes an empty ModuleList to hold the LSTM layers
-        self.lstms = nn.ModuleList()
-        input_size = self.input_size
-
-        # Creates the LSTM layers of the neural network
-        for hidden_size in self.hidden_sizes:
-            self.lstms.append(nn.LSTM(input_size=input_size,  
-                                      hidden_size=hidden_size, 
-                                      num_layers=cfg.nn.num_layers, 
-                                      batch_first=True))
-            input_size = hidden_size
-
-        # Initializes the fully connected (FC) layer which maps the last hidden state to the output
-        self.fc = nn.Linear(self.hidden_sizes[-1], self.output_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Defines the forward pass of the LSTM network.
-        :param x: The input tensor.
-        :returns: The output tensor, corresponding to the predicted target variable(s).
-        """
-
-        # Ensures the model has been fitted before making predictions
-        if not self.lstms:
-            raise RuntimeError("You must call fit before calling predict")
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
         
-        # Obtains the batch size
-        batch_size = x.size(0)
-        output = x
+        """
+        Constructor for the LSTM class.
 
-        # Iterates over LSTM layers, with each LSTM layer's output serving as input to the next
-        for lstm in self.lstms:
-            h0 = Variable(torch.zeros(cfg.nn.num_layers, 
-                                      batch_size, 
-                                      lstm.hidden_size)).to(cfg.training.device)
-            c0 = Variable(torch.zeros(cfg.nn.num_layers, 
-                                      batch_size, 
-                                      lstm.hidden_size)).to(cfg.training.device)
-            output, (hn, _) = lstm(output, (h0, c0))
+        Initializes a new instance of LSTM with the specified configuration for sequence processing tasks. 
+        It constructs an LSTM layer followed by a series of fully connected layers based on the given arguments.
+        """
+        super().__init__()
 
-        # Passes the last hidden state through the FC layer
-        out = self.fc(output[:, -1, :])
-        # Reshapes the output tensor
-        out = out.view(-1,self.output_size)
+        self.rnn_size = rnn_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.activation = activation
+        self.bias = bias
+        self.seq_len = seq_len
 
-        # Returns the output of the forward pass of the LSTM network
+    def initialize_module(self):
+        """
+        Implements the initialization of the LSTM and fully connected layers.
+
+        Sets up the architecture of the neural network based on the configuration provided in the constructor. 
+        This includes initializing the LSTM layer with the defined `rnn_size` and `num_layers`, and the fully 
+        connected layers according to `hidden_size` and `activation` function.
+
+        Raises:
+            AttributeError
+                If `n_features_in_` is not set before calling this method, as it is required to set the `input_size`
+                for the LSTM layer.
+        """
+
+        # Checks if hidden_sizes is a single integer and, if so, converts it to a list
+        if isinstance(self.hidden_size, int):
+            self.hidden_sizes = [self.hidden_size]
+        else:
+            self.hidden_sizes = self.hidden_size
+
+        if isinstance(self, Classifier):
+            self.output_size = self.n_classes_
+        elif isinstance(self, Regressor):
+            self.output_size = self.n_outputs_
+
+        self.lstm = nn.LSTM(input_size=self.n_features_in_,
+                             hidden_size=self.rnn_size,
+                             num_layers=self.num_layers,
+                             bidirectional=False,
+                             batch_first=True,
+                             bias=self.bias)
+        
+        layers = []
+
+        fc_input_size = self.rnn_size
+        # Creates the layers of the neural network
+        for hidden_size in self.hidden_sizes:
+            layers.append(nn.Linear(fc_input_size, hidden_size, bias=self.bias))
+            layers.append(get_activation_function(self.activation))
+            layers.append(nn.Dropout(self.dropout))
+
+            fc_input_size = hidden_size
+
+        # Appends the output layer to the neural network
+        layers.append(nn.Linear(fc_input_size, self.output_size)) 
+
+        self.layers = nn.Sequential(*layers)
+
+    @property
+    def model_type(self):
+        return "rnn"
+
+class LSTMClassifier(Classifier, LSTM):
+
+    """
+    LSTMClassifier is a neural network module for sequence classification tasks
+    that uses an LSTM (Long Short-Term Memory) layer followed by a fully
+    connected layer. It is suitable for tasks where the input data is a sequence
+    and the output is a discrete class.
+
+    Parameters:
+        rnn_size : int
+            The number of units in the LSTM layer.
+        hidden_size : int
+            The number of units in the hidden layer(s) following the LSTM layer.
+        num_layers : int
+            The number of layers in the LSTM.
+        dropout : float
+            If non-zero, introduces a dropout layer on the outputs of each LSTM layer
+            except the last layer, with dropout probability equal to `dropout`.
+        activation : str
+            The activation function to use on the outputs of the hidden layers.
+        bias : bool
+            If `False`, then the layer does not use bias weights b_ih and b_hh.
+            Default: `True`.
+        seq_len : int
+            The length of the input sequences.
+        **kwargs : dict, optional
+            Additional arguments passed to the `Classifier` base class.
+
+    Attributes:
+        criterion : torch.nn.Module
+            The criterion that is used to compute the loss of the model.
+
+    Methods:
+        forward(x)
+            Defines the forward pass of the LSTM classifier.
+
+    """
+
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
+        """
+        Constructs an LSTMClassifier instance with specified parameters for the LSTM
+        and fully connected layers. It initializes base Classifier attributes and
+        sets up the criterion as Negative Log-Likelihood Loss (NLLLoss).
+        """
+        Classifier.__init__(self, **kwargs)
+        LSTM.__init__(self,
+                        rnn_size=rnn_size,
+                        hidden_size=hidden_size,
+                        num_layers=num_layers,
+                        dropout=dropout,
+                        activation=activation,
+                        seq_len=seq_len,
+                        bias=bias,
+                        **kwargs
+                        )
+
+        self.criterion = nn.NLLLoss()
+
+    def forward(self, x):
+        """
+        Forward pass through the LSTM and fully connected layers. This method takes an
+        input sequence, processes it through the LSTM layer(s), and passes the final
+        hidden state through the fully connected layer(s) to produce the output.
+
+        Parameters:
+            x : torch.Tensor
+                The input data tensor for sequence classification. Expected to have
+                dimensions (batch_size, seq_len, input_size).
+
+        Returns:
+            torch.Tensor
+                The output tensor after processing through LSTM and fully connected layers.
+                It contains the log probabilities of the classes for each sequence in the batch.
+
+        Raises:
+            RuntimeError
+                If the input tensor does not match the expected dimensions or if an operation
+                within the forward pass fails.
+
+        """
+        # Ensures LSTM initial states h_0 and c_0 are reset to zeros at each forward call
+        h_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.rnn_size))
+        c_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.rnn_size))
+
+        # Processes input through the LSTM layer
+        out, (hn, cn) = self.lstm(x, (h_0.detach(), c_0.detach()))
+
+        # Takes the output of the last sequence step from LSTM layer
+        out = self.layers(out[:, -1, :])
+
+        # Applies softmax to output layer to obtain log probabilities for classification
+        out = F.softmax(out, dim=-1)
+
         return out
 
+class LSTMRegressor(Regressor, LSTM):
 
-class LSTMRegressor(RegressorNN):
     """
-    A class used to represent a Long Short-Term Memory (LSTM) network for regression tasks.
-    This class inherits from the `RegressorNN` class.
+    LSTMRegressor is a neural network module for sequence regression tasks that uses
+    an LSTM (Long Short-Term Memory) layer followed by a fully connected layer. It is
+    suitable for tasks where the input data is a sequence and the output is a continuous value.
+
+    Parameters:
+        rnn_size : int
+            The number of units in the LSTM layer.
+        hidden_size : int
+            The number of units in the hidden layer(s) following the LSTM layer.
+        num_layers : int
+            The number of layers in the LSTM.
+        dropout : float
+            If non-zero, introduces a dropout layer on the outputs of each LSTM layer
+            except the last layer, with dropout probability equal to `dropout`.
+        activation : str
+            The activation function to use on the outputs of the hidden layers.
+        bias : bool
+            If `False`, then the layer does not use bias weights b_ih and b_hh.
+            Default: `True`.
+        seq_len : int
+            The length of the input sequences.
+        **kwargs : dict, optional
+            Additional arguments passed to the `Regressor` base class.
 
     Attributes:
-        model_type (str): A string that represents the type of the model (default is "rnn").
-
-    Args:
-        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
-                                              a single integer that represents the number of nodes in a single hidden layer.
-        num_layers (int): The number of recurrent layers (default is 1).
+        criterion : torch.nn.Module
+            The criterion that is used to compute the loss of the model, which in the
+            case of regression, is typically Mean Squared Error (MSE).
 
     Methods:
-        __init__(self, **kwargs): Initializes the LSTMRegressor object with given or default parameters.
-        _init_model(self): Initializes the LSTM and fully connected layers of the model based on configuration.
-        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the LSTM network.
+        forward(x)
+            Defines the forward pass of the LSTM regressor.
+
     """
 
-    model_type = "rnn"
-
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
         """
-        Initializes the LSTMRegressor object with given or default parameters.
-        """
-        super().__init__(**kwargs)
-
-    def _init_model(self):
-        """
-        Initializes the LSTM and fully connected layers of the model based on configuration.
-        """
-        # Checks if hidden_sizes is a single integer and, if so, converts it to a list
-        if isinstance(cfg.nn.hidden_size, int):
-            self.hidden_sizes = [cfg.nn.hidden_size]
-        else:
-            self.hidden_sizes = cfg.nn.hidden_size
-
-        # Initializes an empty ModuleList to hold the LSTM layers
-        self.lstms = nn.ModuleList()
-        input_size = self.input_size
-
-        # Creates the LSTM layers of the neural network
-        for hidden_size in self.hidden_sizes:
-            self.lstms.append(nn.LSTM(input_size=input_size,  
-                                      hidden_size=hidden_size, 
-                                      num_layers=cfg.nn.num_layers, 
-                                      batch_first=True))
-            input_size = hidden_size
-
-        # Initializes the fully connected (FC) layer which maps the last hidden state to the output
-        self.fc = nn.Linear(self.hidden_sizes[-1], self.output_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Defines the forward pass of the LSTM network.
-        :param x: The input tensor.
-        :returns: The output tensor, corresponding to the predicted target variable(s).
+        Constructs an LSTMRegressor instance with specified parameters for the LSTM
+        and fully connected layers. It initializes base Regressor attributes and
+        sets up the criterion as Mean Squared Error Loss (MSELoss).
         """
 
-        # Ensures the model has been fitted before making predictions
-        if not self.lstms:
-            raise RuntimeError("You must call fit before calling predict")
+        Regressor.__init__(self, **kwargs)
+        LSTM.__init__(self, 
+                     rnn_size=rnn_size,
+                     hidden_size=hidden_size, 
+                     num_layers=num_layers,
+                     dropout=dropout, 
+                     activation=activation, 
+                     seq_len=seq_len,
+                     bias=bias, 
+                     **kwargs
+                     )
+
+        self.criterion = nn.MSELoss()
+
+    def forward(self, x):
+        """
+        Forward pass through the LSTM and fully connected layers. This method takes an
+        input sequence, processes it through the LSTM layer(s), and passes the final
+        hidden state through the fully connected layer(s) to produce the output.
+
+        Parameters:
+            x : torch.Tensor
+                The input data tensor for sequence regression. Expected to have
+                dimensions (batch_size, seq_len, input_size).
+
+        Returns:
+            torch.Tensor
+                The output tensor after processing through LSTM and fully connected layers.
+                It contains the continuous values predicted for each sequence in the batch.
+
+        Raises:
+            RuntimeError
+                If the input tensor does not match the expected dimensions or if an operation
+                within the forward pass fails.
+
+        """
         
-        # Obtains the batch size
-        batch_size = x.size(0)
-        output = x
+        # Ensures LSTM initial states h_0 and c_0 are reset to zeros at each forward call
+        h_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.rnn_size))
+        c_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.rnn_size))
 
-        # Iterates over LSTM layers, with each LSTM layer's output serving as input to the next
-        for lstm in self.lstms:
-            h0 = Variable(torch.zeros(cfg.nn.num_layers, 
-                                      batch_size, 
-                                      lstm.hidden_size)).to(cfg.training.device)
-            c0 = Variable(torch.zeros(cfg.nn.num_layers, 
-                                      batch_size, 
-                                      lstm.hidden_size)).to(cfg.training.device)
-            output, (hn, _) = lstm(output, (h0, c0))
+        # Processes input through the LSTM layer
+        out, (hn, cn) = self.lstm(x, (h_0.detach(), c_0.detach()))
 
-        # Passes the last hidden state through the FC layer
-        out = self.fc(output[:, -1, :])
-        # Reshapes the output tensor
-        out = out.view(-1,self.output_size)
+        # Takes the output of the last sequence step from LSTM layer
+        out = self.layers(out[:, -1, :])
 
-        # Returns the output of the forward pass of the LSTM network
+        # Returns the final output for regression
         return out

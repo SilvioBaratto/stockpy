@@ -1,93 +1,119 @@
-from abc import abstractmethod, ABCMeta
-import os
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule, PyroSample
-from pyro.infer.autoguide import AutoNormal
-import torch.nn.functional as F
-import pyro.poutine as poutine
-from pyro.infer import (
-    SVI,
-    Trace_ELBO,
-    Predictive,
-    TraceMeanField_ELBO
-)
-from typing import Union, Tuple, Optional
-import pandas as pd
-import numpy as np
-from ._base import RegressorProb
-from .utils._hmm_utils import Emitter, GatedTransition
-from ..config import Config as cfg
 
-class GHMMRegressor(RegressorProb):
-    """
-    A class used to represent a Gaussian Hidden Markov Model (GHMM) for regression tasks.
-    This class inherits from the `RegressorProb` class.
+from stockpy.base import Regressor
+from stockpy.base import Classifier 
+from stockpy.utils import to_device
+from stockpy.utils import get_activation_function
 
-    Attributes:
-        rnn_dim (int): 
-            The dimension of the hidden state of the RNN.
-        z_dim (int): 
-            The dimension of the latent random variable z.
-        emission_dim (int): 
-            The dimension of the hidden state of the emission model.
-        transition_dim (int): 
-            The dimension of the hidden state of the transition model.
-        variance (float): 
-            The variance of the observation noise.
-        model_type (str): 
-            A string representing the type of the model (default is "rnn").
+from ._combiner import Combiner
+from ._emitter import EmitterRegressor, EmitterClassifier
+from ._transition import Transition
 
-    Methods:
-        __init__(self, **kwargs): 
-            Initializes the GaussianHMMRegressor object with given or default parameters.
-        _init_model(self): 
-            Initializes the GHMM modules (emitter, transition) and some trainable parameters.
-        model(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
-            Defines the generative model which describes the process of generating the data.
-        guide(self, x_data: torch.Tensor, y_data: Optional[torch.Tensor] = None, annealing_factor: float = 1.0) -> torch.Tensor:
-            Defines the variational guide (approximate posterior) that is used for inference.
-    """
+class GHMM(PyroModule):
 
-    model_type = "rnn"
-   
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self,
+                 z_dim=32,
+                 emission_dim=32,
+                 transition_dim=32,
+                 dropout=0.2,
+                 variance=0.1,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
+        
+        super().__init__()
 
-    def _init_model(self):
-        # Initialize GHMM modules: emitter, transition
-        # Also define trainable parameters z_0, z_q_0, and h_0 that help define the 
-        # probability distributions p(z_1) and q(z_1)
+        self.z_dim = z_dim
+        self.emission_dim = emission_dim
+        self.transition_dim = transition_dim
+        self.dropout = dropout
+        self.variance = variance
+        self.activation = activation
+        self.bias = bias
+        self.seq_len = seq_len
 
-        self.emitter = Emitter(input_size=self.input_size, 
-                               output_size=self.output_size)
-        self.transition = GatedTransition(input_size=self.input_size, 
-                                          output_size=self.output_size)
+    def reset_weights(self):
+        """
+        Reinitializes the weights of the neural network.
+        """
+        pass
 
-        if cfg.training.use_cuda:
-            if torch.cuda.device_count() > 1:
-                self.emitter = nn.DataParallel(self.emitter)
-                self.transition = nn.DataParallel(self.transition)
+    def initialize_module(self):
+        """
+        Initializes the layers of the neural network based on configuration.
+        """
 
-            self.emitter = self.emitter.to(cfg.training.device)
-            self.transition = self.transition.to(cfg.training.device)
+        if isinstance(self, Classifier):
+            self.output_size = self.n_classes_
+        elif isinstance(self, Regressor):
+            self.output_size = self.n_outputs_
 
+        self.emitter_rgr = EmitterRegressor(self.n_features_in_,
+                                        self.z_dim, 
+                                        self.emission_dim,
+                                        self.output_size)
+
+        self.emitter_cls = EmitterClassifier(self.n_features_in_,
+                                        self.z_dim, 
+                                        self.emission_dim,
+                                        self.output_size)
+
+        self.transition = Transition(self.z_dim, 
+                                     self.n_features_in_,
+                                     self.transition_dim)
+        
+        to_device(self.emitter_rgr, self.device)
+        to_device(self.emitter_cls, self.device)
+        to_device(self.transition, self.device)
+        
         # define a (trainable) parameters z_0 and z_q_0 that help define
         # the probability distributions p(z_1) and q(z_1)
         # (since for t = 1 there are no previous latents to condition on)
-        self.z_0 = nn.Parameter(torch.zeros(cfg.prob.z_dim))
-        self.z_q_0 = nn.Parameter(torch.zeros(1, cfg.prob.z_dim))
+        self.z_0 = nn.Parameter(torch.zeros(self.z_dim))
+        self.z_q_0 = nn.Parameter(torch.zeros(1, self.z_dim))
 
-    def model(self, 
-              x_data: torch.Tensor, 
-              y_data: Optional[torch.Tensor] = None, 
-              annealing_factor: float = 1.0
-              ) -> torch.Tensor:
+    @property
+    def model_type(self):
+        return "rnn"
+    
+class GHMMRegressor(Regressor, GHMM):
+
+    def __init__(self,
+                 z_dim=32,
+                 emission_dim=32,
+                 transition_dim=32,
+                 dropout=0.2,
+                 variance=0.1,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
         """
-        Implements the generative model p(y,z|x) which includes the observation 
+        Initializes the MLPClassifier object with given or default parameters.
+        """
+        Regressor.__init__(self, **kwargs)
+        GHMM.__init__(self,
+                     z_dim=z_dim,
+                     emission_dim=emission_dim,
+                     transition_dim=transition_dim,
+                     dropout=dropout,
+                     variance=variance,
+                     activation=activation,
+                     bias=bias,
+                     seq_len=seq_len,
+                     **kwargs)
+        
+        self.criterion = nn.MSELoss()
+
+    def model(self, x, y, annealing_factor = 1.0):
+        """
+        Defines the generative model p(y,z|x) which includes the observation 
         model p(y|z) and transition model p(z_t | z_{t-1}). It also handles the 
         computation of the parameters of these models.
 
@@ -100,52 +126,59 @@ class GHMMRegressor(RegressorProb):
             torch.Tensor: The sampled latent variable `z` from the last time step of the model.
         """
 
-        T_max = x_data.size(1)
+        # this is the number of time steps we need to process in the data
+        T_max = x.size(1)
 
         # register all PyTorch (sub)modules with pyro
         # this needs to happen in both the model and guide
         pyro.module("ghmm", self)
 
         # set z_prev = z_0 to setup the recursive conditioning in p(z_t | z_{t-1})
-        z_prev = self.z_0.expand(x_data.size(0), self.z_0.size(0))
+        z_prev = self.z_0.expand(x.size(0), self.z_0.size(0))
 
         # we enclose all the sample statements in the model in a plate.
         # this marks that each datapoint is conditionally independent of the others
-        with pyro.plate("z_minibatch", len(x_data)):
-            # sequentially sample the remaining latent and observed variables
-            for t in range(1, T_max):
-                # sample the next latent state z_t from the transition model
-                z_loc, z_scale = self.transition(z_prev, x_data[:, t - 1, :])
+        with pyro.plate("z_minibatch", len(x)):
+            # sample the latents z and observed y's one time step at a time
+            for t in pyro.markov(range(1, T_max + 1)):
+                # the next chunk of code samples z_t ~ p(z_t | z_{t-1})
+                # note that (both here and elsewhere) we use poutine.scale to take care
+                # of KL annealing.
 
-                with poutine.scale(None, annealing_factor):
+                # first compute the parameters of the diagonal gaussian
+                # distribution p(z_t | z_{t-1})
+                z_loc, z_scale = self.transition(z_prev, x[:, t - 1, :])
+
+                z_scale = z_scale.clamp(min=1e-6)
+
+                # then sample z_t according to dist.Normal(z_loc, z_scale).
+                # note that we use the reshape method so that the univariate
+                # Normal distribution is treated as a multivariate Normal
+                # distribution with a diagonal covariance.
+
+                with pyro.poutine.scale(scale=annealing_factor):
                     z_t = pyro.sample("z_%d" % t,
                                     dist.Normal(z_loc, z_scale)
                                                 .to_event(1))
 
                 # compute the mean of the Gaussian distribution p(y_t | z_t)
-                mean_t, variance = self.emitter(z_t, x_data[:, t - 1, :])
+                mu, sigma = self.emitter_rgr(z_t, x[:, t - 1, :])
+
                 # the next statement instructs pyro to observe y_t according to the
                 # Gaussian distribution p(y_t | z_t)
                 pyro.sample("obs_y_%d" % t,
-                            dist.Normal(mean_t, variance).to_event(1),
-                            obs=y_data)
+                            dist.Normal(mu, sigma).to_event(1),
+                            obs=y)
                 
                 # print(f"model z_prev shape: {z_prev.shape}")
                 # print(f"model x_data[:, t - 1, :] shape: {x_data[:, t - 1, :].shape}")   
                 # the latent sampled at this time step will be conditioned upon
                 # in the next time step so keep track of it
                 z_prev = z_t
-        
-        return z_t
-
-    def guide(self, 
-              x_data: torch.Tensor, 
-              y_data: Optional[torch.Tensor] = None, 
-              annealing_factor: float = 1.0
-              ) -> torch.Tensor:
-        
+            
+    def guide(self, x, y = None, annealing_factor = 1.0):
         """
-        Implements the guide (also called the inference model or variational distribution) q(z|x,y)
+        Defines the guide (also called the inference model or variational distribution) q(z|x,y)
         which is an approximation to the posterior p(z|x,y). It also handles the computation of the 
         parameters of this guide.
 
@@ -158,51 +191,231 @@ class GHMMRegressor(RegressorProb):
             torch.Tensor: The sampled latent variable `z` from the last time step of the guide.
         """
         
-        T_max = x_data.size(1)
-
+        # this is the number of time steps we need to process in the mini-batch
+        T_max = x.size(1)
         # register all PyTorch (sub)modules with pyro
-        # this needs to happen in both the model and guide
         pyro.module("ghmm", self)
 
         # initialize the values of the latent variables using heuristics
-        z_q_0_expanded = self.z_q_0.expand(x_data.size(0), cfg.prob.z_dim)
-        z_prev = z_q_0_expanded
+        z_prev = self.z_q_0.expand(x.size(0), self.z_dim)
+        
+        # we enclose all the sample statements in the guide in a plate.
+        # this marks that each datapoint is conditionally independent of the others.
+        with pyro.plate("z_minibatch", len(x)):
+            # sample the latents z one time step at a time
+            for t in pyro.markov(range(1, T_max + 1)):
+                # the next two lines assemble the distribution q(z_t | z_{t-1}, x_{t:T})
 
-        with pyro.plate("z_minibatch", len(x_data)):
-            # mark z_0 as auxiliary
-            for t in range(T_max):
-                # define the distribution q(z_t | z_{t-1}, x_{t:T})
-                z_loc, z_scale = self.transition(z_prev, x_data[:, t - 1, :])
-                z_dist = dist.Normal(z_loc, z_scale).to_event(1)
+                z_loc, z_scale = self.transition(z_prev, x[:, t - 1, :])
+
+                z_scale = z_scale.clamp(min=1e-6)
+
+                z_dist = dist.Normal(z_loc, z_scale)
 
                 # sample z_t from the distribution z_dist
                 with pyro.poutine.scale(None, annealing_factor):
-                    z_t = pyro.sample("z_%d" % t, 
-                                      z_dist)
-
+                    z_t = pyro.sample("z_%d" % t, z_dist.to_event(1))
+           
                 # the latent sampled at this time step will be conditioned
                 # upon in the next time step so keep track of it
-                z_prev = z_t
+                z_prev = z_t  
 
-            return z_t
-        
-    def _initSVI(self) -> pyro.infer.svi.SVI:
+    def forward(self, x):
         """
-        Initializes the Stochastic Variational Inference (SVI) for the GaussianHMMRegressor model.
+        Defines the forward pass of the neural network.
+
+        Args:
+            x (torch.Tensor): Input tensor for the neural network.
 
         Returns:
-            pyro.infer.svi.SVI: The initialized SVI object.
+            torch.Tensor: Output tensor from the neural network.
         """
-        return SVI(model=self.model,
-                   guide=self.guide,
-                   optim=self.optimizer, 
-                   loss=TraceMeanField_ELBO())
+        preds = []
+                
+        # Run the guide and capture the trace
+        guide_trace = pyro.poutine.trace(self.guide).get_trace(x)
 
-    def _predict(self,
-                test_dl : torch.utils.data.DataLoader
-                ) -> torch.Tensor:
+        # This is the number of time steps we need to process in the mini-batch
+        T_max = x.size(1)
 
-        return self._predictHMM(test_dl)
-    
-    def forward(self):
-        pass
+        # Extract the latent variables from the trace and pass them to the emitter
+        for t in pyro.markov(range(1, T_max + 1)):
+
+            z_t = guide_trace.nodes[f"z_{t}"]["value"]
+
+            mean_t, _ = self.emitter_rgr(z_t, x[:, t - 1, :])
+            
+            preds.append(mean_t)
+                
+        # Stack and average the predictions
+        preds = torch.stack(preds)
+
+        return preds[-1, :, :]
+                
+class GHMMClassifier(Classifier, GHMM):
+
+    def __init__(self,
+                 z_dim=32,
+                 emission_dim=32,
+                 transition_dim=32,
+                 dropout=0.2,
+                 variance=0.1,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
+        """
+        Initializes the MLPClassifier object with given or default parameters.
+        """
+        Classifier.__init__(self, **kwargs)
+        GHMM.__init__(self,
+                     z_dim=z_dim,
+                     emission_dim=emission_dim,
+                     transition_dim=transition_dim,
+                     dropout=dropout,
+                     variance=variance,
+                     activation=activation,
+                     bias=bias,
+                     seq_len=seq_len,
+                     **kwargs)
+        
+        self.criterion = nn.NLLLoss()
+
+    def model(self, x, y, annealing_factor = 1.0):
+        """
+        Defines the generative model p(y,z|x) which includes the observation 
+        model p(y|z) and transition model p(z_t | z_{t-1}). It also handles the 
+        computation of the parameters of these models.
+
+        Args:
+            x_data (torch.Tensor): Input tensor for the model.
+            y_data (Optional[torch.Tensor]): Optional observed output tensor for the model.
+            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
+
+        Returns:
+            torch.Tensor: The sampled latent variable `z` from the last time step of the model.
+        """
+
+        # this is the number of time steps we need to process in the data
+        T_max = x.size(1)
+
+        # register all PyTorch (sub)modules with pyro
+        # this needs to happen in both the model and guide
+        pyro.module("dmm", self)
+
+        # set z_prev = z_0 to setup the recursive conditioning in p(z_t | z_{t-1})
+        z_prev = self.z_0.expand(x.size(0), self.z_0.size(0))
+
+        # we enclose all the sample statements in the model in a plate.
+        # this marks that each datapoint is conditionally independent of the others
+        with pyro.plate("z_minibatch", len(x)):
+            # sample the latents z and observed y's one time step at a time
+            for t in pyro.markov(range(1, T_max + 1)):
+                # the next chunk of code samples z_t ~ p(z_t | z_{t-1})
+                # note that (both here and elsewhere) we use poutine.scale to take care
+                # of KL annealing.
+
+                # first compute the parameters of the diagonal gaussian
+                # distribution p(z_t | z_{t-1})
+                z_loc, z_scale = self.transition(z_prev, x[:, t - 1, :])
+
+                z_scale = z_scale.clamp(min=1e-6)
+                # then sample z_t according to dist.Normal(z_loc, z_scale).
+                # note that we use the reshape method so that the univariate
+                # Normal distribution is treated as a multivariate Normal
+                # distribution with a diagonal covariance.
+
+                with pyro.poutine.scale(scale=annealing_factor):
+                    z_t = pyro.sample("z_%d" % t,
+                                    dist.Normal(z_loc, z_scale)
+                                                .to_event(1))
+
+                # compute the mean of the Gaussian distribution p(y_t | z_t)
+                probs_t = self.emitter_cls(z_t, x[:, t - 1, :])
+
+                # the next statement instructs pyro to observe y_t according to the
+                # Gaussian distribution p(y_t | z_t)
+                pyro.sample("obs_y_%d" % t,
+                            dist.Categorical(probs=probs_t).to_event(1),obs=y)
+                
+                # print(f"model z_prev shape: {z_prev.shape}")
+                # print(f"model x_data[:, t - 1, :] shape: {x_data[:, t - 1, :].shape}")   
+                # the latent sampled at this time step will be conditioned upon
+                # in the next time step so keep track of it
+                z_prev = z_t
+            
+    def guide(self, x, y = None, annealing_factor = 1.0):
+        """
+        Defines the guide (also called the inference model or variational distribution) q(z|x,y)
+        which is an approximation to the posterior p(z|x,y). It also handles the computation of the 
+        parameters of this guide.
+
+        Args:
+            x_data (torch.Tensor): Input tensor for the guide.
+            y_data (Optional[torch.Tensor]): Optional observed output tensor for the guide.
+            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
+
+        Returns:
+            torch.Tensor: The sampled latent variable `z` from the last time step of the guide.
+        """
+        
+        # this is the number of time steps we need to process in the mini-batch
+        T_max = x.size(1)
+        # register all PyTorch (sub)modules with pyro
+        pyro.module("dmm", self)
+
+        # initialize the values of the latent variables using heuristics        
+        z_prev = self.z_q_0.expand(x.size(0), self.z_dim)
+        
+        # we enclose all the sample statements in the guide in a plate.
+        # this marks that each datapoint is conditionally independent of the others.
+        with pyro.plate("z_minibatch", len(x)):
+            # sample the latents z one time step at a time
+            for t in pyro.markov(range(1, T_max + 1)):
+                # the next two lines assemble the distribution q(z_t | z_{t-1}, x_{t:T})
+
+                z_loc, z_scale = self.transition(z_prev, x[:, t - 1, :])
+
+                z_scale = z_scale.clamp(min=1e-6)
+
+                z_dist = dist.Normal(z_loc, z_scale)
+
+                # sample z_t from the distribution z_dist
+                with pyro.poutine.scale(None, annealing_factor):
+                    z_t = pyro.sample("z_%d" % t, z_dist.to_event(1))
+           
+                # the latent sampled at this time step will be conditioned
+                # upon in the next time step so keep track of it
+                z_prev = z_t 
+
+    def forward(self, x):
+        """
+        Defines the forward pass of the neural network.
+
+        Args:
+            x (torch.Tensor): Input tensor for the neural network.
+
+        Returns:
+            torch.Tensor: Output tensor from the neural network.
+        """
+        preds = []
+                
+        # Run the guide and capture the trace
+        guide_trace = pyro.poutine.trace(self.guide).get_trace(x)
+
+        # This is the number of time steps we need to process in the mini-batch
+        T_max = x.size(1)
+
+        # Extract the latent variables from the trace and pass them to the emitter
+        for t in pyro.markov(range(1, T_max + 1)):
+
+            z_t = guide_trace.nodes[f"z_{t}"]["value"]
+                
+            class_logits_t = self.emitter_cls(z_t, x[:, t - 1, :])
+            
+            preds.append(class_logits_t)
+                
+        # Stack and average the predictions
+        preds = torch.stack(preds)
+
+        return preds.mean(0)

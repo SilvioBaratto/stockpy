@@ -1,187 +1,170 @@
-from abc import ABCMeta, abstractmethod
-import os
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd import Variable
-from typing import Union, Tuple
-import pandas as pd
-import numpy as np
-from ._base import ClassifierNN
-from ._base import RegressorNN
-from ..config import Config as cfg
+from stockpy.base import Regressor
+from stockpy.base import Classifier 
+from stockpy.utils import get_activation_function
 
-class BiGRUClassifier(ClassifierNN):
-    """
-    A class used to represent a Bidirectional Gated Recurrent Unit (BiGRU) network for classification tasks.
-    This class inherits from the `ClassifierNN` class.
+class BiGRU(nn.Module):
 
-    Attributes:
-        model_type (str): A string that represents the type of the model (default is "rnn").
-
-    Args:
-        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
-                                              a single integer that represents the number of nodes in a single hidden layer.
-        num_layers (int): The number of recurrent layers (default is 1).
-
-    Methods:
-        __init__(self, **kwargs): Initializes the BiGRUClassifier object with given or default parameters.
-        _init_model(self): Initializes the BiGRU layers and fully connected layer of the model based on configuration.
-        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the BiGRU network.
-    """
-
-    model_type = "rnn"
-
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
         """
-        Initializes the BiGRUClassifier object with given or default parameters.
+        Initializes the MLP object with given or default parameters.
         """
-        super().__init__(**kwargs)
+        super().__init__()
 
-    def _init_model(self):
+        self.rnn_size = rnn_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.dropout = dropout
+        self.activation = activation
+        self.bias = bias
+        self.seq_len = seq_len
+
+    def initialize_module(self):
         """
-        Initializes the BiGRU layers and fully connected layer of the model based on configuration.
+        Implements the initialization of the LSTM and fully connected layers.
+
+        Sets up the architecture of the neural network based on the configuration provided in the constructor. 
+        This includes initializing the LSTM layer with the defined `rnn_size` and `num_layers`, and the fully 
+        connected layers according to `hidden_size` and `activation` function.
+
+        Raises
+        ------
+        AttributeError
+            If `n_features_in_` is not set before calling this method, as it is required to set the `input_size`
+            for the LSTM layer.
         """
-        # Check if hidden_sizes is a single integer and, if so, converts it to a list
-        if isinstance(cfg.nn.hidden_size, int):
-            self.hidden_sizes = [cfg.nn.hidden_size]
+
+        # Checks if hidden_sizes is a single integer and, if so, converts it to a list
+        if isinstance(self.hidden_size, int):
+            self.hidden_sizes = [self.hidden_size]
         else:
-            self.hidden_sizes = cfg.nn.hidden_size
+            self.hidden_sizes = self.hidden_size
 
-        # Initializes an empty module list for the BiGRU layers
-        self.bigrus = nn.ModuleList()
-        input_size = self.input_size
+        if isinstance(self, Classifier):
+            self.output_size = self.n_classes_
+        elif isinstance(self, Regressor):
+            self.output_size = self.n_outputs_
 
-        # Iterates through the hidden sizes and creates BiGRU layers accordingly
+        self.bigru = nn.GRU(input_size=self.n_features_in_,
+                             hidden_size=self.rnn_size,
+                             num_layers=self.num_layers,
+                             bidirectional=True,
+                             batch_first=True,
+                             bias=self.bias)
+        
+        layers = []
+
+        fc_input_size = self.rnn_size * 2
+        # Creates the layers of the neural network
         for hidden_size in self.hidden_sizes:
-            self.bigrus.append(nn.GRU(input_size=input_size,
-                                      hidden_size=hidden_size,
-                                      num_layers=cfg.nn.num_layers,
-                                      bidirectional=True,
-                                      batch_first=True))
+            layers.append(nn.Linear(fc_input_size, hidden_size, bias=self.bias))
+            layers.append(get_activation_function(self.activation))
+            layers.append(nn.Dropout(self.dropout))
 
-            # Multiplies by 2 for the next input size because the GRU is bidirectional
-            input_size = hidden_size * 2
+            fc_input_size = hidden_size
 
-        # The final fully connected layer's input size is also doubled because the GRU is bidirectional
-        self.fc = nn.Linear(self.hidden_sizes[-1] * 2, self.output_size)
+        # Appends the output layer to the neural network
+        layers.append(nn.Linear(fc_input_size, self.output_size)) 
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.layers = nn.Sequential(*layers)
+
+    @property
+    def model_type(self):
+        return "rnn"
+    
+class BiGRUClassifier(Classifier, BiGRU):
+
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
         """
-        Defines the forward pass of the BiGRU network.
-
-        Args:
-            x (torch.Tensor): The input tensor.
-
-        Returns:
-            torch.Tensor: The output tensor.
-
-        Raises:
-            RuntimeError: If the model has not been initialized by calling the fit method before calling predict.
+        Initializes the MLPClassifier object with given or default parameters.
         """
-        # Ensures that the model has been initialized
-        if not self.bigrus:
-            raise RuntimeError("You must call fit before calling predict")
+        Classifier.__init__(self, classes=None, **kwargs)
+        BiGRU.__init__(self,
+                        rnn_size=rnn_size,
+                        hidden_size=hidden_size,
+                        num_layers=num_layers,
+                        dropout=dropout,
+                        activation=activation,
+                        seq_len=seq_len,
+                        bias=bias,
+                        **kwargs
+                        )
 
-        batch_size = x.size(0)
-        output = x
+        self.criterion = nn.NLLLoss()
 
-        # Applies each BiGRU layer on the input tensor
-        for bigru in self.bigrus:
-            h0 = Variable(torch.zeros(cfg.nn.num_layers * 2,
-                                      batch_size,
-                                      bigru.hidden_size)).to(cfg.training.device)  # times 2 because of bidirectional
-            output, hn = bigru(output, h0)
-
-        # Applies the final fully connected layer
-        out = self.fc(output[:, -1, :])
-        out = out.view(-1, self.output_size)
+    def forward(self, x):
+        """
+        Forward pass through the model.
+        """
+        
+        h_0 = Variable(torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size))
+        
+        out, _ = self.bigru(x, h_0)
+        
+        # Concat the final forward and backward hidden states
+        out = self.layers(out[:, -1, :])
+        
+        out = F.softmax(out, dim=-1)
 
         return out
 
-class BiGRURegressor(RegressorNN):
-    """
-    A class used to represent a Bidirectional Gated Recurrent Unit (BiGRU) network for classification tasks.
-    This class inherits from the `ClassifierNN` class.
+class BiGRURegressor(Regressor, BiGRU):
 
-    Attributes:
-        model_type (str): A string that represents the type of the model (default is "rnn").
-
-    Args:
-        hidden_size (Union[int, List[int]]): A list of integers that represents the number of nodes in each hidden layer or
-                                              a single integer that represents the number of nodes in a single hidden layer.
-        num_layers (int): The number of recurrent layers (default is 1).
-
-    Methods:
-        __init__(self, **kwargs): Initializes the BiGRURegressor object with given or default parameters.
-        _init_model(self): Initializes the BiGRU layers and fully connected layer of the model based on configuration.
-        forward(x: torch.Tensor) -> torch.Tensor: Defines the forward pass of the BiGRU network.
-    """
-
-    model_type = "rnn"
-
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 rnn_size = 32,
+                 hidden_size=32,
+                 num_layers=1,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 seq_len=20,
+                 **kwargs):
         """
-        Initializes the BiGRURegressor object with given or default parameters.
+        Initializes the MLPClassifier object with given or default parameters.
         """
-        super().__init__(**kwargs)
+        Regressor.__init__(self, **kwargs)
+        BiGRU.__init__(self, 
+                     rnn_size=rnn_size,
+                     hidden_size=hidden_size, 
+                     num_layers=num_layers,
+                     dropout=dropout, 
+                     activation=activation, 
+                     seq_len=seq_len,
+                     bias=bias, 
+                     **kwargs
+                     )
 
-    def _init_model(self):
+        self.criterion = nn.MSELoss()
+
+    def forward(self, x):
         """
-        Initializes the BiGRU layers and fully connected layer of the model based on configuration.
+        Forward pass through the model.
         """
-        # Check if hidden_sizes is a single integer and, if so, converts it to a list
-        if isinstance(cfg.nn.hidden_size, int):
-            self.hidden_sizes = [cfg.nn.hidden_size]
-        else:
-            self.hidden_sizes = cfg.nn.hidden_size
-
-        # Initializes an empty module list for the BiGRU layers
-        self.bigrus = nn.ModuleList()
-        input_size = self.input_size
-
-        # Iterates through the hidden sizes and creates BiGRU layers accordingly
-        for hidden_size in self.hidden_sizes:
-            self.bigrus.append(nn.GRU(input_size=input_size,
-                                      hidden_size=hidden_size,
-                                      num_layers=cfg.nn.num_layers,
-                                      bidirectional=True,
-                                      batch_first=True))
-
-            # Multiplies by 2 for the next input size because the GRU is bidirectional
-            input_size = hidden_size * 2
-
-        # The final fully connected layer's input size is also doubled because the GRU is bidirectional
-        self.fc = nn.Linear(self.hidden_sizes[-1] * 2, self.output_size)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Defines the forward pass of the BiGRU network.
-
-        Args:
-            x (torch.Tensor): The input tensor.
-
-        Returns:
-            torch.Tensor: The output tensor.
-
-        Raises:
-            RuntimeError: If the model has not been initialized by calling the fit method before calling predict.
-        """
-        # Ensures that the model has been initialized
-        if not self.bigrus:
-            raise RuntimeError("You must call fit before calling predict")
-
-        batch_size = x.size(0)
-        output = x
-
-        # Applies each BiGRU layer on the input tensor
-        for bigru in self.bigrus:
-            h0 = Variable(torch.zeros(cfg.nn.num_layers * 2,
-                                      batch_size,
-                                      bigru.hidden_size)).to(cfg.training.device)  # times 2 because of bidirectional
-            output, hn = bigru(output, h0)
-
-        # Applies the final fully connected layer
-        out = self.fc(output[:, -1, :])
-        out = out.view(-1, self.output_size)
-
+        
+        h_0 = Variable(torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size))
+        
+        out, _ = self.gru(x, h_0)
+        
+        # Concat the final forward and backward hidden states
+        out = self.layers(out[:, -1, :])
+     
         return out

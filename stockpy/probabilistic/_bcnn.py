@@ -1,214 +1,306 @@
-from abc import abstractmethod, ABCMeta
-import os
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule, PyroSample
-from pyro.infer.autoguide import AutoNormal
-from pyro.infer import (
-    SVI,
-    Trace_ELBO,
-    Predictive,
-    TraceMeanField_ELBO
-)
-from typing import Union, Tuple
-import pandas as pd
-import numpy as np
-from ._base import ClassifierProb
-from ._base import RegressorProb
-from ..config import Config as cfg
 
-class BCNNClassifier(ClassifierProb):
-    """
-    A class used to represent a Bayesian Convolutional Neural Network (CNN) 
-    for probabilistic classification tasks. This class inherits from the 
-    `ClassifierProb` class.
+from stockpy.base import Regressor
+from stockpy.base import Classifier 
+from stockpy.utils import to_device
+from stockpy.utils import get_activation_function
 
-    ...
+class BCNN(PyroModule):
 
-    Args:
-        hidden_size: A list of integers that represents the number of nodes in each hidden layer or 
-            a single integer that represents the number of nodes in a single hidden layer.
-        num_filters: The number of filters in the convolutional layer.
-        kernel_size: The size of the kernel in the convolutional layer.
-        pool_size: The size of the pooling layer.
-        dropout: The dropout rate for regularization.
+    def __init__(self,
+                 hidden_size=32,
+                 num_filters=32,
+                 kernel_size=3,
+                 pool_size=2,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 **kwargs):
+        """
+        Initializes the CNN object with given or default parameters.
+        """
+        super().__init__()
 
-    Attributes:
-        model_type: A string that represents the type of the model (default is "cnn").
+        self.hidden_size = hidden_size
+        self.num_filters = num_filters
+        self.kernel_size = kernel_size
+        self.pool_size = pool_size
+        self.dropout = dropout
+        self.activation = activation
+        self.bias = bias
 
-    Methods:
-        __init__(self, **kwargs): Initializes the BayesianCNNClassifier object with given or default parameters.
-        _init_model(self): Initializes the Convolutional layers and fully connected layers of the model 
-            based on configuration. This model uses PyroModule wrappers for the layers 
-            to enable Bayesian inference.
-        forward(self, x_data: torch.Tensor, y_data: torch.Tensor=None) -> torch.Tensor: Defines the forward pass 
-            of the Bayesian CNN, and optionally observes the output if ground truth `y_data` is provided.
-        _initSVI(self) -> pyro.infer.svi.SVI: Initializes Stochastic Variational Inference (SVI) for the model.
-            Defines the guide function to be a Normal distribution that learns to approximate the posterior, 
-            and uses Mean Field ELBO as the variational loss.
-    """
+    def reset_weights(self):
+        """
+        Re-initializes the weights of the model.
+        """
+        for layer in self.layers:
+            if isinstance(layer, nn.Conv1d):
+                nn.init.kaiming_normal_(layer.weight.data)
+                if layer.bias is not None:
+                    nn.init.constant_(layer.bias.data, 0)
+            elif isinstance(layer, nn.Linear):
+                nn.init.xavier_normal_(layer.weight.data)
+                if layer.bias is not None:
+                    nn.init.constant_(layer.bias.data, 0)
 
-    model_type = "cnn"
+    def initialize_module(self):
+        """
+        Initializes the layers of the neural network based on configuration.
+        """
+        # Checks if hidden_sizes is a single integer and, if so, converts it to a list
+        if isinstance(self, Classifier):
+            self.output_size = self.n_classes_
+        elif isinstance(self, Regressor):
+            self.output_size = self.n_outputs_
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Initializes the BayesianCNNClassifier object with given or default parameters.
-
-    def _init_model(self):
-        # Create the convolutional layers
-
-        # Check if hidden_sizes is a single integer and, if so, convert it to a list
-        if isinstance(cfg.nn.hidden_size, int):
-            self.hidden_sizes = [cfg.nn.hidden_size]
+        # Check if hidden_sizes is a single integer and, if so, converts it to a list
+        if isinstance(self.hidden_size, int):
+            self.hidden_sizes = [self.hidden_size]
         else:
-            self.hidden_sizes = cfg.nn.hidden_size
+            self.hidden_sizes = self.hidden_size
 
-        # Create the Bayesian CNN layers with Pyro's Module wrapper
-        layers = [PyroModule[nn.Conv1d](1, cfg.nn.num_filters, cfg.nn.kernel_size),  # 1D convolutional layer
-                  PyroModule[nn.ReLU](),  # Activation function
-                  PyroModule[nn.MaxPool1d](cfg.nn.pool_size),  # Max pooling layer
+        self.input_size = self.n_features_in_
+
+        # Initializes a list to store the layers of the neural network
+        layers = [PyroModule[nn.Conv1d](1, self.num_filters, self.kernel_size),  # 1D convolutional layer
+                  get_activation_function(self.activation),
+                  PyroModule[nn.MaxPool1d](self.pool_size),  # Max pooling layer
                   PyroModule[nn.Flatten]()]  # Flatten layer for transforming the output for use in FC layers
-
-        # Calculate the input size for the first FC layer after flattening
-        current_input_size = cfg.nn.num_filters * ((self.input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size)
-
-        # Create the FC layers of the neural network with Pyro's Module wrapper
+                
+        # Calculates the input size for the first FC layer after flattening
+        current_input_size = self.num_filters * ((self.input_size - self.kernel_size + 1) \
+                                                    // self.pool_size)
+        
+        # Create fully connected layers
         for hidden_size in self.hidden_sizes:
-            layers.append(PyroModule[nn.Linear](current_input_size, hidden_size))  # Linear (FC) layer
-            layers.append(PyroModule[nn.ReLU]())  # Activation function
-            layers.append(PyroModule[nn.Dropout](cfg.comm.dropout))  # Dropout layer for regularization
-            current_input_size = hidden_size
+            linear_layer = PyroModule[nn.Linear](current_input_size, hidden_size)
 
-        # Add the output FC layer with Pyro's Module wrapper
-        layers.append(PyroModule[nn.Linear](current_input_size, self.output_size))
+            linear_layer.weight = PyroSample(
+                dist.Normal(0., 1.).expand([hidden_size, current_input_size]).to_event(2)
+            )
+            linear_layer.bias = PyroSample(
+                dist.Normal(0., 1.).expand([hidden_size]).to_event(1)
+            )
 
-        # Create the neural network as a sequential model based on the layers list with Pyro's Module wrapper
+            layers.append(linear_layer)
+            layers.append(get_activation_function(self.activation))
+            layers.append(PyroModule[nn.Dropout](self.dropout))
+            input_size = hidden_size
+
+        # Create output layer
+        output_layer = PyroModule[nn.Linear](current_input_size, self.output_size)
+        # Set prior on weights and biases for output layer
+        output_layer.weight = PyroSample(
+            dist.Normal(0., 1.).expand([self.output_size, input_size]).to_event(2)
+        )
+        output_layer.bias = PyroSample(
+            dist.Normal(0., 1.).expand([self.output_size]).to_event(1)
+        )
+
+        layers.append(output_layer)
+
+        # Combine layers into a sequential model
         self.layers = PyroModule[nn.Sequential](*layers)
 
-    def forward(self, x_data: torch.Tensor, y_data: torch.Tensor=None) -> torch.Tensor:
-        # Ensure that the model has been initialized
+        to_device(self.layers, self.device)
+
+    @property
+    def model_type(self):
+        return "cnn"
+
+class BCNNClassifier(Classifier, BCNN):
+
+    def __init__(self,
+                 hidden_size=32,
+                 num_filters=32,
+                 kernel_size=3,
+                 pool_size=2,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 **kwargs):
+        """
+        Initializes the MLPClassifier object with given or default parameters.
+        """
+        Classifier.__init__(self, **kwargs)
+        BCNN.__init__(self, 
+                     hidden_size=hidden_size, 
+                     num_filters=num_filters,
+                     kernel_size=kernel_size,
+                     pool_size=pool_size,
+                     dropout=dropout, 
+                     activation=activation, 
+                     bias=bias, 
+                     **kwargs
+                     )
+
+        self.criterion = nn.NLLLoss()
+
+    def model(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Defines the forward pass of the neural network.
+        :param x: The input tensor.
+        :returns: The output tensor, corresponding to the predicted target variable(s).
+        """
+        # Ensures the model has been fitted before making predictions
         if self.layers is None:
-            raise Exception("Model has not been initialized.")
+            raise RuntimeError("You must call fit before calling predict")
+        
+        for i, layer in enumerate(self.layers):
+            if isinstance(layer, PyroModule[nn.Linear]):
+                # Set up prior for the weights and biases of each layer
+                weight_prior = dist.Normal(torch.zeros_like(layer.weight), 
+                                           torch.ones_like(layer.weight)).to_event(2)
+                bias_prior = dist.Normal(torch.zeros_like(layer.bias), 
+                                         torch.ones_like(layer.bias)).to_event(1)
 
-        x = self.layers(x_data)
-
-        # Apply softmax to the output to get class probabilities
-        x = nn.functional.softmax(x, dim=1)
-
-        # Pyro uses this to sample the observed data for probabilistic models
-        with pyro.plate("data", x_data.shape[0]):
-            obs = pyro.sample("obs", dist.Categorical(probs=x).to_event(1), obs=y_data)
-
-        return x
-
-    def _initSVI(self) -> pyro.infer.svi.SVI:
-        # Pyro's Stochastic Variational Inference (SVI) is used for Bayesian inference
-        self.guide = AutoNormal(self.forward)
-        return SVI(model=self.forward,
-                   guide=self.guide,
-                   optim=self.optimizer,
-                   loss=TraceMeanField_ELBO())
-
-
-class BCNNRegressor(RegressorProb):
-    """
-    A class used to represent a Bayesian Convolutional Neural Network (CNN) 
-    for probabilistic regression tasks. This class inherits from the 
-    `ClassifierProb` class.
-
-    ...
-
-    Args:
-        hidden_size: A list of integers that represents the number of nodes in each hidden layer or 
-            a single integer that represents the number of nodes in a single hidden layer.
-        num_filters: The number of filters in the convolutional layer.
-        kernel_size: The size of the kernel in the convolutional layer.
-        pool_size: The size of the pooling layer.
-        dropout: The dropout rate for regularization.
-
-    Attributes:
-        model_type: A string that represents the type of the model (default is "cnn").
-
-    Methods:
-        __init__(self, **kwargs): Initializes the BayesianCNNRegressor object with given or default parameters.
-        _init_model(self): Initializes the Convolutional layers and fully connected layers of the model 
-            based on configuration. This model uses PyroModule wrappers for the layers 
-            to enable Bayesian inference.
-        forward(self, x_data: torch.Tensor, y_data: torch.Tensor=None) -> torch.Tensor: Defines the forward pass 
-            of the Bayesian CNN, and optionally observes the output if ground truth `y_data` is provided.
-        _initSVI(self) -> pyro.infer.svi.SVI: Initializes Stochastic Variational Inference (SVI) for the model.
-            Defines the guide function to be a Normal distribution that learns to approximate the posterior, 
-            and uses Mean Field ELBO as the variational loss.
-    """
-
-    model_type = "cnn"
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        # Initializes the BayesianCNNClassifier object with given or default parameters.
-
-    def _init_model(self):
-        # Create the convolutional layers
-
-        # Check if hidden_sizes is a single integer and, if so, convert it to a list
-        if isinstance(cfg.nn.hidden_size, int):
-            self.hidden_sizes = [cfg.nn.hidden_size]
-        else:
-            self.hidden_sizes = cfg.nn.hidden_size
-
-        # Create the Bayesian CNN layers with Pyro's Module wrapper
-        layers = [PyroModule[nn.Conv1d](1, cfg.nn.num_filters, cfg.nn.kernel_size),  # 1D convolutional layer
-                  PyroModule[nn.ReLU](),  # Activation function
-                  PyroModule[nn.MaxPool1d](cfg.nn.pool_size),  # Max pooling layer
-                  PyroModule[nn.Flatten]()]  # Flatten layer for transforming the output for use in FC layers
-
-        # Calculate the input size for the first FC layer after flattening
-        current_input_size = cfg.nn.num_filters * ((self.input_size - cfg.nn.kernel_size + 1) // cfg.nn.pool_size)
-
-        # Create the FC layers of the neural network with Pyro's Module wrapper
-        for hidden_size in self.hidden_sizes:
-            layers.append(PyroModule[nn.Linear](current_input_size, hidden_size))  # Linear (FC) layer
-            layers.append(PyroModule[nn.ReLU]())  # Activation function
-            layers.append(PyroModule[nn.Dropout](cfg.comm.dropout))  # Dropout layer for regularization
-            current_input_size = hidden_size
-
-        # Add the output FC layer with Pyro's Module wrapper
-        layers.append(PyroModule[nn.Linear](current_input_size, self.output_size))
-
-        # Create the neural network as a sequential model based on the layers list with Pyro's Module wrapper
-        self.layers = PyroModule[nn.Sequential](*layers)
-
-    def forward(self, x_data: torch.Tensor,
-                y_data: torch.Tensor=None) -> torch.Tensor:
-
-        # Ensure that the model has been initialized
+                # Sample from the prior
+                layer.weight = pyro.sample(f"weight_{i}", weight_prior)
+                layer.bias = pyro.sample(f"bias_{i}", bias_prior)
+        
+        with pyro.plate("data", x.shape[0]):
+            out = self.layers(x)
+            obs = pyro.sample("obs", dist.Categorical(logits=out).to_event(1), obs=y)
+    
+    def guide(self, x: torch.Tensor, y: torch.Tensor=None) -> torch.Tensor:
+        """
+        Defines the guide (i.e. variational distribution) for the model.
+        :param x: The input tensor.
+        :returns: The output tensor, corresponding to the predicted target variable(s).
+        """
+        # Ensures the model has been fitted before making predictions
         if self.layers is None:
-            raise Exception("Model has not been initialized.")
+            raise RuntimeError("You must call fit before calling predict")
+        
+        for i, layer in enumerate(self.layers):
+            if isinstance(layer, PyroModule[nn.Linear]):
+                weight_loc = pyro.param(f"weight_loc_{i}", torch.zeros_like(layer.weight))
+                weight_scale_unconstrained = pyro.param(f"weight_scale_{i}", torch.ones_like(layer.weight))
+                bias_loc = pyro.param(f"bias_loc_{i}", torch.zeros_like(layer.bias))
+                bias_scale_unconstrained = pyro.param(f"bias_scale_{i}", torch.ones_like(layer.bias))
 
-        x = self.layers(x_data)
+                # Apply softplus to ensure that scale is positive
+                weight_scale = F.softplus(weight_scale_unconstrained)
+                bias_scale = F.softplus(bias_scale_unconstrained)
 
-        # Use StudentT distribution instead of Normal
-        df = pyro.sample("df", dist.Exponential(1.))
-        scale = pyro.sample("scale", dist.HalfCauchy(2.5))
-        with pyro.plate("data", x_data.shape[0]):
-            obs = pyro.sample("obs", dist.StudentT(df, x, scale).to_event(1),
-                              obs=y_data)
+                layer.weight = pyro.sample(f"weight_{i}", dist.Normal(weight_loc, weight_scale).to_event(2))
+                layer.bias = pyro.sample(f"bias_{i}", dist.Normal(bias_loc, bias_scale).to_event(1))
+            
+        with pyro.plate("data", x.shape[0]):
+            out = self.layers(x)
+            preds = F.softmax(out, dim=-1)
+            return preds
+        
+    def forward(self, x):
 
-        return x
+        preds = []
 
-    def _initSVI(self) -> pyro.infer.svi.SVI:
-        # Pyro's Stochastic Variational Inference (SVI) is used for Bayesian inference
-        self.guide = AutoNormal(self.forward)
-        return SVI(model=self.forward,
-                   guide=self.guide,
-                   optim=self.optimizer,
-                   loss=TraceMeanField_ELBO())
+        for _ in range(self.n_outputs_):
+            guide_trace = pyro.poutine.trace(self.guide).get_trace(x)
+            preds.append(guide_trace.nodes["_RETURN"]["value"])
 
-    def _predict(self,
-                 test_dl: torch.utils.data.DataLoader
-                 ) -> torch.Tensor:
+        preds = torch.stack(preds)
 
-        return self._predictNN(test_dl)
+        return preds.mean(0)
+
+class BCNNRegressor(Regressor, BCNN):
+
+    def __init__(self,
+                 hidden_size=32,
+                 num_filters=32,
+                 kernel_size=3,
+                 pool_size=2,
+                 dropout=0.2,
+                 activation='relu',
+                 bias=True,
+                 **kwargs):
+        """
+        Initializes the MLPClassifier object with given or default parameters.
+        """
+        Regressor.__init__(self, **kwargs)
+        BCNN.__init__(self, 
+                     hidden_size=hidden_size, 
+                     num_filters=num_filters,
+                     kernel_size=kernel_size,
+                     pool_size=pool_size,
+                     dropout=dropout, 
+                     activation=activation, 
+                     bias=bias, 
+                     **kwargs
+                     )
+
+        self.criterion = nn.MSELoss()
+
+    def model(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+        """
+        Defines the forward pass of the neural network.
+        :param x: The input tensor.
+        :returns: The output tensor, corresponding to the predicted target variable(s).
+        """
+        # Ensures the model has been fitted before making predictions
+        if self.layers is None:
+            raise RuntimeError("You must call fit before calling predict")
+        
+        # Returns the output of the forward pass of the neural network
+        for i, layer in enumerate(self.layers):
+            if isinstance(layer, PyroModule[nn.Linear]):
+                # Set up prior for the weights and biases of each layer
+                weight_prior = dist.Normal(torch.zeros_like(layer.weight), torch.ones_like(layer.weight)).to_event(2)
+                bias_prior = dist.Normal(torch.zeros_like(layer.bias), torch.ones_like(layer.bias)).to_event(1)
+
+                # Sample from the prior
+                layer.weight = pyro.sample(f"weight_{i}", weight_prior)
+                layer.bias = pyro.sample(f"bias_{i}", bias_prior)
+
+        # Observation model (likelihood)
+        with pyro.plate("data", x.shape[0]):
+            out = self.layers(x)
+            # Sample from the likelihood
+            obs = pyro.sample("obs", dist.Normal(out, 1.0).to_event(1), obs=y)
+
+    
+    def guide(self, x: torch.Tensor, y: torch.Tensor=None) -> torch.Tensor:
+        """
+        Defines the guide (i.e. variational distribution) for the model.
+        :param x: The input tensor.
+        :param y: The output tensor, used only to match the model's signature.
+        :returns: The output tensor, corresponding to the predicted target variable(s).
+        """
+        # Ensures the model has been fitted before making predictions
+        if self.layers is None:
+            raise RuntimeError("You must call fit before calling predict")
+                
+        for i, layer in enumerate(self.layers):
+            if isinstance(layer, PyroModule[nn.Linear]):
+                weight_loc = pyro.param(f"weight_loc_{i}", torch.zeros_like(layer.weight))
+                weight_scale_unconstrained = pyro.param(f"weight_scale_{i}", torch.ones_like(layer.weight))
+                bias_loc = pyro.param(f"bias_loc_{i}", torch.zeros_like(layer.bias))
+                bias_scale_unconstrained = pyro.param(f"bias_scale_{i}", torch.ones_like(layer.bias))
+
+                # Apply softplus to ensure that scale is positive
+                weight_scale = F.softplus(weight_scale_unconstrained)
+                bias_scale = F.softplus(bias_scale_unconstrained)
+
+                layer.weight = pyro.sample(f"weight_{i}", dist.Normal(weight_loc, weight_scale).to_event(2))
+                layer.bias = pyro.sample(f"bias_{i}", dist.Normal(bias_loc, bias_scale).to_event(1))
+
+        with pyro.plate("data", x.shape[0]):
+            out = self.layers(x)
+            return out
+        
+    def forward(self, x):
+
+        preds = []
+
+        for _ in range(self.n_outputs_):
+            guide_trace = pyro.poutine.trace(self.guide).get_trace(x)
+            preds.append(guide_trace.nodes["_RETURN"]["value"])
+
+        preds = torch.stack(preds)
+
+        return preds.mean(0)
