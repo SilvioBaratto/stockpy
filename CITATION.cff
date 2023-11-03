@@ -4,7 +4,7 @@ authors:
 - family-names: "Baratto"
   given-names: "Silvio"
   orcid: "https://orcid.org/0009-0002-1906-0057"
-title: "stockpy: Machine Learning library to make stock market prediction"
-version: 0.1.8
+title: "stockpy: Deep Learning-Based Regression and Classification Framework built on top of PyTorch and Pyro"
+version: 0.3.1
 date-released: 2023-03-25
 url: "https://github.com/SilvioBaratto/stockpy"

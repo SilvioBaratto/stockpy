@@ -10,82 +10,106 @@
 [![Documentation Status](https://readthedocs.org/projects/stockpy/badge/?version=latest)](https://stockpy.readthedocs.io/?badge=latest)
 [![PyPI version](https://badge.fury.io/py/stockpy-learn.svg)](https://badge.fury.io/py/stockpy-learn)
 
-## Table of contents
+## Table of Contents
 * [Description](#description)
-* [Documentation](https://stockpy.readthedocs.io/) 
+* [Documentation](https://stockpy.readthedocs.io/)
+* [Installation](#installation)
+* [Usage](#usage)
+* [Examples](#examples)
 * [Data Downloader](#data-downloader)
 * [License](#license)
+* [Contributing](#contributing)
+* [TODOs](#todos)
 
 ## Description
 **stockpy** is a versatile Python Machine Learning library initially designed for stock market data analysis and predictions. It has now evolved to handle a wider range of datasets, supporting tasks such as regression and classification. It currently supports the following algorithms, each with regression and classification implementations:
 
-- Bayesian Neural Networks (BayesianNN)
+- Bayesian Neural Networks (BNN)
 - Long Short Term Memory (LSTM)
 - Bidirectional Long Short Term Memory (BiLSTM)
 - Gated Recurrent Unit (GRU)
 - Bidirectional Gated Recurrent Unit (BiGRU)
 - Multilayer Perceptron (MLP)
-- Deep Markov Model (DeepMarkovModel) `warning: only regression`
-- Gaussian Hidden Markov Models (GaussianHMM) `warning: only regression`
-
-Whether you are looking to perform predictions on stock market data or extract patterns from more general datasets, stockpy can cater to your requirements.
+- Deep Markov Model (DMM) 
+- Gaussian Hidden Markov Models (GHMM) 
 
 ## Usage
-To use **stockpy**, start by importing the relevant models from the `stockpy.neural_network` and `stockpy.probabilistic` modules. The library can be used with various types of input data, such as CSV files, pandas dataframes and numpy arrays.
+To use **stockpy**, start by importing the relevant models from the `stockpy.neural_network` and `stockpy.probabilistic` modules. The library can be used with various types of input data, such as CSV files, pandas dataframes, numpy arrays and torch arrays.
 
 Here's an example to demonstrate the usage of stockpy for regression. In this example, we read a CSV file containing stock market data for Apple (AAPL), split the data into training and testing sets, fit an LSTM model to the training data, and use the model to make predictions on the test data:
+
 ```Python
-from sklearn.model_selection import train_test_split
+from stockpy.neural_network import CNNRegressor
 import pandas as pd
-from stockpy.probabilistic import DeepMarkovModelRegressor
-from stockpy.neural_network import LSTMRegressor
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 
-# read CSV file and drop missing values
-df = pd.read_csv('../stock/AAPL.csv', parse_dates=True, index_col='Date').dropna(how="any")
+# Load the dataset
+df = pd.read_csv('stock/AAPL.csv', parse_dates=True, index_col='Date').dropna(how="any")
 
-# split data into training and test set
+# Define features and target
 X = df[['Open', 'High', 'Low', 'Volume']]
 y = df['Close']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, shuffle=False)
 
-# create model instance and fit to training data
-predictor = DeepMarkovModelRegressor()
-predictor.fit(X=X_train,
-               y=y_train, 
-               lr=0.001, 
-               batch_size=24,
-               sequence_length=22,
-               scaler_type='minmax',
-               epochs=10)
+# Split the dataset
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
 
-# predictions on test data
-y_pred = predictor.predict(X_test)
+# Scale the data
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+# Convert the data to torch tensors
+X_train = torch.tensor(X_train, dtype=torch.float)
+X_test = torch.tensor(X_test, dtype=torch.float)
+y_train = torch.tensor(y_train.values, dtype=torch.float)
+
+# Fit the model
+predictor = CNNRegressor(hidden_size=32)
+
+predictor.fit(X_train, 
+              y_train, 
+              batch_size=32, 
+              lr=0.01, 
+              optimizer=torch.optim.Adam, 
+              epochs=50)
 ```
 
 Here's an example to demonstrate the usage of stockpy for classification. In this example, we read a pickle file containing labeled data, split the data into training and testing sets, fit an LSTM model to the training data, and use the model to make classification on the test data:
 
 ```Python
-from sklearn.model_selection import train_test_split
-import pandas as pd
 from stockpy.neural_network import LSTMClassifier
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
 
-data = pd.read_pickle('../../test/data.pickle')
-X = data.drop(['scenario'], axis=1)
-y = data['scenario']
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+X, y = make_classification(n_samples=10000, 
+                           n_features=20, 
+                           n_informative=15, 
+                           n_redundant=5, 
+                           n_classes=5, 
+                           random_state=0)
 
-# create model instance and fit to training data
-predictor = LSTMClassifier(hidden_size=32)
-predictor.fit(X=X_train,
-               y=y_train, 
-               lr=0.001, 
-               batch_size=24,
-               sequence_length=22,
-               scaler_type='minmax',
-               epochs=10)
 
-# Append true labels and predicted labels to lists using the score method
-true_labels, pred_labels = predictor.score(X_test, y_test)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.05, shuffle=False)
+
+# Scale the data and convert to torch tensors
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+X_train = scaler.fit_transform(X_train)
+X_test = scaler.transform(X_test)
+
+X_train = X_train.astype(np.float32)
+X_test = X_test.astype(np.float32)
+y_train = y_train.astype(np.int64)
+
+predictor = LSTMClassifier()
+
+predictor.fit(X_train, 
+              y_train, 
+              batch_size=32, 
+              lr=0.01, 
+              optimizer=torch.optim.Adam, 
+              epochs=50)
 ```
 
 The above code can be applied to all models in the library, just make sure to import from the correct location, either `stockpy.neural_network` or `stockpy.probabilistic`.
@@ -116,47 +140,19 @@ To install the package:
 
 ```bash
 > cd stockpy
-> ./install.sh
-```
-## Data downloader
-The data downloader is a command-line application located named `data.py`, which can be used to download and update stock market data. The downloader has been tested and verified using Ubuntu 22.04 LTS.
-
-| Parameter       | Explanation
-|-----------------|-------------------------------------|
-| `--download`| Download all the S&P 500 stocks. If no start and end dates are specified, the default range is between "2017-01-01" and today's date.                |
-| `--stock`| Download a specific stock specified by the user. If no start and end dates are specified, the default range is between "2017-01-01" and today's date.                |
-| `--update`| Update all the stocks present in the folder containing the files. It is possible to update the files to any range of dates. If a stock wasn't listed before a specific date, it will be downloaded from the day it enters the public market. |
-|`--update.stock`| Update a specific stock specified by the user. It is possible to update the files to any range of dates by specifying the start and end dates. |
-|`--start`| Specify the start date for downloading or updating data. |
-|`--end`| Specify the end date for downloading or updating data. |
-|`--delete`| Delete all files present in the files folder. | 
-|`--delete-stock`| Delete a specific stock present in the files folder. | 
-|`--folder`| Choose the folder where to read or download all the files. |
-### Usage example
-Below are some examples of how to use the downloader:
-```Python
-# Download all the data between "2017-01-01" and "2018-01-01"
-python3 data.py --download --start="2017-01-01" --end="2018-01-01"
-
-# Download data for Apple (AAPL) from "2017-01-01" to today's date
-python3 data.py --stock="AAPL" --end="today"
-
-# Update all the data between "2014-01-01" and "2020-01-01"
-python3 data.py --update --start="2014-01-01" --end="2020-01-01"
-
-# Update a specific stock from "2014-01-01" until the last day present in the stock file
-python3 data.py --update-stock --stock="AAPL" --start="2014-01-01"
-
-# Download all the data between "2017-01-01" and today's date, 
-# choosing the folder where to download the files
-python3 data.py --download --folder="../../example"
+> pip install .
 ```
 
-## TODOS
-- Implementing other functionalities as portfolio optimization
-- Implement test folder
-- Add more tutorials and code explanation
-- Implement transformers
+## TODOs
+Below is a list of planned enhancements and features that are in the pipeline for **stockpy**. Contributions and suggestions are always welcome!
+
+- [ ] Implement a dedicated `test` directory with comprehensive unit tests to ensure reliability and facilitate continuous integration.
+- [ ] Expand the documentation to include more detailed tutorials and code explanations, aiding users in effectively utilizing **stockpy**.
+- [ ] Enrich the algorithmic suite by adding additional models for regression and classification, catering to a broader range of data science needs.
+- [ ] Integrate generative models into the library to provide advanced capabilities for data synthesis and pattern discovery.
+- [ ] Develop and incorporate sophisticated prediction models that can handle complex forecasting tasks with higher accuracy.
+
+*Note: A checked box (✅) indicates that the task has been completed.*
 
 ## Authors and acknowledgements
 **stockpy** is currently developed and mantained by **Silvio Baratto**. You can contact me at:

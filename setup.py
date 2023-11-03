@@ -5,10 +5,10 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name='stockpy-learn',
-    version='0.2.1',
+    version='0.3.1',
     author='Silvio Baratto',
     author_email='silvio.baratto22@gmail.com',
-    description='Machine Learning library to make stock market prediction',
+    description='stockpy: Deep Learning-Based Regression and Classification Framework built on top of PyTorch and Pyro',
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/SilvioBaratto/stockpy",
@@ -27,10 +27,8 @@ setuptools.setup(
         "pyro-ppl>=1.7.0",
         "numpy>=1.21.2",
         "pandas>=1.3.3",
-        "yfinance>=0.1.63",
-        "yahoofinancials>=1.6",
-        "pandas-datareader>=0.10.0",
         "tqdm>=4.62.3",
         "scikit-learn>=0.24.2",
+        "safetensors>=0.4.0"
     ],
 )
