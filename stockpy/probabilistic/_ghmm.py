@@ -3,18 +3,46 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pyro
 import pyro.distributions as dist
-from pyro.nn import PyroModule, PyroSample
+from pyro.nn import PyroModule
 
 from stockpy.base import Regressor
 from stockpy.base import Classifier 
-from stockpy.utils import to_device
-from stockpy.utils import get_activation_function
 
-from ._combiner import Combiner
 from ._emitter import EmitterRegressor, EmitterClassifier
 from ._transition import Transition
 
 class GHMM(PyroModule):
+
+    """
+    A Gaussian Hidden Markov Model (GHMM) class that encapsulates neural network components for modeling 
+    sequences with latent variables. The model can be used for both classification and regression tasks.
+
+    Attributes:
+        z_dim (int): Dimensionality of the latent state.
+        emission_dim (int): Dimensionality of the hidden layers in the emission model.
+        transition_dim (int): Dimensionality of the hidden layers in the transition model.
+        dropout (float): Dropout rate used in the neural network components.
+        variance (float): The variance used in the latent state initialization.
+        activation (str): The type of activation function to use.
+        bias (bool): Whether to include bias parameters in the neural network layers.
+        seq_len (int): The length of the input sequences.
+        z_0 (nn.Parameter): Initial latent state parameter for `z_1`.
+        z_q_0 (nn.Parameter): Initial latent state parameter for `q(z_1)`.
+        emitter_rgr (EmitterRegressor): Emission model for regression tasks.
+        emitter_cls (EmitterClassifier): Emission model for classification tasks.
+        transition (Transition): Transition model defining the evolution of latent states.
+
+    Args:
+        z_dim (int): Dimension of the latent variable `z_t`.
+        emission_dim (int): Size of the hidden layer for the emission model.
+        transition_dim (int): Size of the hidden layer for the transition model.
+        dropout (float): Dropout rate for regularization.
+        variance (float): Variance for the latent state initialization.
+        activation (str): Name of the activation function to be used.
+        bias (bool): Flag to include bias in linear layers or not.
+        seq_len (int): Length of the sequences to model.
+        **kwargs: Additional keyword arguments.
+    """
 
     def __init__(self,
                  z_dim=32,
@@ -38,16 +66,16 @@ class GHMM(PyroModule):
         self.bias = bias
         self.seq_len = seq_len
 
-    def reset_weights(self):
-        """
-        Reinitializes the weights of the neural network.
-        """
-        pass
-
     def initialize_module(self):
         """
-        Initializes the layers of the neural network based on configuration.
+        Initializes the various neural network components of the GHMM based on the configured parameters. 
+        This includes the emission model for both regression and classification tasks, the transition model, 
+        and the initial latent state parameters.
+
+        This method should be called explicitly after creating an instance of `GHMM` and before using it 
+        for any sequence modeling tasks.
         """
+
 
         if isinstance(self, Classifier):
             self.output_size = self.n_classes_
@@ -67,11 +95,7 @@ class GHMM(PyroModule):
         self.transition = Transition(self.z_dim, 
                                      self.n_features_in_,
                                      self.transition_dim)
-        
-        to_device(self.emitter_rgr, self.device)
-        to_device(self.emitter_cls, self.device)
-        to_device(self.transition, self.device)
-        
+                
         # define a (trainable) parameters z_0 and z_q_0 that help define
         # the probability distributions p(z_1) and q(z_1)
         # (since for t = 1 there are no previous latents to condition on)
@@ -84,6 +108,46 @@ class GHMM(PyroModule):
     
 class GHMMRegressor(Regressor, GHMM):
 
+    """
+    A regressor based on Gaussian Hidden Markov Models (GHMMs) which combines the properties
+    of a GHMM with the capabilities of a regressor. It can be used to perform sequence-based 
+    regression tasks, predicting continuous outputs from input sequences.
+
+    Inherits from:
+        Regressor: A base regression class that may define general regression functionalities.
+        GHMM: A Gaussian Hidden Markov Model class with sequence modeling capabilities.
+
+    Attributes inherited from GHMM:
+        z_dim (int): Dimensionality of the latent state.
+        emission_dim (int): Dimensionality of the hidden layers in the emission model.
+        transition_dim (int): Dimensionality of the hidden layers in the transition model.
+        dropout (float): Dropout rate used in the neural network components.
+        variance (float): The variance used in the latent state initialization.
+        activation (str): The type of activation function to use.
+        bias (bool): Whether to include bias parameters in the neural network layers.
+        seq_len (int): The length of the input sequences.
+        z_0 (nn.Parameter): Initial latent state parameter for `z_1`.
+        z_q_0 (nn.Parameter): Initial latent state parameter for `q(z_1)`.
+        emitter_rgr (EmitterRegressor): Emission model for regression tasks.
+        transition (Transition): Transition model defining the evolution of latent states.
+
+    Args:
+        z_dim (int): Dimension of the latent variable `z_t`.
+        emission_dim (int): Size of the hidden layer for the emission model.
+        transition_dim (int): Size of the hidden layer for the transition model.
+        dropout (float): Dropout rate for regularization.
+        variance (float): Variance for the latent state initialization.
+        activation (str): Name of the activation function to be used.
+        bias (bool): Flag to include bias in linear layers or not.
+        seq_len (int): Length of the sequences to model.
+        **kwargs: Additional keyword arguments specific to the Regressor base class.
+
+    Note:
+        The initialization parameters will first initialize the `Regressor` base class 
+        with provided keyword arguments, then initialize the `GHMM` class with specified 
+        parameters for the GHMM components.
+    """
+
     def __init__(self,
                  z_dim=32,
                  emission_dim=32,
@@ -95,8 +159,13 @@ class GHMMRegressor(Regressor, GHMM):
                  seq_len=20,
                  **kwargs):
         """
-        Initializes the MLPClassifier object with given or default parameters.
+        Constructor for the GHMMRegressor class, initializing the components of both
+        the Regressor and the GHMM classes with the given parameters.
+
+        The **kwargs are passed directly to the base Regressor class to allow for 
+        flexibility in configuring any additional regressor-specific settings.
         """
+
         Regressor.__init__(self, **kwargs)
         GHMM.__init__(self,
                      z_dim=z_dim,
@@ -111,114 +180,101 @@ class GHMMRegressor(Regressor, GHMM):
         
         self.criterion = nn.MSELoss()
 
-    def model(self, x, y, annealing_factor = 1.0):
+    def model(self, x, y, annealing_factor=1.0):
         """
-        Defines the generative model p(y,z|x) which includes the observation 
-        model p(y|z) and transition model p(z_t | z_{t-1}). It also handles the 
-        computation of the parameters of these models.
+        The generative model for the variational autoencoder, which specifies the joint
+        probability distribution over the latent variables `z` and observed variables `y`
+        given the inputs `x`.
 
         Args:
-            x_data (torch.Tensor): Input tensor for the model.
-            y_data (Optional[torch.Tensor]): Optional observed output tensor for the model.
-            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
+            x (torch.Tensor): The input features with shape (batch_size, seq_len, num_features).
+            y (torch.Tensor): The target values with shape (batch_size, seq_len, output_size).
+            annealing_factor (float): A scaling factor for the KL divergence term to control
+                                      its influence on the loss (default: 1.0).
 
-        Returns:
-            torch.Tensor: The sampled latent variable `z` from the last time step of the model.
+        Note:
+            This method makes use of the Pyro's plate notation to efficiently handle mini-batches,
+            and markov to indicate conditional independencies that arise in markov models, allowing
+            for efficient inference.
         """
 
-        # this is the number of time steps we need to process in the data
+        # Number of time steps to process
         T_max = x.size(1)
 
-        # register all PyTorch (sub)modules with pyro
-        # this needs to happen in both the model and guide
+        # Register PyTorch (sub)modules with Pyro
         pyro.module("ghmm", self)
 
-        # set z_prev = z_0 to setup the recursive conditioning in p(z_t | z_{t-1})
+        # Expand the initial latent state to match the batch size
         z_prev = self.z_0.expand(x.size(0), self.z_0.size(0))
 
-        # we enclose all the sample statements in the model in a plate.
-        # this marks that each datapoint is conditionally independent of the others
+        # Process the sequence one time step at a time
         with pyro.plate("z_minibatch", len(x)):
-            # sample the latents z and observed y's one time step at a time
             for t in pyro.markov(range(1, T_max + 1)):
-                # the next chunk of code samples z_t ~ p(z_t | z_{t-1})
-                # note that (both here and elsewhere) we use poutine.scale to take care
-                # of KL annealing.
 
-                # first compute the parameters of the diagonal gaussian
-                # distribution p(z_t | z_{t-1})
+                # Compute the parameters of the latent state distribution at time t
                 z_loc, z_scale = self.transition(z_prev, x[:, t - 1, :])
 
+                # Ensure the scale is positive
                 z_scale = z_scale.clamp(min=1e-6)
 
-                # then sample z_t according to dist.Normal(z_loc, z_scale).
-                # note that we use the reshape method so that the univariate
-                # Normal distribution is treated as a multivariate Normal
-                # distribution with a diagonal covariance.
-
+                # Sample the latent variable z_t using the reparameterization trick
                 with pyro.poutine.scale(scale=annealing_factor):
-                    z_t = pyro.sample("z_%d" % t,
-                                    dist.Normal(z_loc, z_scale)
-                                                .to_event(1))
+                    z_t = pyro.sample(f"z_{t}",
+                                      dist.Normal(z_loc, z_scale).to_event(1))
 
-                # compute the mean of the Gaussian distribution p(y_t | z_t)
+                # Compute the parameters of the observation distribution at time t
                 mu, sigma = self.emitter_rgr(z_t, x[:, t - 1, :])
 
-                # the next statement instructs pyro to observe y_t according to the
-                # Gaussian distribution p(y_t | z_t)
-                pyro.sample("obs_y_%d" % t,
+                # Sample the observation y at time t
+                pyro.sample(f"obs_y_{t}",
                             dist.Normal(mu, sigma).to_event(1),
                             obs=y)
-                
-                # print(f"model z_prev shape: {z_prev.shape}")
-                # print(f"model x_data[:, t - 1, :] shape: {x_data[:, t - 1, :].shape}")   
-                # the latent sampled at this time step will be conditioned upon
-                # in the next time step so keep track of it
+
+                # Update the previous latent state
                 z_prev = z_t
             
-    def guide(self, x, y = None, annealing_factor = 1.0):
+    def guide(self, x, y=None, annealing_factor=1.0):
         """
-        Defines the guide (also called the inference model or variational distribution) q(z|x,y)
-        which is an approximation to the posterior p(z|x,y). It also handles the computation of the 
-        parameters of this guide.
+        The variational guide (approximate posterior) for the variational autoencoder,
+        which defines the family of distributions over the latent variables `z` that will
+        be optimized to approximate the true posterior.
 
         Args:
-            x_data (torch.Tensor): Input tensor for the guide.
-            y_data (Optional[torch.Tensor]): Optional observed output tensor for the guide.
-            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
+            x (torch.Tensor): The input features with shape (batch_size, seq_len, num_features).
+            y (torch.Tensor): The target values (optional, not used in the guide).
+            annealing_factor (float): A scaling factor for the KL divergence term (default: 1.0).
 
-        Returns:
-            torch.Tensor: The sampled latent variable `z` from the last time step of the guide.
+        Note:
+            This guide corresponds to the mean-field approximation where the latent variables
+            at each time step are independent given the observed data.
         """
-        
-        # this is the number of time steps we need to process in the mini-batch
+
+        # Number of time steps to process
         T_max = x.size(1)
-        # register all PyTorch (sub)modules with pyro
+
+        # Register PyTorch (sub)modules with Pyro
         pyro.module("ghmm", self)
 
-        # initialize the values of the latent variables using heuristics
+        # Expand the initial latent state to match the batch size
         z_prev = self.z_q_0.expand(x.size(0), self.z_dim)
-        
-        # we enclose all the sample statements in the guide in a plate.
-        # this marks that each datapoint is conditionally independent of the others.
-        with pyro.plate("z_minibatch", len(x)):
-            # sample the latents z one time step at a time
-            for t in pyro.markov(range(1, T_max + 1)):
-                # the next two lines assemble the distribution q(z_t | z_{t-1}, x_{t:T})
 
+        with pyro.plate("z_minibatch", len(x)):
+            for t in pyro.markov(range(1, T_max + 1)):
+                # Compute the parameters of the guide distribution for z_t
                 z_loc, z_scale = self.transition(z_prev, x[:, t - 1, :])
 
+                # Ensure the scale is positive
                 z_scale = z_scale.clamp(min=1e-6)
 
+                # Define the distribution q(z_t | z_{t-1}, x_{t:T})
                 z_dist = dist.Normal(z_loc, z_scale)
 
-                # sample z_t from the distribution z_dist
-                with pyro.poutine.scale(None, annealing_factor):
-                    z_t = pyro.sample("z_%d" % t, z_dist.to_event(1))
-           
-                # the latent sampled at this time step will be conditioned
-                # upon in the next time step so keep track of it
-                z_prev = z_t  
+                # Sample z_t from the guide distribution
+                with pyro.poutine.scale(scale=annealing_factor):
+                    z_t = pyro.sample(f"z_{t}", z_dist.to_event(1))
+
+                # Update the previous latent state
+                z_prev = z_t 
 
     def forward(self, x):
         """
