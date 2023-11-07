@@ -1,8 +1,6 @@
-<p align="center">
-  <a href="https://github.com/SilvioBaratto/stockpy" target="_blank" >
-    <img alt="stockpy" src="docs/source/_static/img/logo.png" width="400" />
-  </a>
-</p>
+<div align="center">
+  <a href="https://github.com/SilvioBaratto/stockpy"> <img src="docs/source/_static/img/stockpi_v3.png"></a>
+</div>
 
 ![Python package](https://github.com/SilvioBaratto/stockpy/workflows/Python%20package/badge.svg?branch=master)
 [![GitHub license](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)](https://github.com/Naereen/StrapDown.js/blob/master/LICENSE)
