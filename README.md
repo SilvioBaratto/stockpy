@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="https://github.com/SilvioBaratto/stockpy"> <img src="docs/source/_static/img/stockpi_v3_white.png"></a>
+  <a href="https://github.com/SilvioBaratto/stockpy"> <img src="docs/source/_static/img/stockpi_solo_icono_v3.svg"></a>
 </div>
 
 ![Python package](https://github.com/SilvioBaratto/stockpy/workflows/Python%20package/badge.svg?branch=master)
