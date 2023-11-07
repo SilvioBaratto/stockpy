@@ -31,7 +31,6 @@ from stockpy.callbacks import PassthroughScoring
 from stockpy.preprocessing import StockDatasetFFNN
 from stockpy.preprocessing import StockDatasetRNN
 from stockpy.preprocessing import StockDatasetCNN
-from stockpy.preprocessing import StockDatasetSeq2Seq
 from stockpy.preprocessing import ValidSplit
 from stockpy.preprocessing import get_len
 from stockpy.preprocessing import unpack_data
@@ -2231,6 +2230,7 @@ class BaseEstimator:
         Notes:
             - It's generally a good practice to call this method before performing operations that
             require a fitted model, such as predicting or updating parameters.
+
             - The `check_is_fitted` function from scikit-learn is used internally, so the model
             adheres to scikit-learn's conventions on fitted models.
 
@@ -2242,8 +2242,6 @@ class BaseEstimator:
             else:
                 attributes = ['module_']
         
-        # Utilize scikit-learn's check_is_fitted utility function to perform
-        # the actual check.
         check_is_fitted(self, attributes, *args, **kwargs)
 
     def trim_for_prediction(self):
@@ -2701,7 +2699,7 @@ class BaseEstimator:
             'rnn': StockDatasetRNN,
             'ffnn': StockDatasetFFNN,
             'cnn': StockDatasetCNN,
-            'seq2seq': StockDatasetSeq2Seq,
+            # 'seq2seq': StockDatasetSeq2Seq,
         }
 
         # Select and potentially instantiate the dataset
@@ -2717,7 +2715,7 @@ class BaseEstimator:
 
         # Initialize with additional parameters if required
         if not is_initialized:
-            if issubclass(dataset_cls, (StockDatasetRNN, StockDatasetSeq2Seq)):
+            if issubclass(dataset_cls, StockDatasetRNN):
                 # Initialize with sequence length for RNN and Seq2Seq models
                 return dataset_cls(X, y, length=None, seq_len=self.seq_len, **dataset_kwargs)
 
@@ -4482,7 +4480,7 @@ class Classifier(BaseEstimator, ClassifierMixin):
             X, 
             y=None, 
             optimizer=torch.optim.SGD,
-            elbo=None,
+            elbo=TraceMeanField_ELBO,
             callbacks=None,
             lr=0.01,
             epochs=10,
@@ -4663,6 +4661,9 @@ class Classifier(BaseEstimator, ClassifierMixin):
             likely class label. If `predict_nonlinearity` is provided, it will be applied to the output
             of the network before the argmax operation.
         """
+        # Assuming 'X' and 'predict_nonlinearity' are already defined above this snippet
+        if not isinstance(X, torch.utils.data.dataset.Subset) and X.ndim == 1:
+            X = X.reshape(1, -1)
 
         self.predict_nonlinearity = predict_nonlinearity
         
@@ -4753,7 +4754,7 @@ class Regressor(BaseEstimator, RegressorMixin):
             X, 
             y=None, 
             optimizer=torch.optim.SGD,
-            elbo=pyro.infer.TraceMeanField_ELBO,
+            elbo=TraceMeanField_ELBO,
             callbacks=None,
             lr=0.01,
             epochs=10,
@@ -4886,9 +4887,10 @@ class Regressor(BaseEstimator, RegressorMixin):
                 The predicted values as a one-dimensional array.
 
         """
-        if X.ndim == 1:
+        # Assuming 'X' and 'predict_nonlinearity' are already defined above this snippet
+        if not isinstance(X, torch.utils.data.dataset.Subset) and X.ndim == 1:
             X = X.reshape(1, -1)
-
+            
         # initialize non linearity
         self.predict_nonlinearity = predict_nonlinearity
 
