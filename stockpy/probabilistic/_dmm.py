@@ -3,60 +3,89 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pyro
 import pyro.distributions as dist
-from pyro.nn import PyroModule, PyroSample
+from pyro.nn import PyroModule
 
 from stockpy.base import Regressor
 from stockpy.base import Classifier 
-from stockpy.utils import to_device
-from stockpy.utils import get_activation_function
 
 from ._combiner import Combiner
 from ._emitter import EmitterRegressor, EmitterClassifier
 from ._transition import Transition
 
+__all__ = ['DMMRegressor', 'DMMClassifier']
+
 class DMM(PyroModule):
-
     """
-    Deep Markov Model (DMM) implemented as a PyroModule, representing a class of deep generative models
-    where the latent state space follows a Markov process.
+    Deep Markov Model with Markov latent state space.
 
-    Attributes:
-        z_dim (int): Dimensionality of the latent state space.
-        emission_dim (int): Dimensionality of the emission parameters.
-        transition_dim (int): Dimensionality of the transition parameters.
-        rnn_dim (int): Dimensionality of the RNN's hidden states.
-        num_layers (int): Number of layers in the RNN.
-        dropout (float): Dropout rate for regularization.
-        variance (float): Variance parameter for certain probability distributions.
-        activation (str): Activation function used in neural network layers.
-        bias (bool): If `True`, layers will use bias terms.
-        seq_len (int): Length of the input sequences.
-        emitter_rgr (PyroModule): The regression module for emission.
-        emitter_cls (PyroModule): The classification module for emission.
-        transition (PyroModule): The transition module.
-        combiner (PyroModule): Combines RNN outputs with latent states.
-        rnn (torch.nn.Module): Recurrent neural network module.
-        z_0 (torch.nn.Parameter): Initial latent state parameter.
-        z_q_0 (torch.nn.Parameter): Initial parameter for the variational distribution of the latent state.
-        h_0 (torch.nn.Parameter): Initial hidden state parameter for the RNN.
+    Parameters
+    ----------
+    z_dim : int, optional
+        Dimensionality of latent states, by default 32.
+    emission_dim : int, optional
+        Dimensionality of emission parameters, by default 32.
+    transition_dim : int, optional
+        Dimensionality of transition parameters, by default 32.
+    rnn_dim : int, optional
+        Dimensionality of RNN hidden states, by default 32.
+    num_layers : int, optional
+        Number of RNN layers, by default 1.
+    dropout : float, optional
+        Dropout rate, by default 0.2.
+    variance : float, optional
+        Variance for distributions, by default 0.1.
+    activation : str, optional
+        Neural network activation function, by default 'relu'.
+    bias : bool, optional
+        Use bias in layers, by default True.
+    seq_len : int, optional
+        Input sequence length, by default 20.
+    **kwargs
+        Additional keyword arguments.
 
-    Args:
-        z_dim (int, optional): Dimensionality of the latent state space (default: 32).
-        emission_dim (int, optional): Dimensionality of the emission parameters (default: 32).
-        transition_dim (int, optional): Dimensionality of the transition parameters (default: 32).
-        rnn_dim (int, optional): Dimensionality of the RNN's hidden states (default: 32).
-        num_layers (int, optional): Number of layers in the RNN (default: 1).
-        dropout (float, optional): Dropout rate for regularization (default: 0.2).
-        variance (float, optional): Variance parameter for certain probability distributions (default: 0.1).
-        activation (str, optional): Activation function used in neural network layers (default: 'relu').
-        bias (bool, optional): If `True`, layers will use bias terms (default: True).
-        seq_len (int, optional): Length of the input sequences (default: 20).
-        **kwargs: Arbitrary keyword arguments.
+    Attributes
+    ----------
+    z_dim : int
+        Latent state dimensionality.
+    emission_dim : int
+        Emission parameters dimensionality.
+    transition_dim : int
+        Transition parameters dimensionality.
+    rnn_dim : int
+        RNN hidden state dimensionality.
+    num_layers : int
+        RNN layer count.
+    dropout : float
+        Regularization dropout rate.
+    variance : float
+        Variance for probability distributions.
+    activation : str
+        Activation function in network layers.
+    bias : bool
+        Bias term inclusion in layers.
+    seq_len : int
+        Sequence length for input data.
+    emitter_rgr : PyroModule
+        Regression module for emissions.
+    emitter_cls : PyroModule
+        Classification module for emissions.
+    transition : PyroModule
+        Transition state module.
+    combiner : PyroModule
+        Module combining RNN output and latent states.
+    rnn : torch.nn.Module
+        Recurrent neural network module.
+    z_0 : torch.nn.Parameter
+        Initial latent state parameter.
+    z_q_0 : torch.nn.Parameter
+        Initial latent state variational parameter.
+    h_0 : torch.nn.Parameter
+        Initial hidden state parameter for RNN.
 
-    Note:
-        Inherits from PyroModule to seamlessly integrate deep learning with probabilistic modeling.
-        The `DMM` can operate as both a regressor and a classifier depending on the type of the
-        emitter module initialized.
+    Notes
+    -----
+    Inherits from PyroModule for integration of deep learning with probabilistic modeling.
+    Operates as regressor or classifier based on emitter module type.
     """
 
     def __init__(self,
@@ -87,13 +116,12 @@ class DMM(PyroModule):
 
     def initialize_module(self):
         """
-        Initializes the neural network modules and parameters of the DMM.
-        This method should be called after creating an instance of DMM and before
-        using it for inference or training.
+        Initialize the DMM neural network modules and parameters.
 
-        Raises:
-            TypeError: If the object does not have the expected attributes due to not
-                       being an instance of `Classifier` or `Regressor`.
+        Raises
+        ------
+        TypeError
+            If instance is neither `Classifier` nor `Regressor`.
         """
 
         if isinstance(self, Classifier):
@@ -138,35 +166,48 @@ class DMM(PyroModule):
         return "rnn"
     
 class DMMRegressor(Regressor, DMM):
-
     """
-    Deep Markov Model Regressor (DMMRegressor) is a specialized version of the DMM that is designed
-    to perform regression tasks using deep generative modeling.
+    Specialized DMM for regression tasks using deep generative modeling.
 
-    Inherits from:
-        Regressor: A base class for regression models.
-        DMM: The base Deep Markov Model class for deep generative models.
+    Inherits From
+    -------------
+    Regressor
+        Base class for regression models.
+    DMM
+        Base class for deep generative models following a Markov process.
 
-    Attributes:
-        Inherits all attributes from the DMM class and potentially modifies output dimensions
-        based on the regression requirements.
+    Attributes
+    ----------
+    Inherits all attributes from the DMM class with adjustments for regression.
 
-    Args:
-        z_dim (int, optional): Dimensionality of the latent state space (default: 32).
-        emission_dim (int, optional): Dimensionality of the emission parameters (default: 32).
-        transition_dim (int, optional): Dimensionality of the transition parameters (default: 32).
-        rnn_dim (int, optional): Dimensionality of the RNN's hidden states (default: 32).
-        num_layers (int, optional): Number of layers in the RNN (default: 1).
-        dropout (float, optional): Dropout rate for regularization (default: 0.2).
-        variance (float, optional): Variance parameter for certain probability distributions (default: 0.1).
-        activation (str, optional): Activation function used in neural network layers (default: 'relu').
-        bias (bool, optional): If `True`, adds bias to RNN layers (default: True).
-        seq_len (int, optional): Length of the input sequences (default: 20).
-        **kwargs: Arbitrary keyword arguments that are passed to the Regressor base class.
+    Parameters
+    ----------
+    z_dim : int, optional
+        Dimensionality of the latent state space (default is 32).
+    emission_dim : int, optional
+        Dimensionality of the emission parameters (default is 32).
+    transition_dim : int, optional
+        Dimensionality of the transition parameters (default is 32).
+    rnn_dim : int, optional
+        Dimensionality of the RNN hidden states (default is 32).
+    num_layers : int, optional
+        Number of layers in the RNN (default is 1).
+    dropout : float, optional
+        Dropout rate for regularization (default is 0.2).
+    variance : float, optional
+        Variance parameter for distributions (default is 0.1).
+    activation : str, optional
+        Activation function in neural network layers (default is 'relu').
+    bias : bool, optional
+        If `True`, adds bias to RNN layers (default is True).
+    seq_len : int, optional
+        Input sequence length (default is 20).
+    **kwargs
+        Additional arbitrary keyword arguments passed to Regressor base class.
 
-    Note:
-        The `DMMRegressor` initializes the DMM as a regression model, adjusting the output
-        dimensions to match the requirements of the regression task.
+    Note
+    ----
+    Adjusts DMM output dimensions for regression task requirements.
     """
 
     def __init__(self,
@@ -188,9 +229,12 @@ class DMMRegressor(Regressor, DMM):
         parameters or their default values. It first initializes the Regressor base class
         and then the DMM class with the provided arguments.
 
-        Raises:
-            TypeError: If an argument passed is not of the expected type.
-            ValueError: If an invalid value is passed to an argument.
+        Raises
+        ------
+        TypeError
+            If an argument is not of the expected type.
+        ValueError
+            If an invalid value is passed to an argument.
         """
 
         Regressor.__init__(self, **kwargs)
@@ -209,28 +253,27 @@ class DMMRegressor(Regressor, DMM):
         
         self.criterion = nn.MSELoss()
 
-    def model(self, x, y, annealing_factor = 1.0):
-
+    def model(self, x, y, annealing_factor=1.0):
         """
-        Define the generative model for a deep Markov model (DMM) regressor.
+        Defines the generative model for the deep Markov model (DMM) regressor.
 
-        The model is a Pyro probabilistic model, which includes the definition of the prior over
-        the latent variables z and the likelihood of the observations y given z. It is used for
-        training the model with variational inference.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Observed input features with shape (batch_size, T_max, input_dim), where T_max is the
+            maximum sequence length in the batch.
+        y : torch.Tensor
+            Target variable with shape (batch_size, T_max, output_dim), where T_max is the maximum
+            sequence length in the batch.
+        annealing_factor : float, optional
+            Factor to anneal the KL-divergence term in the loss during training (default is 1.0).
 
-        Args:
-            x (torch.Tensor): The observed input features with shape (batch_size, T_max, input_dim),
-                            where T_max is the maximum sequence length in the batch.
-            y (torch.Tensor): The target variable with shape (batch_size, T_max, output_dim),
-                            where T_max is the maximum sequence length in the batch.
-            annealing_factor (float, optional): Factor to anneal the KL-divergence term in the loss
-                                                during training (default is 1.0).
-
-        Notes:
-            - The `model` function is part of the Pyro model-guide pair required for SVI.
-            - It includes annealing of the KL-divergence to stabilize training in the early epochs.
-            - The `pyro.plate` construct is used to denote independent batches during the sampling process.
-            - Time dependencies are handled through Pyro's `markov` context manager.
+        Notes
+        -----
+        - This function is part of the Pyro model-guide pair required for stochastic variational inference (SVI).
+        - Annealing of the KL-divergence is incorporated to stabilize training in the early epochs.
+        - The `pyro.plate` construct is utilized to denote independent batches for stochastic sampling.
+        - Time dependencies within the sequence data are managed using Pyro's `markov` context manager.
         """
 
         # Determine the sequence length from the input features `x`.
@@ -276,28 +319,27 @@ class DMMRegressor(Regressor, DMM):
                 # Update `z_prev` to the current `z_t` to be used in the next time step.
                 z_prev = z_t
             
-    def guide(self, x, y = None, annealing_factor = 1.0):
-
+    def guide(self, x, y=None, annealing_factor=1.0):
         """
-        Define the variational guide for the deep Markov model (DMM) regressor.
+        Defines the variational guide for the deep Markov model (DMM) regressor.
 
-        The guide serves as an approximate posterior that is optimized to resemble the true posterior
-        of the latent variables given the observations. It is a parametrized distribution from which
-        we can sample z and is defined using the same plates as the model for the latent variables.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Observed input features with shape (batch_size, T_max, input_dim), where T_max is the
+            maximum sequence length in the batch.
+        y : torch.Tensor, optional
+            The target variable, not utilized in the guide, included for compatibility with the model
+            signature (default is None).
+        annealing_factor : float, optional
+            Factor to anneal the KL-divergence term in the loss during training (default is 1.0).
 
-        Args:
-            x (torch.Tensor): The observed input features with shape (batch_size, T_max, input_dim),
-                            where T_max is the maximum sequence length in the batch.
-            y (torch.Tensor, optional): The target variable is not used in the guide and included
-                                        for API consistency (default is None).
-            annealing_factor (float, optional): Factor to anneal the KL-divergence term in the loss
-                                                during training (default is 1.0).
-
-        Notes:
-            - The `guide` function is part of the Pyro model-guide pair required for SVI.
-            - It specifies the family of distributions used for approximation of the posterior.
-            - Time dependencies are handled through Pyro's `markov` context manager.
-            - The hidden state of the RNN is used to compute the parameters of the variational distribution.
+        Notes
+        -----
+        - This function is a component of the Pyro model-guide pair required for stochastic variational inference (SVI).
+        - It outlines the family of distributions for approximating the posterior.
+        - Temporal dependencies within the sequence data are managed using Pyro's `markov` context manager.
+        - Parameters for the variational distribution are computed using the RNN's hidden state.
         """
         
         # Determine the sequence length from the input features `x`.
@@ -350,24 +392,26 @@ class DMMRegressor(Regressor, DMM):
         The predictions for all time steps are then combined, and the output for the last
         time step is returned as the final prediction for the sequence.
 
-        Args:
-            x (torch.Tensor): The input tensor for the neural network with shape
-                            (batch_size, T_max, input_dim), where `T_max` is the maximum
-                            sequence length in the batch, and `input_dim` is the dimension
-                            of the input features.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor with shape (batch_size, T_max, input_dim), where `T_max` is the maximum
+            sequence length in the batch and `input_dim` is the dimension of input features.
 
-        Returns:
-            torch.Tensor: The output tensor from the neural network containing the predicted
-                        values for the last time step in the input sequence. The shape of
-                        the tensor is (batch_size, output_dim), where `output_dim` is the
-                        dimension of the output features.
+        Returns
+        -------
+        torch.Tensor
+            Output tensor containing predicted values for the last time step in the input sequence,
+            with shape (batch_size, output_dim), where `output_dim` is the dimension of the output
+            features.
 
-        Notes:
-            - This method assumes that `guide` has been defined and can provide the latent
-            variables `z_t` required for generating the predictions.
-            - The predictions for only the last time step are returned, which aligns with
-            many sequence-to-one prediction tasks. To get predictions for all time steps,
-            modify the method to return the entire `preds` tensor.
+        Notes
+        -----
+        - This method is predicated on a defined `guide` capable of providing the necessary latent
+        variables `z_t` for prediction.
+        - Only the predictions for the last time step are returned, suiting sequence-to-one prediction
+        tasks. For sequence-to-sequence predictions, modify the method to return the entire sequence
+        of predictions.
         """
         # Initialize a list to hold the predictions at each time step.
         preds = []
@@ -398,33 +442,61 @@ class DMMRegressor(Regressor, DMM):
         return preds[-1, :, :]
                 
 class DMMClassifier(Classifier, DMM):
-
     """
-    DMMClassifier is a deep Markov model for classification tasks.
-    
-    This model is a probabilistic approach to sequence classification using a
-    deep Markov model (DMM) structure, which allows for capturing temporal 
-    dependencies and uncertainties in sequential data.
-    
-    Parameters:
-        z_dim (int): The size of the latent state space. Default is 32.
-        emission_dim (int): The size of the emission's output space. Default is 32.
-        transition_dim (int): The size of the transition's output space. Default is 32.
-        rnn_dim (int): The size of the RNN's hidden layer. Default is 32.
-        num_layers (int): The number of RNN layers. Default is 1.
-        dropout (float): The dropout rate for regularization. Default is 0.2.
-        variance (float): The initial variance of the probabilistic layers. Default is 0.1.
-        activation (str): The type of activation function to use. Default is 'relu'.
-        bias (bool): Whether to use bias in the RNN layers. Default is True.
-        seq_len (int): The length of the input sequences. Default is 20.
-        **kwargs: Additional keyword arguments for the Classifier base class.
-    
-    Attributes:
-        n_classes_ (int): Number of classes for classification. Set during fitting.
-        n_features_in_ (int): Number of features expected during fitting. Set during fitting.
-        z_0 (torch.nn.Parameter): Initial latent state parameter.
-        z_q_0 (torch.nn.Parameter): Initial latent state parameter for the guide.
-        h_0 (torch.nn.Parameter): Initial hidden state for the RNN.
+    DMMClassifier implements a deep Markov model for classification tasks, encapsulating
+    the strengths of deep Markov models in capturing temporal dependencies and uncertainties
+    in sequential data.
+
+    Parameters
+    ----------
+    z_dim : int, optional
+        Size of the latent state space, by default 32.
+    emission_dim : int, optional
+        Size of the emission's output space, by default 32.
+    transition_dim : int, optional
+        Size of the transition's output space, by default 32.
+    rnn_dim : int, optional
+        Size of the RNN's hidden layer, by default 32.
+    num_layers : int, optional
+        Number of RNN layers, by default 1.
+    dropout : float, optional
+        Dropout rate for regularization, by default 0.2.
+    variance : float, optional
+        Initial variance of the probabilistic layers, by default 0.1.
+    activation : str, optional
+        Activation function type, by default 'relu'.
+    bias : bool, optional
+        Whether to use bias in the RNN layers, by default True.
+    seq_len : int, optional
+        Length of the input sequences, by default 20.
+    **kwargs : dict, optional
+        Additional keyword arguments for the Classifier base class.
+
+    Attributes
+    ----------
+    n_classes_ : int
+        Number of classes for classification. This is set during the fitting process.
+    n_features_in_ : int
+        Number of expected features during fitting. This is set during the fitting process.
+    z_0 : torch.nn.Parameter
+        Initial latent state parameter.
+    z_q_0 : torch.nn.Parameter
+        Initial latent state parameter for the guide.
+    h_0 : torch.nn.Parameter
+        Initial hidden state parameter for the RNN.
+
+    Notes
+    -----
+    DMMClassifier integrates the Classifier and DMM functionalities to provide a specialized
+    approach to sequence classification. It leverages a deep Markov model framework to effectively
+    model sequence data and its temporal characteristics for classification purposes.
+
+    Examples
+    --------
+    >>> from stockpy import DMMClassifier
+    >>> model = DMMClassifier(z_dim=50, rnn_dim=64, num_layers=2)
+    >>> model.fit(X_train, y_train)
+    >>> y_pred = model.predict(X_test)
     """
 
     def __init__(self,
@@ -440,9 +512,18 @@ class DMMClassifier(Classifier, DMM):
                  seq_len=20,
                  **kwargs):
         """
-        Constructor for DMMClassifier.
+        Constructor method for the DMMClassifier class.
         
-        See class documentation for more details on the parameters.
+        This method initializes a new instance of DMMClassifier with the specified
+        parameters or their default values. It first initializes the Classifier base class
+        and then the DMM class with the provided arguments.
+
+        Raises
+        ------
+        TypeError
+            If an argument is not of the expected type.
+        ValueError
+            If an invalid value is passed to an argument.
         """
 
         Classifier.__init__(self, **kwargs)
@@ -461,27 +542,38 @@ class DMMClassifier(Classifier, DMM):
         
         self.criterion = nn.NLLLoss()
 
-    def model(self, x, y, annealing_factor = 1.0):
+    def model(self, x, y, annealing_factor=1.0):
         """
-        Define the generative model for a deep Markov model (DMM) regressor.
+        Defines the generative part of the deep Markov model for sequence regression.
 
-        The model is a Pyro probabilistic model, which includes the definition of the prior over
-        the latent variables z and the likelihood of the observations y given z. It is used for
-        training the model with variational inference.
+        This is a core component of the variational inference process where the prior distribution
+        over the latent states and the likelihood of the observed data given the latent states are specified.
 
-        Args:
-            x (torch.Tensor): The observed input features with shape (batch_size, T_max, input_dim),
-                            where T_max is the maximum sequence length in the batch.
-            y (torch.Tensor): The target variable with shape (batch_size, T_max, output_dim),
-                            where T_max is the maximum sequence length in the batch.
-            annealing_factor (float, optional): Factor to anneal the KL-divergence term in the loss
-                                                during training (default is 1.0).
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input features with shape (batch_size, T_max, input_dim), where T_max is the maximum
+            sequence length in the batch, and input_dim is the dimension of the input features.
+        y : torch.Tensor
+            Target variable with shape (batch_size, T_max, output_dim), where T_max is the maximum
+            sequence length in the batch, and output_dim is the dimension of the output space.
+        annealing_factor : float, optional
+            A factor to anneal the KL-divergence term in the variational loss during training. It can
+            help in stabilizing the training in its early stages, by default 1.0.
 
-        Notes:
-            - The `model` function is part of the Pyro model-guide pair required for SVI.
-            - It includes annealing of the KL-divergence to stabilize training in the early epochs.
-            - The `pyro.plate` construct is used to denote independent batches during the sampling process.
-            - Time dependencies are handled through Pyro's `markov` context manager.
+        Notes
+        -----
+        The `model` function is invoked during the training loop in the context of stochastic variational
+        inference (SVI) in Pyro. It specifies how the latent variables are generated (the prior) and how
+        they generate the observed data (the likelihood).
+
+        - It is crucial for the `model` to be paired with an appropriate guide (variational posterior)
+        during inference in Pyro's SVI.
+        - The use of `pyro.plate` indicates conditional independence of the data and helps in scaling to
+        large datasets by enabling mini-batch training.
+        - Temporal dependencies within the sequence are captured using Pyro's `markov` context manager
+        which allows for defining state transitions in the latent state space.
+
         """
 
         # Determine the maximum number of time steps from the input shape.
@@ -518,27 +610,43 @@ class DMMClassifier(Classifier, DMM):
                 # Update the previous latent state to the current one for the next time step.
                 z_prev = z_t
             
-    def guide(self, x, y = None, annealing_factor = 1.0):
+    def guide(self, x, y=None, annealing_factor=1.0):
         """
-        Define the variational guide for the deep Markov model (DMM) regressor.
+        Specifies the variational guide, a parameterized approximate posterior, for the deep Markov model.
 
-        The guide serves as an approximate posterior that is optimized to resemble the true posterior
-        of the latent variables given the observations. It is a parametrized distribution from which
-        we can sample z and is defined using the same plates as the model for the latent variables.
+        This guide is a critical part of the stochastic variational inference process, providing a tractable
+        proxy for the intractable true posterior over the latent states.
 
-        Args:
-            x (torch.Tensor): The observed input features with shape (batch_size, T_max, input_dim),
-                            where T_max is the maximum sequence length in the batch.
-            y (torch.Tensor, optional): The target variable is not used in the guide and included
-                                        for API consistency (default is None).
-            annealing_factor (float, optional): Factor to anneal the KL-divergence term in the loss
-                                                during training (default is 1.0).
+        Parameters
+        ----------
+        x : torch.Tensor
+            Observed input features with shape (batch_size, T_max, input_dim), where T_max is the
+            maximum sequence length in the batch, and input_dim is the dimension of the input features.
+        y : torch.Tensor, optional
+            Target variable which is not utilized in the guide but is kept for consistency with the
+            model's API. By default, it is None.
+        annealing_factor : float, optional
+            A factor used to anneal the KL-divergence term in the variational loss during the training
+            process, by default 1.0.
 
-        Notes:
-            - The `guide` function is part of the Pyro model-guide pair required for SVI.
-            - It specifies the family of distributions used for approximation of the posterior.
-            - Time dependencies are handled through Pyro's `markov` context manager.
-            - The hidden state of the RNN is used to compute the parameters of the variational distribution.
+        Notes
+        -----
+        The `guide` function works in tandem with the `model` function during variational inference
+        using Pyro's SVI framework. The guide is optimized to minimize the KL-divergence with respect
+        to the true posterior.
+
+        - The use of `pyro.plate` indicates conditional independence of the data and supports
+        mini-batch training by denoting independent batches.
+        - The `markov` context manager from Pyro is used to model the transitions of the latent
+        Markovian states, maintaining their temporal dependency structure.
+        - While `y` is not used in the guide, it is included in the parameter list to match the
+        signature of the `model` function.
+        
+        Examples
+        --------
+        >>> def guide(self, x, y=None):
+        ...     # Approximate posterior specification here.
+        ...     pass
         """
         
         # Determine the maximum number of time steps from the input shape.
@@ -579,39 +687,42 @@ class DMMClassifier(Classifier, DMM):
 
     def forward(self, x):
         """
-        Perform the forward pass with the neural network, predicting class logits at each time step of the input sequence.
-        
-        The forward pass uses the latent variables sampled by the guide during the variational inference process
-        and passes them to the emitter to produce logits for class probabilities at each time step.
-        The final prediction is the average of these logits across all time steps.
+        Computes the forward pass, predicting the class logits for each time step of the input sequence.
 
-        Args:
-            x (torch.Tensor): The input tensor of shape (batch_size, sequence_length, num_features),
-                            where sequence_length is the length of the time series, and num_features
-                            is the number of features at each time step.
+        This method integrates the learned latent representations with the emitter network to output
+        the raw scores (logits) for each class.
 
-        Returns:
-            torch.Tensor: The output tensor of shape (batch_size, num_classes), which contains the averaged
-                        logits for class probabilities over the sequence for each instance in the batch.
-                        
-                        The logits can then be passed through a softmax function to obtain probability
-                        distributions over the classes for each instance.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor with shape (batch_size, sequence_length, num_features), where sequence_length
+            is the length of the time series and num_features is the number of features at each time step.
 
-        Example:
-            >>> x = torch.rand(32, 20, 10) # A batch of 32 sequences, each of length 20, with 10 features each
-            >>> model = DMMClassifier(...)
-            >>> logits = model.forward(x)
-            >>> probabilities = torch.nn.functional.softmax(logits, dim=1)
-            >>> predicted_classes = torch.argmax(probabilities, dim=1)
-            # predicted_classes now contains the most likely class for each instance in the batch
+        Returns
+        -------
+        torch.Tensor
+            A tensor with shape (batch_size, num_classes) representing the averaged logits for class probabilities
+            across the sequence for each batch instance. These logits are suitable for passing through a softmax
+            to obtain normalized probabilities.
 
-        Note:
-            The guide function must be defined and properly initialized in the class, as it is used to sample the
-            latent variables and the trace of the guide is used within this forward pass.
+        Examples
+        --------
+        >>> x = torch.rand(32, 20, 10)  # A batch of 32 sequences, each 20 time steps long with 10 features.
+        >>> model = DMMClassifier(...)
+        >>> logits = model.forward(x)
+        >>> probabilities = torch.nn.functional.softmax(logits, dim=1)
+        >>> predicted_classes = torch.argmax(probabilities, dim=1)
+        # predicted_classes contains the most probable class for each instance in the batch.
 
-            The emitter must also be defined and should represent a neural network module capable of
-            taking the latent variables `z_t` and input features `x` to produce the logits for class probabilities.
+        Notes
+        -----
+        - The `guide` function must be properly defined and initialized within the class as it is critical
+        for sampling the latent variables during the variational inference process.
+        - The `emitter` is a neural network module that takes as input the latent variables `z_t` and
+        the features `x` to generate the logits for class probabilities. This module should be
+        adequately defined and initialized to enable the forward computation.
         """
+
         preds = []
                 
         # Run the guide and capture the trace

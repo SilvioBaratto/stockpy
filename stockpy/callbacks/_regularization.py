@@ -9,7 +9,8 @@ __all__ = ['GradientNormClipping']
 
 
 class GradientNormClipping(Callback):
-    """Clips gradient norm of a module's parameters.
+    """
+    Clips gradient norm of a module's parameters.
 
     The norm is computed over all gradients together, as if they were
     concatenated into a single vector. Gradients are modified
@@ -19,16 +20,16 @@ class GradientNormClipping(Callback):
 
     Parameters
     ----------
-    gradient_clip_value : float (default=None)
+    gradient_clip_value : float, optional
       If not None, clip the norm of all model parameter gradients to this
       value. The type of the norm is determined by the
-      ``gradient_clip_norm_type`` parameter and defaults to L2.
+      ``gradient_clip_norm_type`` parameter and defaults to L2. Default is None.
 
-    gradient_clip_norm_type : float (default=2)
+    gradient_clip_norm_type : float or 'inf', optional
       Norm to use when gradient clipping is active. The default is
-      to use L2-norm. Can be 'inf' for infinity norm.
-
+      to use L2-norm. Can be 'inf' for infinity norm. Default is 2.
     """
+    
     def __init__(
             self,
             gradient_clip_value=None,

@@ -17,50 +17,59 @@ from stockpy.utils import flatten
 from stockpy.utils import is_pandas_ndframe
 from stockpy.utils import check_indexing
 from stockpy.utils import to_numpy
-import stockpy
 
 def _apply_to_data(data, func, unpack_dict=False):
     """
-    Apply a given function to the input data. It supports data in the form of mappings (like dictionaries),
-    lists, tuples, or a single value. If the input is a mapping and `unpack_dict` is True, 
-    it applies the function to the values of the dictionary.
+    Apply a given function to the input data.
 
-    Parameters:
-        data : Any
-            The input data on which to apply the function. This can be a mapping, list, tuple, or a single value.
-        func : Callable
-            The function to apply to the elements of `data`. This function must take a single argument and return a value.
-        unpack_dict : bool, optional
-            Determines whether to apply the function to the values of a mapping or not. If False, the function is applied
-            to the entire item (key-value pair). Default is False.
+    This function supports data in the form of mappings (like dictionaries),
+    lists, tuples, or a single value. If the input is a mapping and `unpack_dict` 
+    is True, it applies the function to the values of the dictionary.
 
-    Returns:
-        Any
-            The result of applying `func` to `data`. The return type matches the structure of `data`: 
-            if `data` is a dictionary, a dictionary is returned; if a list or tuple, a list is returned; 
-            otherwise, a single value is returned.
+    Parameters
+    ----------
+    data : Any
+        The input data on which to apply the function. This can be a mapping, 
+        list, tuple, or a single value.
+    func : Callable
+        The function to apply to the elements of `data`. This function must 
+        take a single argument and return a value.
+    unpack_dict : bool, optional
+        Determines whether to apply the function to the values of a mapping or 
+        not. If False, the function is applied to the entire item (key-value pair). 
+        Default is False.
 
-    Examples:
-        >>> data = {'a': 1, 'b': 2}
-        >>> func = lambda x: x * 2
-        >>> _apply_to_data(data, func)
-        {'a': 2, 'b': 4}
+    Returns
+    -------
+    Any
+        The result of applying `func` to `data`. The return type matches the 
+        structure of `data`: if `data` is a dictionary, a dictionary is returned; 
+        if a list or tuple, a list is returned; otherwise, a single value is returned.
 
-        >>> data = [1, 2, 3]
-        >>> _apply_to_data(data, func)
-        [2, 4, 6]
+    Examples
+    --------
+    >>> data = {'a': 1, 'b': 2}
+    >>> func = lambda x: x * 2
+    >>> _apply_to_data(data, func)
+    {'a': 2, 'b': 4}
 
-        >>> data = 5
-        >>> _apply_to_data(data, func)
-        10
+    >>> data = [1, 2, 3]
+    >>> _apply_to_data(data, func)
+    [2, 4, 6]
 
-        >>> data = {'a': [1, 2], 'b': [3, 4]}
-        >>> _apply_to_data(data, func, unpack_dict=True)
-        [[2, 4], [6, 8]]
+    >>> data = 5
+    >>> _apply_to_data(data, func)
+    10
 
-    Notes:
-        - If `data` is a list or tuple containing types that `func` cannot handle, a TypeError will be raised.
-        - The function does not apply `func` to the keys of a mapping.
+    >>> data = {'a': [1, 2], 'b': [3, 4]}
+    >>> _apply_to_data(data, func, unpack_dict=True)
+    [[2, 4], [6, 8]]
+
+    Notes
+    -----
+    - If `data` is a list or tuple containing types that `func` cannot handle, 
+      a TypeError will be raised.
+    - The function does not apply `func` to the keys of a mapping.
     """
     apply_ = partial(_apply_to_data, func=func, unpack_dict=unpack_dict)
 
@@ -85,23 +94,26 @@ def _is_sparse(x):
     and also checks if `x` has an attribute `is_sparse` which might be defined in
     custom sparse matrix classes.
 
-    Parameters:
-        x : Any
-            The input data to check.
+    Parameters
+    ----------
+    x : Any
+        The input data to check.
 
-    Returns:
-        bool
-            True if `x` is a sparse matrix, False otherwise.
+    Returns
+    -------
+    bool
+        True if `x` is a sparse matrix, False otherwise.
 
-    Examples:
-        >>> from scipy.sparse import csr_matrix
-        >>> x = csr_matrix([0, 1, 2])
-        >>> _is_sparse(x)
-        True
+    Examples
+    --------
+    >>> from scipy.sparse import csr_matrix
+    >>> x = csr_matrix([0, 1, 2])
+    >>> _is_sparse(x)
+    True
 
-        >>> x = [0, 1, 2]
-        >>> _is_sparse(x)
-        False
+    >>> x = [0, 1, 2]
+    >>> _is_sparse(x)
+    False
     """
     try:
         return sparse.issparse(x) or x.is_sparse
@@ -115,24 +127,27 @@ def _len(x):
     If the input data `x` is a sparse matrix, it returns the first dimension size,
     otherwise, it returns the length of `x`.
 
-    Parameters:
-        x : Any
-            The input data to get the length of. Can be a sparse matrix or any other
-            object that supports the `len` function.
+    Parameters
+    ----------
+    x : Any
+        The input data to get the length of. Can be a sparse matrix or any other
+        object that supports the `len` function.
 
-    Returns:
-        int
-            The length of the first dimension if `x` is sparse, or the length of `x`.
+    Returns
+    -------
+    int
+        The length of the first dimension if `x` is sparse, or the length of `x`.
 
-    Examples:
-        >>> from scipy.sparse import csr_matrix
-        >>> x = csr_matrix([[0, 1], [2, 3]])
-        >>> _len(x)
-        2
+    Examples
+    --------
+    >>> from scipy.sparse import csr_matrix
+    >>> x = csr_matrix([[0, 1], [2, 3]])
+    >>> _len(x)
+    2
 
-        >>> x = [0, 1, 2, 3]
-        >>> _len(x)
-        4
+    >>> x = [0, 1, 2, 3]
+    >>> _len(x)
+    4
     """
     if _is_sparse(x):
         return x.shape[0]
@@ -146,28 +161,32 @@ def get_len(data):
     batch encodings from Huggingface's tokenizers. It ensures that all elements in
     the dataset have the same length.
 
-    Parameters:
-        data : Mapping or other collections
-            The input data for which to determine the length. This can be a dictionary
-            that possibly includes a 'input_ids' key, which is common in Huggingface
-            BatchEncodings, or any other collection type.
+    Parameters
+    ----------
+    data : Mapping or other collections
+        The input data for which to determine the length. This can be a dictionary
+        that possibly includes a 'input_ids' key, which is common in Huggingface
+        BatchEncodings, or any other collection type.
 
-    Returns:
-        int
-            The consistent length of the dataset.
+    Returns
+    -------
+    int
+        The consistent length of the dataset.
 
-    Raises:
-        ValueError
-            If the elements of the dataset do not have the same length.
+    Raises
+    ------
+    ValueError
+        If the elements of the dataset do not have the same length.
 
-    Examples:
-        >>> data = {'input_ids': [[1, 2, 3], [4, 5, 6]], 'attention_mask': [[1, 1, 1], [1, 1, 1]]}
-        >>> get_len(data)
-        2
+    Examples
+    --------
+    >>> data = {'input_ids': [[1, 2, 3], [4, 5, 6]], 'attention_mask': [[1, 1, 1], [1, 1, 1]]}
+    >>> get_len(data)
+    2
 
-        >>> data = [[1, 2, 3], [4, 5, 6, 7]]
-        >>> get_len(data)
-        ValueError: Dataset does not have consistent lengths.
+    >>> data = [[1, 2, 3], [4, 5, 6, 7]]
+    >>> get_len(data)
+    ValueError: Dataset does not have consistent lengths.
     """
     if isinstance(data, Mapping) and (data.get('input_ids') is not None):
         # Special casing for Huggingface BatchEncodings
@@ -185,50 +204,41 @@ def get_len(data):
 class StockpyDataset(Dataset):
     """
     Custom dataset class for Stockpy designed to handle a variety of data types.
-    
+
     The `StockpyDataset` class extends PyTorch's `Dataset` class, providing a flexible
     dataset wrapper that supports inputs such as numpy arrays, PyTorch tensors, scipy
     sparse matrices, pandas dataframes, and their dictionary or list aggregations. It
     can handle cases where the target data may not be applicable, returning a dummy tensor
     for compatibility with PyTorch's `DataLoader`.
 
-    Attributes:
-        X : various
-            The input features; supported formats include numpy arrays, tensors, scipy sparse
-            matrices, pandas dataframes, and collections of these types.
-        y : various or None
-            The target labels or values; supports the same formats as `X`. If None, the dataset
-            yields a dummy tensor for `y`.
-        length : int
-            The total number of samples in the dataset. If not specified, it is inferred from `X`
-            and validated against `y` if `y` is provided.
+    Parameters
+    ----------
+    X : various
+        The input features; supported formats include numpy arrays, tensors, scipy sparse
+        matrices, pandas dataframes, and collections of these types.
+    y : various or None
+        The target labels or values; supports the same formats as `X`. If None, the dataset
+        yields a dummy tensor for `y`.
+    length : int, optional
+        The total number of samples in the dataset. If not specified, it is inferred from `X`
+        and validated against `y` if `y` is provided.
 
-    Methods:
-        __len__(self)
-            Returns the total number of samples in the dataset.
-        __getitem__(self, index)
-            Retrieves the input-target pair at the specified index in the dataset.
+    Methods
+    -------
+    __len__(self)
+        Returns the total number of samples in the dataset.
+    __getitem__(self, index)
+        Retrieves the input-target pair at the specified index in the dataset.
 
-    Raises:
-        ValueError
-            If `length` is not provided and the inferred lengths of `X` and `y` do not match.
-
+    Raises
+    ------
+    ValueError
+        If `length` is not provided and the inferred lengths of `X` and `y` do not match.
     """
 
     def __init__(self, X, y=None, length=None):
         """
         Initializes the `StockpyDataset`.
-
-        Parameters:
-            X : various types
-                The input features; supported formats include numpy arrays, tensors, scipy sparse
-                matrices, pandas dataframes, and collections of these types.
-            y : various types or None, optional
-                The target labels or values; supports the same formats as `X`. If None, a dummy tensor
-                is returned in its place during iteration.
-            length : int or None, optional
-                Manually specify the total number of samples in the dataset. If not provided, it is
-                inferred from `X`.
         """
 
         self.X = X
@@ -273,19 +283,21 @@ class StockpyDataset(Dataset):
         tensors and handles cases where the target `y` is None by providing a placeholder tensor. Override
         this method in subclasses to implement custom transformations.
 
-        Parameters:
-            X : various
-                The input data, which can be of any type supported by the dataset class, such as numpy arrays,
-                PyTorch tensors, or scipy sparse matrices.
-            y : various or None
-                The target data, which can be of the same types as `X`, or None. If None, a placeholder tensor
-                is used instead.
+        Parameters
+        ----------
+        X : various
+            The input data, which can be of any type supported by the dataset class, such as numpy arrays,
+            PyTorch tensors, or scipy sparse matrices.
+        y : various or None
+            The target data, which can be of the same types as `X`, or None. If None, a placeholder tensor
+            is used instead.
 
-        Returns:
-            tuple of torch.Tensor
-                The transformed `X` and `y`, ready for use in a PyTorch model. If `X` is a sparse matrix,
-                it is converted to a dense array first. If `y` is None, it is replaced with a tensor of a
-                single zero.
+        Returns
+        -------
+        tuple of torch.Tensor
+            The transformed `X` and `y`, ready for use in a PyTorch model. If `X` is a sparse matrix,
+            it is converted to a dense array first. If `y` is None, it is replaced with a tensor of a
+            single zero.
         """
         # DataLoader can't handle None, so we use a tensor with value 0 as a placeholder.
         y = torch.Tensor([0]) if y is None else y
@@ -305,55 +317,59 @@ class ValidSplit:
     utilities provided by scikit-learn. The class allows for simple train/validation
     splits as well as more complex strategies like k-folds.
 
-    Parameters:
-        cv : int, float, cross-validation generator, or iterable, default=5
-            Determines the cross-validation splitting strategy. Options include:
-            - None: Uses default 3-fold cross-validation.
-            - int: Specifies the number of folds in a (Stratified)KFold.
-            - float: Represents the proportion of the dataset to include in the 
-            validation split (ShuffleSplit strategy).
-            - An object to be used as a cross-validation generator.
-            - An iterable yielding train/test splits.
+    Parameters
+    ----------
+    cv : int, float, cross-validation generator, or iterable, default=5
+        Determines the cross-validation splitting strategy. Options include:
+        - None: Uses default 3-fold cross-validation.
+        - int: Specifies the number of folds in a (Stratified)KFold.
+        - float: Represents the proportion of the dataset to include in the 
+        validation split (ShuffleSplit strategy).
+        - An object to be used as a cross-validation generator.
+        - An iterable yielding train/test splits.
 
-        stratified : bool, default=False
-            Whether to use stratified splits. This is only applicable for binary or 
-            multiclass classification problems to ensure that each fold retains the 
-            percentage of samples for each class.
+    stratified : bool, default=False
+        Whether to use stratified splits. This is only applicable for binary or 
+        multiclass classification problems to ensure that each fold retains the 
+        percentage of samples for each class.
 
-        random_state : int, RandomState instance or None, default=None
-            Random state to control the randomness of the training/validation splits. 
-            This is only applicable when a float is passed to `cv`, signifying a 
-            ShuffleSplit strategy.
+    random_state : int, RandomState instance or None, default=None
+        Random state to control the randomness of the training/validation splits. 
+        This is only applicable when a float is passed to `cv`, signifying a 
+        ShuffleSplit strategy.
 
-    Attributes:
-        cv : int, float, cross-validation generator, or iterable
-            The cross-validation splitting strategy defined by the user.
+    Attributes
+    ----------
+    cv : int, float, cross-validation generator, or iterable
+        The cross-validation splitting strategy defined by the user.
 
-        stratified : bool
-            Indicates if the split should be stratified.
+    stratified : bool
+        Indicates if the split should be stratified.
 
-        random_state : int, RandomState instance, or None
-            The random seed for generating deterministic shuffling sequences. None
-            represents no fixed seed.
+    random_state : int, RandomState instance, or None
+        The random seed for generating deterministic shuffling sequences. None
+        represents no fixed seed.
 
-    Examples:
-        >>> from stockpy import ValidSplit
-        >>> X, y = np.arange(10).reshape((5, 2)), range(5)
-        >>> vs = ValidSplit(cv=2, stratified=False)
-        >>> for train_index, test_index in vs.split(X, y):
-        ...     print("TRAIN:", train_index, "TEST:", test_index)
-        TRAIN: [3 4] TEST: [0 1 2]
-        TRAIN: [0 1 2] TEST: [3 4]
+    Examples
+    --------
+    >>> from stockpy import ValidSplit
+    >>> X, y = np.arange(10).reshape((5, 2)), range(5)
+    >>> vs = ValidSplit(cv=2, stratified=False)
+    >>> for train_index, test_index in vs.split(X, y):
+    ...     print("TRAIN:", train_index, "TEST:", test_index)
+    TRAIN: [3 4] TEST: [0 1 2]
+    TRAIN: [0 1 2] TEST: [3 4]
 
-    Note:
-       This class uses only the first validation split. For models requiring
-       validation across multiple splits, an external cross-validation strategy
-       should be employed.
+    Notes
+    -----
+    This class uses only the first validation split. For models requiring
+    validation across multiple splits, an external cross-validation strategy
+    should be employed.
 
-    See Also:
-        sklearn.model_selection.KFold : K-Fold cross-validator.
-        sklearn.model_selection.ShuffleSplit : ShuffleSplit cross-validator.
-
+    See Also
+    --------
+    sklearn.model_selection.KFold : K-Fold cross-validator.
+    sklearn.model_selection.ShuffleSplit : ShuffleSplit cross-validator.
     """
 
     def __init__(
@@ -368,10 +384,6 @@ class ValidSplit:
         Stores the parameters as attributes for future use. Validates the cv
         parameter and ensures that random_state is only used when applicable.
 
-        Raises:
-            ValueError
-                If cv is a number less than 0 or if random_state is set while cv is 
-                not a float.
         """
 
         self.stratified = stratified  # Whether the split should be stratified
@@ -398,19 +410,23 @@ class ValidSplit:
         will ensure that each fold has the same proportion of observations with a given
         categorical target as the entire dataset.
 
-        Parameters:
-            cv : cross-validation generator or None
-                The cross-validation splitting strategy to check. This could be an instance
-                of `StratifiedKFold`, `StratifiedShuffleSplit`, or None if no strategy has
-                been defined.
+        Parameters
+        ----------
+        cv : cross-validation generator or None
+            The cross-validation splitting strategy to check. This could be an instance
+            of `StratifiedKFold`, `StratifiedShuffleSplit`, or None if no strategy has
+            been defined.
 
-        Returns:
-            bool
-                True if `cv` is an instance of `StratifiedKFold` or `StratifiedShuffleSplit`,
-                indicating that the cross-validation strategy is stratified. False otherwise.
-        Notes:
-            This method is designed for internal use to validate the `cv` parameter during
-            the initialization of the `ValidSplit` object. It is not intended for external use.
+        Returns
+        -------
+        bool
+            True if `cv` is an instance of `StratifiedKFold` or `StratifiedShuffleSplit`,
+            indicating that the cross-validation strategy is stratified. False otherwise.
+
+        Notes
+        -----
+        This method is designed for internal use to validate the `cv` parameter during
+        the initialization of the `ValidSplit` object. It is not intended for external use.
         """
         return isinstance(cv, (StratifiedKFold, StratifiedShuffleSplit))
 
@@ -423,18 +439,21 @@ class ValidSplit:
         useful for interpreting inputs that could be either the number of folds in
         cross-validation or a proportion of the dataset for a split.
 
-        Parameters:
-            x : Number or any
-                The input value to check.
+        Parameters
+        ----------
+        x : Number or any
+            The input value to check.
 
-        Returns:
-            bool
-                True if `x` is a non-integer float, False otherwise.
+        Returns
+        -------
+        bool
+            True if `x` is a non-integer float, False otherwise.
 
-        Notes:
-            This method is a utility function for internal validation of parameters and
-            is not intended for public use. It helps determine the nature of the `cv`
-            parameter in the `ValidSplit` class.
+        Notes
+        -----
+        This method is a utility function for internal validation of parameters and
+        is not intended for public use. It helps determine the nature of the `cv`
+        parameter in the `ValidSplit` class.
         """
         if not isinstance(x, Number):
             return False
@@ -449,20 +468,22 @@ class ValidSplit:
         based on whether the split should be stratified. The splitter is then used
         to generate train/test splits according to the proportion specified by `cv`.
 
-        Returns:
-            StratifiedShuffleSplit or ShuffleSplit
-                An instance of `StratifiedShuffleSplit` if `self.stratified` is True,
-                otherwise an instance of `ShuffleSplit`.
+        Returns
+        -------
+        StratifiedShuffleSplit or ShuffleSplit
+            An instance of `StratifiedShuffleSplit` if `self.stratified` is True,
+            otherwise an instance of `ShuffleSplit`.
 
-        Notes:
-            This method should only be used when `cv` is a float. It is responsible for
-            the internal logic of handling floating-point `cv` values and is not
-            intended for public use.
+        Notes
+        -----
+        This method should only be used when `cv` is a float. It is responsible for
+        the internal logic of handling floating-point `cv` values and is not
+        intended for public use.
         """
         cv_cls = StratifiedShuffleSplit if self.stratified else ShuffleSplit
         return cv_cls(test_size=self.cv, random_state=self.random_state)
 
-    def _check_cv_non_float(self, y):
+    def _check_cv_non_float(self, y=None):
         """
         Validates and converts the cv parameter into a cross-validator object when cv is not a float.
 
@@ -471,18 +492,21 @@ class ValidSplit:
         training and test splits. If `self.stratified` is True and the target `y` is provided, a stratified
         cross-validator will be used.
 
-        Parameters:
-            y : array-like, optional
-                The target variable array. Necessary if a stratified cross-validator is required.
+        Parameters
+        ----------
+        y : array-like, optional
+            The target variable array. Necessary if a stratified cross-validator is required.
 
-        Returns:
-            cross-validation generator
-                A cross-validator object that can be used to generate train/test splits.
+        Returns
+        -------
+        cross-validation generator
+            A cross-validator object that can be used to generate train/test splits.
 
-        Notes:
-            This method does not support float `cv` values. For floating-point values of `cv`, 
-            use the `_check_cv_float` method instead. The `y` parameter is only needed if `self.stratified` 
-            is True and stratification of splits is required.
+        Notes
+        -----
+        This method does not support float `cv` values. For floating-point values of `cv`, 
+        use the `_check_cv_float` method instead. The `y` parameter is only needed if `self.stratified` 
+        is True and stratification of splits is required.
         """
         return check_cv(
             self.cv,
@@ -499,19 +523,22 @@ class ValidSplit:
         specifying a K-fold strategy or another cross-validator. If `self.stratified` is True,
         it attempts to convert `y` into a numpy array format suitable for stratified splitting.
 
-        Parameters:
-            y : array-like or None, optional
-                The target labels. If provided and `self.stratified` is True, a stratified
-                cross-validator will be utilized, requiring `y` to perform the splits.
+        Parameters
+        ----------
+        y : array-like or None, optional
+            The target labels. If provided and `self.stratified` is True, a stratified
+            cross-validator will be utilized, requiring `y` to perform the splits.
 
-        Returns:
-            cross_validator : cross-validation generator
-                The cross-validation generator object that will be used to create train/test splits.
+        Returns
+        -------
+        cross-validation generator
+            The cross-validation generator object that will be used to create train/test splits.
 
-        Notes:
-            The method internally calls `_check_cv_float` if `cv` is a float, otherwise, it calls
-            `_check_cv_non_float`. If `self.stratified` is True and `y` cannot be converted to numpy format,
-            the original `y` will be used for stratification.
+        Notes
+        -----
+        The method internally calls `_check_cv_float` if `cv` is a float, otherwise, it calls
+        `_check_cv_non_float`. If `self.stratified` is True and `y` cannot be converted to numpy format,
+        the original `y` will be used for stratification.
         """
         y_arr = None
         if self.stratified:
@@ -535,14 +562,16 @@ class ValidSplit:
         verify that the input data can be processed without the need for special
         handling or conversions that are required for other data types.
 
-        Parameters:
-            x : various types
-                The input data to be checked.
+        Parameters
+        ----------
+        x : various types
+            The input data to be checked.
 
-        Returns:
-            bool
-                True if `x` is None, a NumPy array, or a pandas DataFrame/Series.
-                False otherwise.
+        Returns
+        -------
+        bool
+            True if `x` is None, a NumPy array, or a pandas DataFrame/Series.
+            False otherwise.
         """
         return (x is None) or isinstance(x, np.ndarray) or is_pandas_ndframe(x)
 
@@ -556,25 +585,28 @@ class ValidSplit:
         cross-validation generator is appropriate for stratified splits. It then
         generates the indices for the split and creates corresponding subsets.
 
-        Parameters:
-            dataset : Dataset
-                The complete dataset to be split.
-            y : array-like, optional
-                The target variable array. Required for stratified splits.
-            groups : array-like, optional
-                Group labels for the samples used while splitting the dataset into
-                train/test set.
+        Parameters
+        ----------
+        dataset : Dataset
+            The complete dataset to be split.
+        y : array-like, optional
+            The target variable array. Required for stratified splits.
+        groups : array-like, optional
+            Group labels for the samples used while splitting the dataset into
+            train/test set.
 
-        Returns:
-            tuple
-                A tuple (dataset_train, dataset_valid) where `dataset_train` is a
-                `Subset` of the original dataset used for training, and `dataset_valid`
-                is a `Subset` used for validation.
+        Returns
+        -------
+        tuple
+            A tuple (dataset_train, dataset_valid) where `dataset_train` is a
+            `Subset` of the original dataset used for training, and `dataset_valid`
+            is a `Subset` used for validation.
 
-        Raises:
-            ValueError
-                If `y` is not provided for a stratified split or if the lengths of
-                `dataset` and `y` do not match.
+        Raises
+        ------
+        ValueError
+            If `y` is not provided for a stratified split or if the lengths of
+            `dataset` and `y` do not match.
         """
 
         bad_y_error = ValueError(
@@ -605,14 +637,15 @@ class ValidSplit:
 
     def __repr__(self):
         """
-        Return a string representation of the ValidSplit object.
+        Returns a string representation of the ValidSplit object.
 
-        This representation includes the class name and its initialization parameters
-        for clarity and debugging purposes.
+        This method provides a human-readable representation of the `ValidSplit` object,
+        including the class name and its initialization parameters. This is useful for
+        clarity and debugging purposes.
 
-        Returns:
-            str
-                A string representation of the ValidSplit object.
-
+        Returns
+        -------
+        str
+            A string representation of the `ValidSplit` object.
         """
         return super(ValidSplit, self).__repr__()

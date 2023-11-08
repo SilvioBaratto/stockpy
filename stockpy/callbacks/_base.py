@@ -10,16 +10,24 @@ __all__ = ['Callback']
 
 
 class Callback:
-    """Base class for callbacks.
+    """
+    Base class for callbacks.
 
-    All custom callbacks should inherit from this class. The subclass
-    may override any of the ``on_...`` methods. It is, however, not
-    necessary to override all of them, since it's okay if they don't
-    have any effect.
+    All custom callbacks should inherit from this class. The subclass may override any of the ``on_...`` methods. 
+    It is, however, not necessary to override all of them, since it's okay if they don't have any effect.
 
-    Classes that inherit from this also gain the ``get_params`` and
-    ``set_params`` method.
+    Classes that inherit from this also gain the ``get_params`` and ``set_params`` method.
 
+    Methods
+    -------
+    get_params()
+        Get parameters for this callback.
+    set_params(**params)
+        Set parameters for this callback.
+
+    Notes
+    -----
+    Subclasses may override any of the ``on_...`` methods.
     """
     def initialize(self):
         """(Re-)Set the initial state of the callback. Use this

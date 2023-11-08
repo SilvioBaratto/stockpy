@@ -27,29 +27,33 @@ def filter_log_keys(keys, keys_ignored=None):
     in `keys_ignored`, keys ending with '_best', keys ending with '_batch_count', or 
     keys starting with 'event_' are excluded from the output.
 
-    Parameters:
-        keys : iterable of str
-            An iterable containing keys that are to be considered for filtering.
-        keys_ignored : iterable of str, optional
-            An additional set of keys that should be ignored during filtering. If None 
-            is given, no additional keys are ignored beyond the default criteria.
+    Parameters
+    ----------
+    keys : iterable of str
+        An iterable containing keys that are to be considered for filtering.
+    keys_ignored : iterable of str, optional
+        An additional set of keys that should be ignored during filtering. If None 
+        is given, no additional keys are ignored beyond the default criteria.
 
-    Yields:
-        str
-            Keys that are not to be ignored based on the filtering criteria.
+    Yields
+    ------
+    str
+        Keys that are not to be ignored based on the filtering criteria.
 
-    Examples:
-        >>> all_keys = ['loss', 'val_loss', 'epoch', 'event_on_batch_end', 'accuracy_best']
-        >>> list(filter_log_keys(all_keys))
-        ['loss', 'val_loss']
+    Examples
+    --------
+    >>> all_keys = ['loss', 'val_loss', 'epoch', 'event_on_batch_end', 'accuracy_best']
+    >>> list(filter_log_keys(all_keys))
+    ['loss', 'val_loss']
 
-        >>> list(filter_log_keys(all_keys, keys_ignored=['val_loss']))
-        ['loss']
+    >>> list(filter_log_keys(all_keys, keys_ignored=['val_loss']))
+    ['loss']
 
-    Notes:
-        The default keys ignored are epoch numbers, the best values of metrics, batch counts,
-        and any keys that begin with 'event_'. Additional keys to be ignored can be specified 
-        through the `keys_ignored` parameter.
+    Notes
+    -----
+    The default keys ignored are epoch numbers, the best values of metrics, batch counts,
+    and any keys that begin with 'event_'. Additional keys to be ignored can be specified 
+    through the `keys_ignored` parameter.
     """
 
     keys_ignored = keys_ignored or ()
@@ -70,30 +74,15 @@ class EpochTimer(Callback):
     This callback measures the time taken for each epoch during the model's training 
     process and records it into the history object under the key 'dur'.
 
-    Attributes:
-        epoch_start_time_ : float
-            The timestamp when the current epoch began. This is used to calculate the epoch
-            duration.
+    Attributes
+    ----------
+    epoch_start_time_ : float
+        The timestamp when the current epoch began. This is used to calculate the epoch
+        duration.
 
-    Examples:
-        >>> from skorch.callbacks import EpochTimer
-        >>> from skorch import NeuralNetClassifier
-        >>> from sklearn.datasets import make_classification
-        >>> from sklearn.model_selection import train_test_split
-        >>> from torch import nn
-
-        >>> X, y = make_classification(1000, 20, n_informative=10, random_state=0)
-        >>> X_train, X_test, y_train, y_test = train_test_split(X, y, random_state=0)
-        >>> class MyModule(nn.Module):
-        ...     # Define your module architecture here
-        ...     pass
-
-        >>> net = NeuralNetClassifier(MyModule, callbacks=[EpochTimer()])
-        >>> net.fit(X_train, y_train)
-        # Epoch timers will be automatically recorded.
-
-    Notes:
-        The duration is stored in seconds.
+    Notes
+    -----
+    The duration is stored in seconds.
     """
     def __init__(self, **kwargs):
         super(EpochTimer, self).__init__(**kwargs)
@@ -116,70 +105,40 @@ class PrintLog(Callback):
     the output from `EpochScoring` callbacks, which can create entries in the log
     that indicate the best values for specific metrics.
 
-    Parameters:
-        keys_ignored : str or list of str, optional
-            Keys from the log that should not be included in the printed table. This can
-            be a single string key or a list of string keys. Keys that start with 'event_'
-            or end with '_best' are automatically ignored, as they are handled
-            specially. The default value is None, which means no additional keys are
-            ignored beyond the defaults.
+    Parameters
+    ----------
+    keys_ignored : str or list of str, optional
+        Keys from the log that should not be included in the printed table. This can
+        be a single string key or a list of string keys. Keys that start with 'event_'
+        or end with '_best' are automatically ignored, as they are handled
+        specially. The default value is None, which means no additional keys are
+        ignored beyond the defaults.
+    sink : callable, optional
+        A callable that will receive the formatted table string. By default, this is
+        the print function, which will print the output to stdout. However, it could
+        also be a logging function or any other callable that accepts a single string
+        argument.
+    tablefmt : str, optional
+        The format specification for the table. This follows the conventions used by
+        the `tabulate` library. Examples include 'plain', 'grid', 'pipe', 'html',
+        'latex', and the default 'simple'.
+    floatfmt : str, optional
+        Format specification for floating-point numbers. This is a format string used
+        to control the output of floating-point numbers. The default is '.4f', which
+        rounds to four decimal places.
+    stralign : str, optional
+        Alignment of the columns containing string data. This can be 'left', 'center',
+        'right', or None (which will disable alignment). The default is 'right' to
+        align string columns to the right, matching the alignment of numeric columns.
 
-        sink : callable, optional
-            A callable that will receive the formatted table string. By default, this is
-            the print function, which will print the output to stdout. However, it could
-            also be a logging function or any other callable that accepts a single string
-            argument.
+    Notes
+    -----
+    By default, 'PrintLog' excludes keys with the 'event_' prefix and those ending
+    with '_best' from printing since they're handled specially. It also avoids
+    printing the 'batches' key by default.
 
-        tablefmt : str, optional
-            The format specification for the table. This follows the conventions used by
-            the `tabulate` library. Examples include 'plain', 'grid', 'pipe', 'html',
-            'latex', and the default 'simple'.
-
-        floatfmt : str, optional
-            Format specification for floating-point numbers. This is a format string used
-            to control the output of floating-point numbers. The default is '.4f', which
-            rounds to four decimal places.
-
-        stralign : str, optional
-            Alignment of the columns containing string data. This can be 'left', 'center',
-            'right', or None (which will disable alignment). The default is 'right' to
-            align string columns to the right, matching the alignment of numeric columns.
-
-    Examples:
-        >>> from skorch import NeuralNetClassifier
-        >>> from skorch.callbacks import PrintLog
-        >>> from skorch.callbacks import EpochScoring
-        >>> from sklearn.datasets import make_classification
-        >>> from torch import nn
-
-        # Create synthetic binary classification dataset
-        X, y = make_classification(1000, 20, n_informative=10, random_state=0)
-
-        # Define a simple PyTorch module
-        class MyModule(nn.Module):
-            # Define your module architecture here
-            pass
-
-        # Initialize NeuralNetClassifier with custom callbacks for logging and scoring
-        net = NeuralNetClassifier(
-            MyModule,
-            max_epochs=10,
-            callbacks=[
-                ('print_log', PrintLog()),
-                ('epoch_scoring', EpochScoring(scoring='accuracy', on_train=True)),
-            ]
-        )
-
-        # Fit model on the synthetic dataset
-        net.fit(X, y)
-
-    Notes:
-        By default, 'PrintLog' excludes keys with the 'event_' prefix and those ending
-        with '_best' from printing since they're handled specially. It also avoids
-        printing the 'batches' key by default.
-
-        'PrintLog' is sensitive to varying number of columns. For the best output,
-        the set of metrics should remain consistent across epochs.
+    'PrintLog' is sensitive to varying number of columns. For the best output,
+    the set of metrics should remain consistent across epochs.
     """
 
     def __init__(
@@ -207,9 +166,6 @@ class PrintLog(Callback):
         The `initialize` method is internally used by the callback mechanism and is not
         typically called manually by users.
 
-        Returns:
-            self : object
-                Returns the instance itself.
         """
 
         self.first_iteration_ = True
@@ -221,7 +177,7 @@ class PrintLog(Callback):
         self.keys_ignored_.add('batches')
         return self
 
-    def format_row(self, row, key, color):
+    def format_row(self, row: dict, key: str, color: Ansi) -> str:
         """
         Formats a single row entry for the log output based on the type of value.
 
@@ -231,22 +187,23 @@ class PrintLog(Callback):
         The method also adds color to the output if the value is the best one
         so far for a particular key.
 
-        Parameters:
-            row : dict
-                A dictionary representing one row of the history. Each key corresponds
-                to a column in the log table.
-            key : str
-                The key for which the corresponding value is to be formatted from the row.
-            color : Ansi
-                An instance of the Ansi class from the `colorama` package, providing the
-                ANSI escape sequence to add color to the output.
+        Parameters
+        ----------
+        row : dict
+            A dictionary representing one row of the history. Each key corresponds
+            to a column in the log table.
+        key : str
+            The key for which the corresponding value is to be formatted from the row.
+        color : Ansi
+            An instance of the Ansi class from the `colorama` package, providing the
+            ANSI escape sequence to add color to the output.
 
-        Returns:
-            str
-                The formatted string representation of the value to be logged. This can
-                be a simple string, a color-coded string, or an empty string for boolean
-                values that are False or None.
-
+        Returns
+        -------
+        str
+            The formatted string representation of the value to be logged. This can
+            be a simple string, a color-coded string, or an empty string for boolean
+            values that are False or None.
         """
         value = row[key]
 
@@ -275,15 +232,16 @@ class PrintLog(Callback):
         It also filters out keys that have been marked as ignored. The purpose is
         to create a consistent and easy-to-read logging output during training.
 
-        Parameters:
-            keys : list of str
-                The list of keys from the history to be sorted for display.
+        Parameters
+        ----------
+        keys : list of str
+            The list of keys from the history to be sorted for display.
 
-        Returns:
-            sorted_keys : list of str
-                The list of sorted keys after filtering and arranging according to the
-                desired order for the log output.
-
+        Returns
+        -------
+        list of str
+            The list of sorted keys after filtering and arranging according to the
+            desired order for the log output.
         """
         sorted_keys = []
 
@@ -307,7 +265,7 @@ class PrintLog(Callback):
 
         return sorted_keys
 
-    def _yield_keys_formatted(self, row):
+    def _yield_keys_formatted(self, row: dict):
         """
         Yields formatted key-value pairs for printing the log row.
 
@@ -316,15 +274,17 @@ class PrintLog(Callback):
         name (without 'event_' prefix, if present) and the formatted value string.
         Event keys are specially treated by removing the 'event_' prefix.
 
-        Parameters:
-            row : dict
-                A dictionary representing the log row where the key is the metric or
-                attribute name, and the value is the corresponding data to be logged.
+        Parameters
+        ----------
+        row : dict
+            A dictionary representing the log row where the key is the metric or
+            attribute name, and the value is the corresponding data to be logged.
 
-        Yields:
-            tuple of (str, str)
-                A tuple containing the cleaned key name and the formatted value string
-                ready for logging output.
+        Yields
+        ------
+        tuple of (str, str)
+            A tuple containing the cleaned key name and the formatted value string
+            ready for logging output.
         """
         # Use a color cycle to alternate colors for each key-value pair
         colors = cycle([color.value for color in Ansi if color != color.ENDC])
@@ -341,7 +301,7 @@ class PrintLog(Callback):
             # Yield the cleaned key and formatted value as a tuple
             yield key, formatted
 
-    def table(self, row):
+    def table(self, row: dict) -> str:
         """
         Create a formatted table from the log row data for printing.
 
@@ -350,15 +310,17 @@ class PrintLog(Callback):
         utilizes the `tabulate` library to create a table that is ready to be printed
         or logged.
 
-        Parameters:
-            row : dict
-                The log row from which the table is created. Each key-value pair in the
-                row corresponds to a column in the table.
+        Parameters
+        ----------
+        row : dict
+            The log row from which the table is created. Each key-value pair in the
+            row corresponds to a column in the table.
 
-        Returns:
-            str
-                A string representing the formatted table, ready to be output to the
-                configured `sink`.
+        Returns
+        -------
+        str
+            A string representing the formatted table, ready to be output to the
+            configured `sink`.
         """
         # Lists to hold the headers and the formatted rows
         headers = []
@@ -388,22 +350,24 @@ class PrintLog(Callback):
         if `verbose` is set to False and `sink` is the `print` function, it won't output
         anything, thus suppressing the output.
 
-        Parameters:
-            text : str
-                The text to be output.
-            verbose : bool
-                Flag indicating whether verbose output is enabled. If True, the text will
-                always be output; if False, the text will only be output if `sink` is not
-                the `print` function.
+        Parameters
+        ----------
+        text : str
+            The text to be output.
+        verbose : bool
+            Flag indicating whether verbose output is enabled. If True, the text will
+            always be output; if False, the text will only be output if `sink` is not
+            the `print` function.
 
-        Notes:
-            - This design allows the user to route the callback's output to a logger or
-            other output streams easily without changing the verbosity of other parts
-            of the code that use the standard `print` function.
-            - It's important to note that setting `verbose=False` will only suppress
-            output if the `sink` is `print`. If `sink` is a different callable, the
-            output will happen regardless of the `verbose` flag, which allows for
-            silent operation with logging.
+        Notes
+        -----
+        - This design allows the user to route the callback's output to a logger or
+        other output streams easily without changing the verbosity of other parts
+        of the code that use the standard `print` function.
+        - It's important to note that setting `verbose=False` will only suppress
+        output if the `sink` is `print`. If `sink` is a different callable, the
+        output will happen regardless of the `verbose` flag, which allows for
+        silent operation with logging.
         """
         # Check if the sink is not the print function or if verbose output is enabled
         if (self.sink is not print) or verbose:
@@ -421,21 +385,23 @@ class PrintLog(Callback):
         which is useful for real-time monitoring in environments where the stdout
         buffer might delay the display of the results.
 
-        Parameters:
-            net : skorch.NeuralNet
-                The neural network instance.
-            **kwargs : dict
-                Additional arguments passed to the callback. Not used in this method.
+        Parameters
+        ----------
+        net : nn.Module or PyroModule
+            The neural network instance.
+        **kwargs : dict
+            Additional arguments passed to the callback. Not used in this method.
 
-        Notes:
-            - The `tabulate` package is used to format the results into a table.
-            - This method updates the `first_iteration_` flag to False after the first
-            call to prevent the header from being printed multiple times.
-            - The `PrintLog` callback flushes the stdout buffer if `sink` is `print` to
-            ensure that the output is not delayed when printed to the console.
-            - `pylint: disable=unused-argument` is used to ignore the unused `kwargs`
-            parameter warning since it's a common pattern in callback definitions to
-            accept and not use additional keyword arguments.
+        Notes
+        -----
+        - The `tabulate` package is used to format the results into a table.
+        - This method updates the `first_iteration_` flag to False after the first
+        call to prevent the header from being printed multiple times.
+        - The `PrintLog` callback flushes the stdout buffer if `sink` is `print` to
+        ensure that the output is not delayed when printed to the console.
+        - `pylint: disable=unused-argument` is used to ignore the unused `kwargs`
+        parameter warning since it's a common pattern in callback definitions to
+        accept and not use additional keyword arguments.
         """
         # Retrieve the latest epoch data from history
         data = net.history[-1]  

@@ -5,32 +5,50 @@ from stockpy.utils import get_activation_function
 
 class Transition(nn.Module):
     """
-    The `Transition` module defines the Gaussian latent transition probability 
-    `p(z_t | z_{t-1}, x_t)`. This probability models the evolution of the latent
-    state `z_t` at time `t` given the previous latent state `z_{t-1}` and an additional
-    input `x_t`. It is used in sequential models where the state transitions are 
-    probabilistic and potentially influenced by external inputs.
+    Define Gaussian latent transition probabilities in sequential models.
 
-    The model combines learned gates and proposed means to compute the mean (`loc`) 
-    and scale of the Gaussian distribution that defines the transition dynamics.
+    This module is used to model the evolution of the latent state `z_t` at time `t`,
+    considering the previous latent state `z_{t-1}` and an external input `x_t`.
 
-    Attributes:
-        lin_gate_z_to_hidden (nn.Linear): Transformation from `z_{t-1}` to gate's hidden layer.
-        lin_gate_x_to_hidden (nn.Linear): Transformation from `x_t` to gate's hidden layer.
-        lin_gate_hidden_to_z (nn.Linear): Transformation from gate's hidden layer to gate values.
-        lin_proposed_mean_z_to_hidden (nn.Linear): Transformation from `z_{t-1}` to proposed mean's hidden layer.
-        lin_proposed_mean_x_to_hidden (nn.Linear): Transformation from `x_t` to proposed mean's hidden layer.
-        lin_proposed_mean_hidden_to_z (nn.Linear): Transformation from proposed mean's hidden layer to mean values.
-        lin_sig (nn.Linear): Transformation for computing the scale parameter.
-        lin_z_to_loc (nn.Linear): Direct transformation from `z_{t-1}` to location parameter.
-        lin_x_to_loc (nn.Linear): Direct transformation from `x_t` to location parameter.
-        relu (nn.ReLU): Activation function used for non-linearity.
-        softplus (nn.Softplus): Activation function to ensure the scale is positive.
-    
-    Args:
-        z_dim (int): Dimensionality of the latent state `z_t`.
-        input_dim (int): Dimensionality of the input `x_t`.
-        transition_dim (int): Dimensionality of the hidden layer for transformation.
+    Attributes
+    ----------
+    lin_gate_z_to_hidden : nn.Linear
+        Learns the transformation from `z_{t-1}` to the gate's hidden layer.
+    lin_gate_x_to_hidden : nn.Linear
+        Learns the transformation from `x_t` to the gate's hidden layer.
+    lin_gate_hidden_to_z : nn.Linear
+        Learns the transformation from the gate's hidden layer to the gate values.
+    lin_proposed_mean_z_to_hidden : nn.Linear
+        Learns the transformation from `z_{t-1}` to the proposed mean's hidden layer.
+    lin_proposed_mean_x_to_hidden : nn.Linear
+        Learns the transformation from `x_t` to the proposed mean's hidden layer.
+    lin_proposed_mean_hidden_to_z : nn.Linear
+        Learns the transformation from the proposed mean's hidden layer to the mean values.
+    lin_sig : nn.Linear
+        Computes the scale parameter.
+    lin_z_to_loc : nn.Linear
+        Directly transforms `z_{t-1}` to the location parameter.
+    lin_x_to_loc : nn.Linear
+        Directly transforms `x_t` to the location parameter.
+    relu : nn.ReLU
+        Applies a rectified linear unit activation function.
+    softplus : nn.Softplus
+        Applies the softplus function to ensure the scale parameter is positive.
+
+    Parameters
+    ----------
+    z_dim : int
+        The size of the latent state `z_t`.
+    input_dim : int
+        The size of the input `x_t`.
+    transition_dim : int
+        The size of the hidden layer for the transformations.
+
+    Notes
+    -----
+    The transition dynamics are defined by a Gaussian distribution with a mean (location) and
+    scale (variance) that are computed through learned transformations involving the current input
+    and the previous latent state.
     """
 
     def __init__(self, z_dim: int, input_dim: int, transition_dim: int):
@@ -60,20 +78,25 @@ class Transition(nn.Module):
         self.relu = nn.ReLU()
         self.softplus = nn.Softplus()
 
-    def forward(self, z_t_1: torch.Tensor, x_t: torch.Tensor) -> tuple:
+    def forward(self, z_t_1: torch.Tensor, x_t: torch.Tensor):
         """
         The forward pass for the `Transition` module computes the mean (`loc`) and scale 
         for the Gaussian distribution governing the transition of latent states. This 
         includes a gating mechanism to blend between the previous state and a proposed 
         new state based on the input.
 
-        Args:
-            z_t_1 (torch.Tensor): The latent state at time `t-1`.
-            x_t (torch.Tensor): The input at time `t`.
+        Parameters
+        ----------
+        z_t_1 : torch.Tensor
+            The latent state at time `t-1`.
+        x_t : torch.Tensor
+            The input at time `t`.
 
-        Returns:
-            tuple: A tuple containing the location (`loc`) and scale parameters for the 
-                   Gaussian distribution of `z_t`.
+        Returns
+        -------
+        tuple
+            A tuple containing the location (`loc`) and scale parameters for the Gaussian
+            distribution of `z_t`.
         """
         # Gate computation
         _gate_z = self.relu(self.lin_gate_z_to_hidden(z_t_1))

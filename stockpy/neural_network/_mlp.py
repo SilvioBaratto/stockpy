@@ -5,15 +5,19 @@ from stockpy.base import Regressor
 from stockpy.base import Classifier 
 from stockpy.utils import get_activation_function
 
+__all__ =  ['MLPClassifier', 'MLPRegressor']
+
 class MLP(nn.Module):
 
-    """
-    Multilayer Perceptron (MLP) class.
+    class MLP:
+        """
+        Multilayer Perceptron (MLP) class.
 
-    This class defines a basic feedforward neural network with configurable
-    number of hidden layers, dropout rate, activation function, and bias term.
+        This class defines a basic feedforward neural network with configurable
+        number of hidden layers, dropout rate, activation function, and bias term.
 
-    Parameters:
+        Parameters
+        ----------
         hidden_size : int or list of int, optional
             The size of each hidden layer. If an int is provided, it is treated as
             the size for a single hidden layer. If a list is provided, each element
@@ -28,7 +32,8 @@ class MLP(nn.Module):
         **kwargs
             Arbitrary keyword arguments which could be used by subclasses or in method calls.
 
-    Attributes:
+        Attributes
+        ----------
         hidden_sizes : list of int
             Stores the size of each hidden layer after processing the input argument.
         output_size : int
@@ -37,8 +42,7 @@ class MLP(nn.Module):
             The loss function used for training the network, specific to the type of task.
         layers : torch.nn.Sequential
             The actual neural network layers stored in a sequential container.
-
-    """
+        """
 
     def __init__(self,
                  hidden_size=32,
@@ -65,9 +69,6 @@ class MLP(nn.Module):
         The initialization of the layers is based on the input size (number of features) and the
         specified architecture of the network (number of hidden layers and their sizes).
 
-        Raises:
-            AttributeError
-                If the object doesn't have 'n_classes_' or 'n_outputs_' attributes when instantiated as a Classifier or Regressor.
         """
         # Checks if hidden_sizes is a single integer and, if so, converts it to a list
         if isinstance(self.hidden_size, int):
@@ -107,29 +108,32 @@ class MLPClassifier(Classifier, MLP):
     This class is a type of neural network specifically designed for classification tasks. 
     It uses a softmax layer as the final layer to obtain probabilities for the classification classes.
 
-    Parameters:
-        hidden_size : int or list of int, optional
-            The size of each hidden layer in the MLP. By default, a single hidden layer with 32 units.
-        dropout : float, optional
-            The dropout rate used for regularization to prevent overfitting. By default, 0.2.
-        activation : str, optional
-            The activation function for the hidden layers. By default, 'relu'.
-        bias : bool, optional
-            Indicates whether or not to use bias terms in the layers. By default, True.
-        **kwargs
-            Additional keyword arguments for the base Classifier class.
+    Parameters
+    ----------
+    hidden_size : int or list of int, optional
+        The size of each hidden layer in the MLP. By default, a single hidden layer with 32 units.
+    dropout : float, optional
+        The dropout rate used for regularization to prevent overfitting. By default, 0.2.
+    activation : str, optional
+        The activation function for the hidden layers. By default, 'relu'.
+    bias : bool, optional
+        Indicates whether or not to use bias terms in the layers. By default, True.
+    **kwargs
+        Additional keyword arguments for the base Classifier class.
 
-    Attributes:
-        Inherits all attributes from the MLP and Classifier classes.
+    Attributes
+    ----------
+    Inherits all attributes from the MLP and Classifier classes.
 
-    Methods:
-        forward(x)
-            Defines the forward pass of the classifier.
+    Raises
+    ------
+    RuntimeError
+        If the `forward` method is called before the model is fitted.
 
-    Raises:
-        RuntimeError
-            If the `forward` method is called before the model is fitted.
-
+    Methods
+    -------
+    forward(x)
+        Defines the forward pass of the classifier.
     """
 
     def __init__(self,
@@ -162,19 +166,21 @@ class MLPClassifier(Classifier, MLP):
         and applies the softmax function to the final layer to get the probabilities
         for each class.
 
-        Parameters:
-            x : torch.Tensor
-                The input tensor containing the features.
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor containing the features.
 
-        Returns:
-            torch.Tensor
-                The output tensor after the softmax layer, representing the probability
-                distribution over the target classes.
+        Returns
+        -------
+        torch.Tensor
+            The output tensor after the softmax layer, representing the probability
+            distribution over the target classes.
 
-        Raises:
-            RuntimeError
-                If the model has not been fitted yet (i.e., `fit` method not called).
-
+        Raises
+        ------
+        RuntimeError
+            If the model has not been fitted yet (i.e., `fit` method not called).
         """
         # Ensures the model has been fitted before making predictions
         if self.layers is None:
@@ -185,37 +191,39 @@ class MLPClassifier(Classifier, MLP):
         return x
     
 class MLPRegressor(Regressor, MLP):
-
     """
     MLPRegressor is a multi-layer perceptron for regression tasks.
 
     It predicts continuous values by using a neural network model without a softmax layer,
     unlike its classification counterpart.
 
-    Parameters:
-        hidden_size : int or list of int, optional
-            The size of each hidden layer in the MLP. If it is an integer, it is the size of a single hidden layer;
-            if it is a list, each element is the size of a layer. By default, it is a single layer with 32 units.
-        dropout : float, optional
-            The dropout rate for regularization to reduce overfitting. By default, 0.2.
-        activation : str, optional
-            The activation function to use for the hidden layers. By default, 'relu'.
-        bias : bool, optional
-            If True, layers will use bias terms. By default, True.
-        **kwargs
-            Additional keyword arguments inherited from the base Regressor class.
+    Parameters
+    ----------
+    hidden_size : int or list of int, optional
+        The size of each hidden layer in the MLP. If it is an integer, it is the size of a single hidden layer;
+        if it is a list, each element is the size of a layer. By default, it is a single layer with 32 units.
+    dropout : float, optional
+        The dropout rate for regularization to reduce overfitting. By default, 0.2.
+    activation : str, optional
+        The activation function to use for the hidden layers. By default, 'relu'.
+    bias : bool, optional
+        If True, layers will use bias terms. By default, True.
+    **kwargs
+        Additional keyword arguments inherited from the base Regressor class.
 
-    Attributes:
-        Inherits all attributes from the MLP and Regressor classes.
+    Attributes
+    ----------
+    Inherits all attributes from the MLP and Regressor classes.
 
-    Methods:
-        forward(x)
-            Defines the forward propagation of the regression model.
+    Raises
+    ------
+    RuntimeError
+        If the `forward` method is invoked before the model has been fitted.
 
-    Raises:
-        RuntimeError
-            If the `forward` method is invoked before the model has been fitted.
-
+    Methods
+    -------
+    forward(x)
+        Defines the forward propagation of the regression model.
     """
 
     def __init__(self,
@@ -246,18 +254,20 @@ class MLPRegressor(Regressor, MLP):
 
         Processes the input tensor `x` through the neural network layers to predict continuous values.
 
-        Parameters:
-            x : torch.Tensor
-                The input tensor containing the features for regression.
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor containing the features for regression.
 
-        Returns:
-            torch.Tensor
-                The output tensor from the final layer of the neural network, representing the predicted values.
+        Returns
+        -------
+        torch.Tensor
+            The output tensor from the final layer of the neural network, representing the predicted values.
 
-        Raises:
-            RuntimeError
-                If the model has not been fitted yet (i.e., `fit` method not called).
-
+        Raises
+        ------
+        RuntimeError
+            If the model has not been fitted yet (i.e., `fit` method not called).
         """
         # Ensures the model has been fitted before making predictions
         if self.layers is None:

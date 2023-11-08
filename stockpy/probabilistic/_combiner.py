@@ -2,28 +2,44 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from stockpy.utils import get_activation_function
-
 class Combiner(nn.Module):
     """
-    The `Combiner` class parameterizes the variational distribution `q(z_t | z_{t-1}, x_{t:T})`,
-    where `z_t` represents the latent variable at time `t`, and `x_{t:T}` is the sequence
-    of observations from time `t` to `T`. It serves as a building block of the guide in variational
-    inference, especially within the context of sequential or time-series models.
+    Parameterizes the variational distribution q(z_t | z_{t-1}, x_{t:T}).
 
-    Attributes:
-        lin_z_to_hidden (nn.Linear): A linear transformation that maps the latent space
-            at `t-1` to the hidden state dimension.
-        lin_hidden_to_loc (nn.Linear): A linear transformation that maps the hidden state
-            to the location (mean) parameter of the latent space at `t`.
-        lin_hidden_to_scale (nn.Linear): A linear transformation that maps the hidden state
-            to the scale (standard deviation) parameter of the latent space at `t`.
-        tanh (nn.Tanh): The hyperbolic tangent non-linearity.
-        softplus (nn.Softplus): The softplus non-linearity, ensuring the scale parameter is positive.
+    This module maps the input and previous latent state to the parameters of the 
+    current latent state's distribution, facilitating backpropagation through time 
+    in variational autoencoders applied to time-series data.
 
-    Args:
-        z_dim (int): The dimensionality of the latent space `z`.
-        rnn_dim (int): The dimensionality of the RNN's hidden state.
+    Parameters
+    ----------
+    z_dim : int
+        Dimensionality of the latent variable at each time step.
+    rnn_dim : int
+        Dimensionality of the hidden state in the RNN.
+
+    Attributes
+    ----------
+    lin_z_to_hidden : torch.nn.Linear
+        Linear layer mapping the latent state at `t-1` to the hidden state dimension.
+    lin_hidden_to_loc : torch.nn.Linear
+        Linear layer mapping the hidden state to the location (mean) parameter of 
+        the latent space at `t`.
+    lin_hidden_to_scale : torch.nn.Linear
+        Linear layer mapping the hidden state to the scale (standard deviation) parameter 
+        of the latent space at `t`.
+    tanh : torch.nn.Tanh
+        The hyperbolic tangent non-linearity.
+    softplus : torch.nn.Softplus
+        The softplus non-linearity, which ensures the scale parameter is positive.
+
+    Notes
+    -----
+    - This class is often used in the construction of the guide for variational 
+      inference in time-series models, where it is important to capture the 
+      temporal dynamics of the latent variables.
+    - The attributes represent neural network components that are responsible for 
+      the variational distribution's parameters at each time step, which are 
+      optimized during training.
     """
 
     def __init__(self, z_dim: int, rnn_dim: int):
@@ -37,23 +53,34 @@ class Combiner(nn.Module):
         self.tanh = nn.Tanh()
         self.softplus = nn.Softplus()
 
-    def forward(self, z_t_1: torch.Tensor, h_rnn: torch.Tensor):
+    def forward(self, z_t_1, h_rnn):
         """
-        Defines the forward pass of the Combiner.
+        Perform the forward pass to compute the parameters of the Gaussian variational distribution 
+        for the latent variable at time t.
 
-        Given the latent variable `z` at time `t-1` and the hidden state `h_rnn` of an RNN
-        conditioned on observations `x_{t:T}`, this method computes the parameters (mean and scale)
-        of the Gaussian distribution `q(z_t | z_{t-1}, x_{t:T})`.
+        Parameters
+        ----------
+        z_t_1 : torch.Tensor
+            The latent variable from the previous time step (t-1).
+        h_rnn : torch.Tensor
+            The RNN hidden state that encapsulates information from the current and all future observations.
 
-        Args:
-            z_t_1 (torch.Tensor): The latent variable at time `t-1`.
-            h_rnn (torch.Tensor): The hidden state of the RNN which encodes `x_{t:T}`.
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            A tuple containing two tensors: 
+            - The first tensor is the location (mean) parameter of the distribution for z_t.
+            - The second tensor is the scale (standard deviation) parameter of the distribution for z_t.
 
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: A tuple containing the location (mean) and
-            scale (standard deviation) parameters of the variational distribution for the latent
-            variable `z_t`.
+        Notes
+        -----
+        - The forward pass uses the previous latent state and the current hidden state to produce 
+        the parameters for the current latent state's distribution.
+        - It assumes that both `z_t_1` and `h_rnn` are outputs of appropriate dimensionality, 
+        consistent with `z_dim` and `rnn_dim` specified during initialization.
+        - The computed scale parameters are constrained to be positive using the softplus function.
         """
+
         # Process the input latent variable through a non-linearity after linear transformation.
         h_latent = self.tanh(self.lin_z_to_hidden(z_t_1))
         

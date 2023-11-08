@@ -1,48 +1,51 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
+
 from stockpy.base import Regressor
 from stockpy.base import Classifier 
 from stockpy.utils import get_activation_function
 
-class GRU(nn.Module):
+__all__ = ['GRUClassifier', 'GRURegressor']
 
+class GRU(nn.Module):
     """
     Gated Recurrent Unit (GRU) based Recurrent Neural Network for sequence processing tasks.
 
     The GRU is capable of capturing dependencies in sequential data and is widely used in time-series analysis,
     natural language processing, and other domains where sequence data is prevalent.
 
-    Parameters:
-        rnn_size : int
-            The number of features in the hidden state `h` of the GRU cells and the dimensionality of the output feature space.
-        hidden_size : int or list of int
-            The size of each hidden layer in the fully connected feedforward network that follows the GRU layers.
-            If an int is provided, it specifies a single hidden layer size; a list specifies the size of each layer.
-        num_layers : int
-            The number of GRU layers to stack. More layers can capture more complex dependencies but also increase computational complexity.
-        dropout : float
-            Dropout rate applied to the GRU layers (if `num_layers` > 1) and the subsequent fully connected layers for regularization.
-        activation : str
-            The type of activation function to apply after each fully connected layer except the output layer. Common options are 'relu', 'tanh', etc.
-        bias : bool
-            Indicates whether or not to include bias terms in the GRU cells and fully connected layers.
-        seq_len : int
-            The length of the input sequences.
-        **kwargs
-            Arbitrary keyword arguments for additional configuration or for use by the `nn.Module` base class.
+    Parameters
+    ----------
+    rnn_size : int
+        The number of features in the hidden state `h` of the GRU cells and the dimensionality of the output feature space.
+    hidden_size : int or list of int
+        The size of each hidden layer in the fully connected feedforward network that follows the GRU layers.
+        If an int is provided, it specifies a single hidden layer size; a list specifies the size of each layer.
+    num_layers : int
+        The number of GRU layers to stack. More layers can capture more complex dependencies but also increase computational complexity.
+    dropout : float
+        Dropout rate applied to the GRU layers (if `num_layers` > 1) and the subsequent fully connected layers for regularization.
+    activation : str
+        The type of activation function to apply after each fully connected layer except the output layer. Common options are 'relu', 'tanh', etc.
+    bias : bool
+        Indicates whether or not to include bias terms in the GRU cells and fully connected layers.
+    seq_len : int
+        The length of the input sequences.
+    **kwargs
+        Arbitrary keyword arguments for additional configuration or for use by the `nn.Module` base class.
 
-    Attributes:
-        GRU : torch.nn.GRU
-            The GRU layer that processes input sequences and outputs a sequence or a final hidden state.
-        layers : torch.nn.Sequential
-            A sequence of fully connected layers that follows the GRU layer for further processing or for generating the output.
+    Attributes
+    ----------
+    GRU : torch.nn.GRU
+        The GRU layer that processes input sequences and outputs a sequence or a final hidden state.
+    layers : torch.nn.Sequential
+        A sequence of fully connected layers that follows the GRU layer for further processing or for generating the output.
 
-    Methods:
-        initialize_module(self)
-            Initializes the GRU and fully connected layers. Typically, this would include setting up the weights and biases for the layers.
-
+    Methods
+    -------
+    initialize_module(self)
+        Initializes the GRU and fully connected layers. Typically, this would include setting up the weights and biases for the layers.
     """
 
     def __init__(self,
@@ -82,9 +85,6 @@ class GRU(nn.Module):
         The method automatically determines the output size based on whether the model instance is for classification
         or regression, derived from `Classifier` or `Regressor`.
 
-        Raises:
-            AttributeError
-                If the model does not have `n_features_in_` set, indicating the number of features in the input data.
         """
 
         # Checks if hidden_sizes is a single integer and, if so, converts it to a list
@@ -133,34 +133,42 @@ class GRUClassifier(Classifier, GRU):
     sequential data. It is tailored for sequence classification, making it suitable for tasks such as time series 
     classification, text categorization, and more.
 
-    Attributes (inherited):
-        rnn_size : int
-            The number of features in the hidden state `h` of each GRU layer.
-        hidden_size : int or list of int
-            The number of features in the hidden layer(s) of the classifier. Can be a list to specify the size of each layer.
-        num_layers : int
-            The number of stacked GRU layers.
-        dropout : float
-            The dropout probability for the dropout layers in the classifier.
-        activation : str
-            The activation function for the hidden layers.
-        bias : bool
-            Whether to use bias terms in the GRU and linear layers.
-        seq_len : int
-            The length of the input sequences.
+    Parameters
+    ----------
+    rnn_size : int
+        The number of features in the hidden state `h` of each GRU layer.
+    hidden_size : int or list of int
+        The number of features in the hidden layer(s) of the classifier. Can be a list to specify the size of each layer.
+    num_layers : int
+        The number of stacked GRU layers.
+    dropout : float
+        The dropout probability for the dropout layers in the classifier.
+    activation : str
+        The activation function for the hidden layers.
+    bias : bool
+        Whether to use bias terms in the GRU and linear layers.
+    seq_len : int
+        The length of the input sequences.
+    **kwargs : dict, optional
+        Additional arguments passed to the `Classifier` and `GRU` base classes.
 
-    Methods:
-        __init__(...)
-            Constructor for `GRUClassifier` which initializes the base GRU structure and classification specific layers.
+    Attributes
+    ----------
+    Inherits all attributes from the `Classifier` and `GRU` classes.
 
-        forward(x)
-            Defines the forward pass of the model.
+    Methods
+    -------
+    forward(x)
+        Defines the forward pass of the model.
 
-    Raises:
-        RuntimeError
-            If the forward pass is called before the model is properly configured.
+    Raises
+    ------
+    RuntimeError
+        If the forward pass is called before the model is properly configured.
 
-    Note: The rest of the methods from `Classifier` and `GRU` are inherited.
+    Note
+    ----
+    The rest of the methods from `Classifier` and `GRU` are inherited.
     """
 
     def __init__(self,
@@ -178,23 +186,6 @@ class GRUClassifier(Classifier, GRU):
         Calls the constructor of `Classifier` and `GRU` to set up the necessary parameters and structures for a
         GRU-based classification model.
 
-        Parameters:
-            rnn_size : int, optional
-                The number of features in the hidden state `h` of each GRU layer (default is 32).
-            hidden_size : int or list of int, optional
-                The size of each hidden layer. Can be a single integer or a list of integers (default is 32).
-            num_layers : int, optional
-                The number of GRU layers to stack (default is 1).
-            dropout : float, optional
-                Dropout probability for regularization (default is 0.2).
-            activation : str, optional
-                Type of activation function to use (default is 'relu').
-            bias : bool, optional
-                Whether to use bias terms (default is True).
-            seq_len : int, optional
-                Length of the input sequence (default is 20).
-            **kwargs : dict, optional
-                Additional keyword arguments for the `Classifier` initialization.
         """
 
         Classifier.__init__(self, **kwargs)
@@ -211,7 +202,7 @@ class GRUClassifier(Classifier, GRU):
 
         self.criterion = nn.NLLLoss()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Defines the forward pass of the classifier.
 
@@ -219,22 +210,24 @@ class GRUClassifier(Classifier, GRU):
         fed into the fully connected layers. The final output is passed through a softmax layer to obtain 
         the classification probabilities.
 
-        Parameters:
-            x : torch.Tensor
-                The input tensor containing the features of shape (batch_size, seq_len, features).
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor containing the features of shape (batch_size, seq_len, features).
 
-        Returns:
-            torch.Tensor
-                The output tensor containing the class probabilities of shape (batch_size, num_classes).
+        Returns
+        -------
+        torch.Tensor
+            The output tensor containing the class probabilities of shape (batch_size, num_classes).
 
-        Raises:
-            RuntimeError
-                If the input tensor `x` does not have the correct shape or type.
-
+        Raises
+        ------
+        RuntimeError
+            If the input tensor `x` does not have the correct shape or type.
         """
 
         # Initializing the initial hidden state for GRU layers with zeros
-        h_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.rnn_size))
+        h_0 = torch.zeros(self.num_layers, x.size(0), self.rnn_size, requires_grad=True)
 
         # Passing the input and initial hidden state through the GRU layers
         # The GRU returns the output for each time step as well as the last hidden state
@@ -250,41 +243,48 @@ class GRUClassifier(Classifier, GRU):
         return out
 
 class GRURegressor(Regressor, GRU):
-
     """
     A regressor that uses a Gated Recurrent Unit (GRU) network for sequence regressions tasks.
 
     The `GRURegressor` extends both `Regressor` and `GRU` classes, leveraging the GRU capabilities for sequence 
     processing and applying it to regression problems.
 
-    Attributes (inherited):
-        rnn_size : int
-            The number of features in the hidden state `h` of each GRU layer.
-        hidden_size : int or list of int
-            The number of features in the hidden layer(s) of the regressor. Can be a list to specify the size of each layer.
-        num_layers : int
-            The number of stacked GRU layers.
-        dropout : float
-            The dropout probability for the dropout layers in the regressor.
-        activation : str
-            The activation function for the hidden layers.
-        bias : bool
-            Whether to use bias terms in the GRU and linear layers.
-        seq_len : int
-            The length of the input sequences.
+    Parameters
+    ----------
+    Inherits all parameters from the `Regressor` and `GRU` classes.
 
-    Methods:
-        __init__(...)
-            Constructor for `GRURegressor` which initializes the base GRU structure and regression specific layers.
+    Attributes
+    ----------
+    rnn_size : int
+        The number of features in the hidden state `h` of each GRU layer.
+    hidden_size : int or list of int
+        The number of features in the hidden layer(s) of the regressor. Can be a list to specify the size of each layer.
+    num_layers : int
+        The number of stacked GRU layers.
+    dropout : float
+        The dropout probability for the dropout layers in the regressor.
+    activation : str
+        The activation function for the hidden layers.
+    bias : bool
+        Whether to use bias terms in the GRU and linear layers.
+    seq_len : int
+        The length of the input sequences.
 
-        forward(x)
-            Defines the forward pass of the model.
+    Methods
+    -------
+    __init__(...)
+        Constructor for `GRURegressor` which initializes the base GRU structure and regression specific layers.
+    forward(x)
+        Defines the forward pass of the model.
 
-    Raises:
-        RuntimeError
-            If the forward pass is called before the model is properly configured.
+    Raises
+    ------
+    RuntimeError
+        If the forward pass is called before the model is properly configured.
 
-    Note: The rest of the methods from `Classifier` and `GRU` are inherited.
+    Note
+    ----
+    The rest of the methods from `Regressor` and `GRU` are inherited.
     """
 
     def __init__(self,
@@ -302,23 +302,6 @@ class GRURegressor(Regressor, GRU):
         Calls the constructor of `Classifier` and `GRU` to set up the necessary parameters and structures for a
         GRU-based regression model.
 
-        Parameters:
-            rnn_size : int, optional
-                The number of features in the hidden state `h` of each GRU layer (default is 32).
-            hidden_size : int or list of int, optional
-                The size of each hidden layer. Can be a single integer or a list of integers (default is 32).
-            num_layers : int, optional
-                The number of GRU layers to stack (default is 1).
-            dropout : float, optional
-                Dropout probability for regularization (default is 0.2).
-            activation : str, optional
-                Type of activation function to use (default is 'relu').
-            bias : bool, optional
-                Whether to use bias terms (default is True).
-            seq_len : int, optional
-                Length of the input sequence (default is 20).
-            **kwargs : dict, optional
-                Additional keyword arguments for the `Classifier` initialization.
         """
 
         Regressor.__init__(self, **kwargs)
@@ -335,28 +318,34 @@ class GRURegressor(Regressor, GRU):
 
         self.criterion = nn.MSELoss()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass through the GRURegressor model.
 
         The method processes the input sequence `x` through the GRU layers and then 
         through the fully connected layers to produce the regression output.
 
-        Parameters:
-            x : torch.Tensor
-                The input tensor containing the sequence of data. It should have dimensions 
-                (batch_size, seq_len, n_features).
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor containing the sequence of data. It should have dimensions 
+            (batch_size, seq_len, n_features).
 
-        Returns:
-            torch.Tensor
-                The output tensor after processing the input through the GRU and linear layers. 
-                For regression, this will typically have dimensions (batch_size, output_size), 
-                where `output_size` corresponds to the predicted values for each sequence in the batch.
+        Returns
+        -------
+        torch.Tensor
+            The output tensor after processing the input through the GRU and linear layers. 
+            For regression, this will typically have dimensions (batch_size, output_size), 
+            where `output_size` corresponds to the predicted values for each sequence in the batch.
 
+        Raises
+        ------
+        RuntimeError
+            If the input tensor `x` does not have the correct shape or type.
         """
         
         # Initialize the hidden state for the GRU
-        h_0 = Variable(torch.zeros(self.num_layers, x.size(0), self.rnn_size))
+        h_0 = torch.zeros(self.num_layers, x.size(0), self.rnn_size, requires_grad=True)
         
         # Pass the input through the GRU layer
         out, _ = self.gru(x, h_0)

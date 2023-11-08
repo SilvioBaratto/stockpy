@@ -5,8 +5,10 @@ import torch.utils.data
 from stockpy.utils import multi_indexing
 from stockpy.preprocessing import StockpyDataset
 
+__all__ = ['StockDatasetFFNN', 'StockDatasetRNN', 'StockDatasetCNN', 'unpack_data']
 def unpack_data(data):
-    """Unpack data returned by the net's iterator into a 2-tuple.
+    """
+    Unpack data returned by the net's iterator into a 2-tuple.
 
     This function is designed to be used within a loop where data is
     being iterated, typically from a DataLoader in PyTorch. It expects
@@ -15,25 +17,28 @@ def unpack_data(data):
     (labels). If the data iterable doesn't contain exactly two elements,
     it is considered an error and raises an exception.
 
-    Parameters:
-        data : iterable
-            An iterable that yields elements, which should be pairs (2-tuple or
-            2-list) of features and labels.
+    Parameters
+    ----------
+    data : iterable
+        An iterable that yields elements, which should be pairs (2-tuple or
+        2-list) of features and labels.
 
-    Returns:
-        tuple
-            A 2-tuple where the first element is the unpacked features and the
-            second element is the unpacked labels.
+    Returns
+    -------
+    tuple
+        A 2-tuple where the first element is the unpacked features and the
+        second element is the unpacked labels.
 
-    Raises:
-        ValueError
-            If `data` does not contain exactly two elements.
+    Raises
+    ------
+    ValueError
+        If `data` does not contain exactly two elements.
 
-    Notes:
-        This function cannot detect it when a user only returns 1
-        item that is exactly of length 2 (e.g., because the batch size is
-        2). In that case, the item will be erroneously split into X and y.
-
+    Notes
+    -----
+    This function cannot detect it when a user only returns 1
+    item that is exactly of length 2 (e.g., because the batch size is
+    2). In that case, the item will be erroneously split into X and y.
     """
     if len(data) != 2:
         raise ValueError(
@@ -50,20 +55,20 @@ class StockDatasetFFNN(StockpyDataset):
     This class extends `StockpyDataset` and customizes the `__getitem__` method to
     provide data in a format that is directly consumable by FFNNs.
 
-    Attributes:
-        Inherits all attributes from `StockpyDataset` including:
-        X : various types
-            Input data in formats supported by `StockpyDataset`.
-        y : various types or None
-            Target data in formats supported by `StockpyDataset`, or None if not applicable.
-        length : int
-            The length of the dataset as defined in `StockpyDataset`.
-        X_indexing : str or callable
-            The indexing strategy used for `X`, inherited from `StockpyDataset`.
-        y_indexing : str or callable
-            The indexing strategy used for `y`, inherited from `StockpyDataset`.
-        X_is_ndframe : bool
-            Boolean flag indicating whether `X` is a pandas NDFrame, inherited from `StockpyDataset`.
+    Attributes
+    ----------
+    X : various types
+        Input data in formats supported by `StockpyDataset`.
+    y : various types or None
+        Target data in formats supported by `StockpyDataset`, or None if not applicable.
+    length : int
+        The length of the dataset as defined in `StockpyDataset`.
+    X_indexing : str or callable
+        The indexing strategy used for `X`, inherited from `StockpyDataset`.
+    y_indexing : str or callable
+        The indexing strategy used for `y`, inherited from `StockpyDataset`.
+    X_is_ndframe : bool
+        Boolean flag indicating whether `X` is a pandas NDFrame, inherited from `StockpyDataset`.
     """
 
     def __getitem__(self, i):
@@ -73,20 +78,22 @@ class StockDatasetFFNN(StockpyDataset):
         The method handles indexing into the dataset's `X` and `y` attributes,
         reshapes data if necessary, and applies any required transformations.
 
-        Parameters:
-            i : int
-                The index of the sample to be retrieved from the dataset.
+        Parameters
+        ----------
+        i : int
+            The index of the sample to be retrieved from the dataset.
 
-        Returns:
-            tuple
-                A 2-tuple where the first element is the feature vector (`Xi`) and the
-                second element is the target (`yi`), if `y` is provided. If `X` is a
-                pandas NDFrame, it reshapes its values to comply with FFNN input requirements.
+        Returns
+        -------
+        tuple
+            A 2-tuple where the first element is the feature vector (`Xi`) and the
+            second element is the target (`yi`), if `y` is provided. If `X` is a
+            pandas NDFrame, it reshapes its values to comply with FFNN input requirements.
 
-        Raises:
-            IndexError
-                If the index `i` is out of bounds of the dataset.
-
+        Raises
+        ------
+        IndexError
+            If the index `i` is out of bounds of the dataset.
         """
         # Extract the data and target for the specified index.
         X, y = self.X, self.y
@@ -104,36 +111,33 @@ class StockDatasetFFNN(StockpyDataset):
     
 class StockDatasetRNN(StockpyDataset):
     """
-    A dataset class specifically tailored for Recurrent Neural Networks (RNNs), 
-    which processes stock data into sequences suitable for temporal models.
+    A dataset class specifically tailored for Recurrent Neural Networks (RNNs).
 
-    Inherits from `StockpyDataset` and adds sequence processing capabilities 
-    to handle the temporal nature of stock data for RNNs.
+    This class processes stock data into sequences suitable for temporal models.
+    It inherits from `StockpyDataset` and adds sequence processing capabilities.
 
-    Attributes:
-        seq_len : int
-            The length of the sequences to be generated for RNN inputs.
-        Inherits all other attributes from `StockpyDataset`.
+    Attributes
+    ----------
+    seq_len : int
+        The length of the sequences to be generated for RNN inputs.
+    X : array-like, shape (n_samples, n_features)
+        The input data containing stock features.
+    y : array-like, shape (n_samples,) or (n_samples, n_targets)
+        The target values. If `None`, the dataset has only inputs (unsupervised).
+    length : int
+        The total number of samples in the dataset.
 
-    Parameters:
-        X : array-like, shape (n_samples, n_features)
-            The input data containing stock features.
-        y : array-like, shape (n_samples,) or (n_samples, n_targets)
-            The target values. If `None`, the dataset has only inputs (unsupervised).
-        length : int
-            The total number of samples in the dataset.
-        seq_len : int
-            The length of the data sequences to be used by the RNN.
+    Parameters
+    ----------
+    X : array-like, shape (n_samples, n_features)
+        The input data containing stock features.
+    y : array-like, shape (n_samples,) or (n_samples, n_targets)
+        The target values. If `None`, the dataset has only inputs (unsupervised).
+    length : int
+        The total number of samples in the dataset.
+    seq_len : int
+        The length of the data sequences to be used by the RNN.
     """
-
-    def __init__(self, X, y, length, seq_len):
-        """
-        Initialize the RNN dataset with the given parameters.
-
-        Parameters inherit from `StockpyDataset` and add `seq_len` for sequence length.
-        """
-        super(StockDatasetRNN, self).__init__(X, y, length)
-        self.seq_len = seq_len
 
     def __getitem__(self, i):
         """
@@ -143,79 +147,86 @@ class StockDatasetRNN(StockpyDataset):
         generates a zero-padded sequence. The padding is prepended to ensure
         that the output always has the shape `(seq_len, n_features)`.
 
-        Parameters:
-            i : int
-                The index of the time sequence to be retrieved from the dataset.
+        Parameters
+        ----------
+        i : int
+            The index of the time sequence to be retrieved from the dataset.
 
-        Returns:
-            tuple
-                A tuple where the first element is a 2D array representing the feature sequence
-                for the RNN (`Xi`), and the second element is the corresponding target (`yi`).
+        Returns
+        -------
+        tuple
+            A tuple where the first element is a 2D array representing the feature sequence
+            for the RNN (`Xi`), and the second element is the corresponding target (`yi`).
 
-        Raises:
-            IndexError
-                If the index `i` is out of bounds considering the sequence length.
-
+        Raises
+        ------
+        IndexError
+            If the index `i` is out of bounds considering the sequence length.
         """
         # Extract the data and target for the specified index.
         X, y = self.X, self.y
 
-        # If X is a pandas NDFrame, reshape its values.
-        if self.X_is_ndframe:
-            X = {k: X[k].values.reshape(-1, 1) for k in X}
+        # Check if 'i' is within the range of 'X'
+        if i < 0 or i >= len(self.X):
+            raise IndexError(f"Index {i} is out of bounds for dataset with length {len(self.X)}")
 
+        # If 'i' allows for a full sequence, take a slice of 'X' directly
         if i >= self.seq_len - 1:
-            # Generate sequence by selecting a range of indices.
-            i_start = i - self.seq_len + 1
-            X = self.X[i_start:(i + 1), :]
+            X_seq = X[i - self.seq_len + 1:i + 1, :]
         else:
-            # Pad the sequence with zeros if not enough data points are available.
-            padding_shape = (self.seq_len - i - 1, self.X.shape[1])
-            padding = np.zeros(padding_shape, dtype=np.float32)
-            X = self.X[0:(i + 1), :]
-            X = np.concatenate((padding, X), axis=0)
+            # If not enough data points are available, pad the sequence with zeros
+            padding_shape = (self.seq_len - (i + 1), X.shape[1])
+            padding = np.zeros(padding_shape, dtype=X.dtype)
+            X_seq = np.concatenate((padding, X[:i + 1, :]), axis=0)
 
-        # Now X contains either a sequence from the dataset or a zero-padded sequence.
-        # Use multi_indexing to get the data at index i (or slice).
-        Xi = multi_indexing(X, slice(0, self.seq_len), self.X_indexing)
+        # Ensure that 'X_seq' is of shape (seq_len, n_features)
+        assert X_seq.shape[0] == self.seq_len, f"Sequence length mismatch: expected {self.seq_len}, got {X_seq.shape[0]}"
 
-        # Use multi_indexing to get the target at index i.
+        # Get the feature sequence for the RNN
+        Xi = multi_indexing(X_seq, slice(0, self.seq_len), self.X_indexing)
+
+        # Get the corresponding target
         yi = multi_indexing(y, i, self.y_indexing)
 
-        # Transform the indexed data and return.
+        # Apply any transformations if necessary (e.g., normalization)
         return self.transform(Xi, yi)
     
 class StockDatasetCNN(StockpyDataset):
     """
-    A dataset class designed for use with Convolutional Neural Networks (CNNs) that
-    processes stock market data, preparing it for convolutional operations.
+    A dataset class designed for use with Convolutional Neural Networks (CNNs).
 
-    This class inherits from `StockpyDataset` and customizes the __getitem__ method to 
+    This class processes stock market data, preparing it for convolutional operations.
+    It inherits from `StockpyDataset` and customizes the `__getitem__` method to 
     accommodate the input requirements of CNNs by reshaping the data appropriately.
 
-    Attributes:
-        Inherits all attributes from the BaseStockDataset class, with additional processing
-        to prepare the data for CNNs.
+    Attributes
+    ----------
+    Inherits all attributes from the BaseStockDataset class, with additional processing
+    to prepare the data for CNNs.
     """
 
     def __getitem__(self, i):
         """
-        Retrieve the i-th sample from the dataset, reshaping it as necessary
-        for use with a CNN. For CNNs, the input X needs to have a specific 
-        shape, often adding a channel dimension, which this method ensures.
+        Retrieve the i-th sample from the dataset, reshaping it for use with a CNN.
 
-        Parameters:
-            i : int
-                The index of the sample to retrieve.
+        For CNNs, the input X needs to have a specific shape, often adding a channel 
+        dimension, which this method ensures.
 
-        Returns:
-            tuple
-                A tuple of the reshaped input data suitable for CNN processing (`Xi`)
-                and its corresponding target (`yi`), if available.
+        Parameters
+        ----------
+        i : int
+            The index of the sample to retrieve.
 
-        Raises:
-            IndexError
-                If the index `i` is out of bounds for the dataset.
+        Returns
+        -------
+        tuple
+            A tuple of the reshaped input data suitable for CNN processing (`Xi`)
+            and its corresponding target (`yi`), if available.
+
+        Raises
+        ------
+        IndexError
+            If the index `i` is out of bounds for the dataset.
         """
         # Extract the data and target for the specified index.
         X, y = self.X, self.y

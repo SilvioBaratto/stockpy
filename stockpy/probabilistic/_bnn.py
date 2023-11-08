@@ -10,27 +10,42 @@ from stockpy.base import Classifier
 from stockpy.utils import to_device
 from stockpy.utils import get_activation_function
 
+__all__ = ['BNNClassifier', 'BNNRegressor']
+
 class BNN(PyroModule):
-
     """
-    A Bayesian Neural Network (BNN) class that uses Pyro's probabilistic modeling capabilities.
-    This class serves as a base for constructing neural networks with Bayesian inference.
+    Implements a Bayesian Neural Network (BNN) using Pyro's probabilistic layers.
 
-    Attributes:
-        hidden_size (int or list of int): Size of the hidden layers. If an integer is provided, 
-            it is treated as the size for a single hidden layer. If a list is provided, each 
-            element specifies the size of a layer in a multi-layer network.
-        dropout (float): The dropout rate for regularization during training.
-        activation (str): The type of activation function to use. Expected to be a valid 
-            string that maps to a PyTorch activation function (e.g., 'relu', 'tanh').
-        bias (bool): Indicates whether or not to include bias parameters in the network layers.
+    Parameters
+    ----------
+    hidden_size : int or list of int
+        Number of units in each hidden layer. An integer specifies a single layer neural network,
+        while a list specifies the size of units in each layer of a multi-layer network.
+    dropout : float, optional
+        Dropout rate for regularization. Default value is 0.2.
+    activation : str, optional
+        The activation function to use. It can be 'relu', 'tanh', etc. Default is 'relu'.
+    bias : bool, optional
+        Whether to use bias in the layers. Default is True.
+    **kwargs
+        Arbitrary keyword arguments.
 
-    Parameters:
-        hidden_size (int or list of int): The number of neurons in the hidden layer(s).
-        dropout (float): Probability of an element to be zeroed during training. Defaults to 0.2.
-        activation (str): Type of activation function to use. Defaults to 'relu'.
-        bias (bool): If set to True, layers will include a bias term. Defaults to True.
-        **kwargs: Additional keyword arguments for more configurations.
+    Attributes
+    ----------
+    hidden_size : int or list of int
+        Size of the hidden layers as provided in the parameter.
+    dropout : float
+        Dropout rate.
+    activation : str
+        Activation function.
+    bias : bool
+        Indicates if bias parameters are included in the network layers.
+
+    Notes
+    -----
+    - This class defines the structure of a BNN where priors can be placed over weights and/or biases.
+    - The network can be constructed with one or more hidden layers based on the `hidden_size` parameter.
+    - `**kwargs` can be used to pass additional parameters that can be used in the PyroModule base class.
     """
 
     def __init__(self,
@@ -40,7 +55,7 @@ class BNN(PyroModule):
                  bias=True,
                  **kwargs):
         """
-        Initializes the MLP object with given or default parameters.
+        Initializes the BNN object with given or default parameters.
         """
         super().__init__()
 
@@ -51,21 +66,27 @@ class BNN(PyroModule):
 
     def initialize_module(self):
         """
-        Initializes the neural network layers based on the attributes of the class instance.
+        Sets up the neural network layers with Bayesian priors on weights and biases.
 
-        This method constructs the neural network architecture by creating a sequence of layers,
-        each followed by an activation function and a dropout layer, ending with an output layer.
-        The weights and biases of each layer are set to be samples from a normal distribution,
-        forming the basis of the Bayesian approach in this neural network.
+        This method builds the neural network by adding sequences of layers with activation
+        and dropout, concluding with an output layer. Weights and biases are treated as random
+        variables with normal priors, embodying the Bayesian framework in this network.
 
-        Raises:
-            AttributeError: If the network type-specific attributes, such as output size, are
-                not set prior to calling this method. This method expects the network to be 
-                properly configured as a classifier or regressor before initialization.
+        Raises
+        ------
+        AttributeError
+            If attributes specifying network details (like output size) have not been set before
+            initialization. This function presupposes the network's detailed setup as a classifier
+            or regressor has been completed.
 
-        Note:
-            This method is typically called internally during the fitting process and should 
-            not be invoked manually without proper configuration.
+        Notes
+        -----
+        - This function is usually called within the model's fit method and is not intended for 
+        direct external calls unless the network is pre-configured correctly.
+        - It is essential that the network's architecture, including input and output sizes,
+        and the number of layers, is defined before calling this method.
+        - The class instance should have attributes like `hidden_size`, `output_size`, `activation`,
+        and `dropout` set up prior to this method invocation.
         """
 
         # Checks if hidden_sizes is a single integer and, if so, converts it to a list
@@ -116,29 +137,55 @@ class BNN(PyroModule):
     def model_type(self):
         return "ffnn"
 
-class BNNClassifier(Classifier, BNN): 
-
+class BNNClassifier(Classifier, BNN):
     """
-    BNNClassifier is a Bayesian Neural Network classifier that extends the Classifier and BNN base classes. 
-    It applies Bayesian inference to neural network classification tasks. It combines the functionalities of 
-    a standard classifier with the Bayesian layers and priors defined in the BNN class.
+    Implements a Bayesian Neural Network for classification tasks using Pyro's probabilistic layers.
 
-    Attributes inherited from BNN:
-        hidden_size (int or list of int): Size of the hidden layers.
-        dropout (float): The dropout rate for regularization during training.
-        activation (str): The type of activation function to use.
-        bias (bool): Indicates whether or not to include bias parameters in the network layers.
+    This class provides a classifier with Bayesian inference abilities using the principles outlined in the BNN class,
+    bringing the uncertainty quantification of Bayesian methods to classification problems.
 
-    Attributes inherited from Classifier:
-        n_classes_ (int): The number of classes in the target labels.
-        n_features_in_ (int): The number of features in the input data.
+    Inherits
+    --------
+    BNN : Base class for Bayesian Neural Network functionalities.
+    Classifier : Base class for classification specific functionalities.
 
-    Parameters:
-        hidden_size (int or list of int): The number of neurons in the hidden layer(s).
-        dropout (float): Probability of an element to be zeroed. Defaults to 0.2.
-        activation (str): Type of activation function to use. Defaults to 'relu'.
-        bias (bool): If set to True, layers will include a bias term. Defaults to True.
-        **kwargs: Additional keyword arguments for the Classifier and BNN classes.
+    Attributes
+    ----------
+    hidden_size : int or list of int
+        Specifies the size(s) of the hidden layer(s). A single integer denotes a single-layer size, while a list
+        defines multiple layers.
+
+    dropout : float
+        Dropout rate used for regularization to prevent overfitting.
+
+    activation : str
+        The type of activation function used in the network layers, such as 'relu' or 'tanh'.
+
+    bias : bool
+        Indicates whether the network layers should include a bias term.
+
+    n_classes_ : int
+        Number of unique classes in the classification task. Inherited from Classifier.
+
+    n_features_in_ : int
+        The number of input features the model expects. Inherited from Classifier.
+
+    Parameters
+    ----------
+    hidden_size : int or list of int, optional
+        The configuration for the number of neurons in the hidden layers.
+
+    dropout : float, optional
+        Specifies the dropout probability for regularization.
+
+    activation : str, optional
+        Designates the type of activation function to apply.
+
+    bias : bool, optional
+        Flag to include bias parameters in the layers.
+
+    **kwargs
+        Variable keyword arguments that can be passed to the BNN and Classifier base classes.
     """
 
     def __init__(self,
@@ -165,21 +212,34 @@ class BNNClassifier(Classifier, BNN):
 
         self.criterion = nn.NLLLoss()
             
-    def model(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    def model(self, x, y):
         """
-        Defines the generative model for a Bayesian neural network, specifying the prior and likelihood.
-        The priors are defined over the weights and biases of the network's layers, and the observations
-        are assumed to follow a Categorical distribution parameterized by the output of the network.
+        Defines the generative model for the Bayesian Neural Network classifier.
 
-        Args:
-            x (torch.Tensor): The input data tensor.
-            y (torch.Tensor): The target tensor with class labels.
+        This method specifies a prior distribution over the neural network's weights and biases and then defines the
+        likelihood of the observed data, given these prior beliefs. The neural network's outputs are used to parameterize
+        the likelihood function, which is assumed to be a Categorical distribution over the class labels.
 
-        Raises:
-            RuntimeError: If the model's layers are not initialized before calling this method.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input features tensor, typically of shape (n_samples, n_features), where n_samples is the number of samples
+            and n_features is the number of features.
 
-        Returns:
-            None: This method does not return a value but instead samples the likelihood of the data.
+        y : torch.Tensor
+            Target labels tensor, typically of shape (n_samples,), containing class labels for each sample.
+
+        Raises
+        ------
+        RuntimeError
+            If the network layers are not initialized prior to invocation, an error is raised indicating that the model
+            cannot be defined without pre-initialized layers.
+
+        Returns
+        -------
+        None
+            The function has no return value. It contributes to the internal state of the Pyro model by sampling from
+            distributions.
         """
 
         # Ensures the model has been fitted before making predictions
@@ -202,21 +262,35 @@ class BNNClassifier(Classifier, BNN):
             out = self.layers(x)
             obs = pyro.sample("obs", dist.Categorical(logits=out).to_event(1), obs=y)
     
-    def guide(self, x: torch.Tensor, y: torch.Tensor=None) -> torch.Tensor:
+    def guide(self, x, y):
         """
-        Defines the variational guide (approximate posterior) for a Bayesian neural network, specifying
-        the variational family for the parameters of the network. This is a mean-field approximation where
-        each parameter has its own variational parameter.
+        Specifies the variational guide for the Bayesian Neural Network classifier.
 
-        Args:
-            x (torch.Tensor): The input data tensor.
-            y (torch.Tensor, optional): The target tensor. Default is None since it's not used in the guide.
+        The guide is a variational approximation to the posterior distribution over the network's weights and biases. 
+        It is implemented as a mean-field approximation where each weight and bias has its own variational parameters
+        that are learned during the inference process.
 
-        Raises:
-            RuntimeError: If the model's layers are not initialized before calling this method.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input features tensor, typically of shape (n_samples, n_features), where n_samples is the number of samples
+            and n_features is the number of features. The input is used to determine the shape of the guide's parameters.
 
-        Returns:
-            None: This method does not return a value but defines the variational distribution.
+        y : torch.Tensor, optional
+            Target labels tensor, which is not used in the guide but included for compatibility with the model signature.
+            By default, it is None.
+
+        Raises
+        ------
+        RuntimeError
+            If the guide's parameters are not initialized before invocation, an error is raised to signal that the
+            variational parameters cannot be defined without pre-initialization.
+
+        Returns
+        -------
+        None
+            The function has no return value. It defines the variational distribution's parameters within the Pyro
+            framework.
         """
 
         # Ensures the model has been fitted before making predictions
@@ -243,27 +317,36 @@ class BNNClassifier(Classifier, BNN):
             return preds
         
     def forward(self, x):
-
         """
-        Generates predictions by running the guide function multiple times and
-        averaging the results.
+        Computes the predictive distribution of the Bayesian Neural Network by averaging 
+        over multiple stochastic forward passes.
 
-        This method uses a Monte Carlo approach to approximate the predictive
-        distribution of a Bayesian neural network. It runs the guide function,
-        which acts as the variational distribution, multiple times and stacks the
-        results to compute the mean prediction across all runs.
+        This forward pass effectively uses Monte Carlo sampling to approximate the 
+        network's predictions. The guide function is repeatedly sampled to obtain a set 
+        of predictions which are then averaged to estimate the overall predictive mean.
 
-        Parameters:
-            x (torch.Tensor): The input data as a tensor.
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input features tensor of shape (n_samples, n_features), where 
+            n_samples is the number of samples and n_features is the number of 
+            features in the input data.
 
-        Returns:
-            torch.Tensor: The averaged predictions as a tensor.
+        Returns
+        -------
+        torch.Tensor
+            The tensor of averaged predictions, representing the mean of the 
+            predictive distribution obtained from the Monte Carlo samples of the 
+            guide function.
 
-        Notes:
-            This method assumes that the `self.n_outputs_` attribute is set and
-            reflects the number of times the guide should be run to generate
-            predictions. Each guide run produces a sample from the variational
-            posterior which are then averaged to form the final prediction.
+        Notes
+        -----
+        - The `self.n_outputs_` attribute needs to be predefined and should correspond 
+        to the number of outputs for the guide function, determining the number of 
+        Monte Carlo samples to take.
+        - The guide function must be defined and properly initialized in the class, as 
+        it is used to sample the variational posterior and generate the set of 
+        predictions for averaging.
         """
 
         preds = []
@@ -277,21 +360,37 @@ class BNNClassifier(Classifier, BNN):
         return preds.mean(0)
     
 class BNNRegressor(Regressor, BNN):
-
     """
-    Bayesian Neural Network (BCNN) Regressor.
+    A Bayesian Neural Network regressor that uses Pyro's variational inference tools to perform
+    regression with uncertainty estimation.
 
-    This class implements a BNN for regression tasks using Pyro's probabilistic models.
-    Inherits from Regressor and BNN classes.
+    Inherits from both Regressor for general regression functionalities and BNN for Bayesian
+    network specifics.
 
-    Parameters:
-        hidden_size (int or list of int): The number of neurons in the hidden layer(s).
-        dropout (float): Probability of an element to be zeroed. Defaults to 0.2.
-        activation (str): Type of activation function to use. Defaults to 'relu'.
-        bias (bool): If set to True, layers will include a bias term. Defaults to True.
-        **kwargs: Additional keyword arguments for the Regressor and BNN classes.
+    Parameters
+    ----------
+    hidden_size : int or list of int
+        Specifies the number of neurons in each hidden layer. A single integer denotes a single
+        hidden layer, whereas a list of integers specifies the size of each layer in a
+        multi-layer perceptron architecture.
+    dropout : float, default=0.2
+        The dropout rate, specifying the probability that an element is set to zero to prevent
+        overfitting during training.
+    activation : str, default='relu'
+        The type of activation function to use. Should be a string corresponding to a valid
+        Pyro or PyTorch activation function (e.g., 'relu', 'tanh', 'sigmoid').
+    bias : bool, default=True
+        Indicates whether or not to use bias terms in the neural network layers.
+    **kwargs
+        Additional keyword arguments that are passed to the base Regressor and BNN classes
+        to allow for more customization.
 
-    
+    Notes
+    -----
+    - The network should be configured with its hyperparameters before calling the fitting
+      methods to ensure proper initialization of all components.
+    - The regression is performed under the Bayesian framework, which enables the model
+      to capture uncertainty in the predictions.
     """
 
     def __init__(self,
@@ -301,21 +400,35 @@ class BNNRegressor(Regressor, BNN):
                  bias=True,
                  **kwargs):
         """
-        Initializes the BNNRegressor object by setting up the architecture of the Bayesian Neural Network
-        for regression tasks with the given parameters.
+        Initialize the BNNRegressor object with the specified neural network architecture.
 
-        Args:
-            hidden_size (int, list, or tuple): Size of hidden layers. If an integer is provided, it is treated as the size for a single hidden layer. If a list or tuple is provided, each element specifies the size for each hidden layer.
-            dropout (float): The dropout rate for regularization. It is applied to all hidden layers.
-            activation (str): The name of the activation function to use after each hidden layer.
-            bias (bool): Indicates whether to include bias parameters in the neural network layers.
-            **kwargs: Additional keyword arguments that are passed to the `Regressor` base class.
+        Parameters
+        ----------
+        hidden_size : int or list of ints
+            Specifies the size of the hidden layers. An integer denotes the size for a single layer,
+            while a list denotes the size for each layer in a multi-layer network.
+        dropout : float, optional
+            The dropout rate for regularization, applied to all hidden layers. Defaults to 0.2.
+        activation : str, optional
+            The name of the activation function to use after each hidden layer. Defaults to 'relu'.
+        bias : bool, optional
+            Indicates whether to include bias parameters in the neural network layers. Defaults to True.
+        **kwargs
+            Arbitrary keyword arguments passed to the `Regressor` base class for further configuration.
 
-        Note:
-            The `**kwargs` should contain all other necessary configurations required for the `Regressor` initialization, such as the number of features, number of outputs, and other specific settings.
+        Raises
+        ------
+        ValueError
+            If the `hidden_size` is not specified or the `activation` function is not recognized.
 
-        Raises:
-            ValueError: If provided arguments are not valid or insufficient for initializing the network layers.
+        Notes
+        -----
+        The `**kwargs` may include configurations specific to the `Regressor` class, such as
+        the number of output features (`n_outputs_`), batch size, and other hyperparameters relevant
+        to regression tasks.
+
+        The initialization method ensures that all network parameters are properly set according to the
+        Bayesian paradigm, where weights and biases are treated as distributions rather than fixed values.
         """
 
         Regressor.__init__(self, **kwargs)
@@ -334,15 +447,25 @@ class BNNRegressor(Regressor, BNN):
         Defines the generative model for a Bayesian neural network where the weights
         and biases of the network are treated as random variables with priors.
 
-        Args:
-            x (torch.Tensor): The input tensor containing the features.
-            y (torch.Tensor): The output tensor containing the response variables.
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor containing the features.
+        y : torch.Tensor
+            The output tensor containing the response variables.
 
-        Raises:
-            RuntimeError: If the model is called before it is fit with training data.
+        Raises
+        ------
+        RuntimeError
+            If the model is called before it is fit with training data.
 
-        Notes:
-            This method is called during training and should not be used for making predictions.
+        Notes
+        -----
+        This method is called during training and should not be used for making predictions.
+
+        Returns
+        -------
+        torch.Tensor
         """
         # Ensures the model has been fitted before making predictions
         if self.layers is None:
@@ -370,17 +493,27 @@ class BNNRegressor(Regressor, BNN):
         """
         Defines the variational guide (approximate posterior) for the Bayesian neural network.
 
-        Args:
-            x (torch.Tensor): The input tensor containing the features.
-            y (torch.Tensor): Unused parameter. It's included to match the signature of the model.
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input tensor containing the features.
+        y : torch.Tensor, optional
+            Unused parameter. It's included to match the signature of the model.
 
-        Raises:
-            RuntimeError: If the guide is called before the model is fit with training data.
+        Raises
+        ------
+        RuntimeError
+            If the guide is called before the model is fit with training data.
 
-        Notes:
-            This method defines the family of distributions used to approximate the posterior distribution
-            of the weights and biases. It is typically parameterized by variational parameters that are learned
-            during training.
+        Notes
+        -----
+        This method defines the family of distributions used to approximate the posterior distribution
+        of the weights and biases. It is typically parameterized by variational parameters that are learned
+        during training.
+
+        Returns
+        -------
+        torch.Tensor
         """
         # Ensures the model has been fitted before making predictions
         if self.layers is None:
@@ -404,8 +537,7 @@ class BNNRegressor(Regressor, BNN):
             out = self.layers(x)
             return out
         
-    def forward(self, x):
-
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Generates predictions by running the guide function multiple times and
         averaging the results.
@@ -415,17 +547,22 @@ class BNNRegressor(Regressor, BNN):
         which acts as the variational distribution, multiple times and stacks the
         results to compute the mean prediction across all runs.
 
-        Parameters:
-            x (torch.Tensor): The input data as a tensor.
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input data as a tensor.
 
-        Returns:
-            torch.Tensor: The averaged predictions as a tensor.
+        Returns
+        -------
+        torch.Tensor
+            The averaged predictions as a tensor.
 
-        Notes:
-            This method assumes that the `self.n_outputs_` attribute is set and
-            reflects the number of times the guide should be run to generate
-            predictions. Each guide run produces a sample from the variational
-            posterior which are then averaged to form the final prediction.
+        Notes
+        -----
+        This method assumes that the `self.n_outputs_` attribute is set and
+        reflects the number of times the guide should be run to generate
+        predictions. Each guide run produces a sample from the variational
+        posterior which are then averaged to form the final prediction.
         """
 
         preds = []

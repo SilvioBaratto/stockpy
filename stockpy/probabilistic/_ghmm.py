@@ -11,37 +11,63 @@ from stockpy.base import Classifier
 from ._emitter import EmitterRegressor, EmitterClassifier
 from ._transition import Transition
 
+__all__ = ['GHMMRegressor', 'GHMMClassifier']
+
 class GHMM(PyroModule):
-
     """
-    A Gaussian Hidden Markov Model (GHMM) class that encapsulates neural network components for modeling 
-    sequences with latent variables. The model can be used for both classification and regression tasks.
+    A Gaussian Hidden Markov Model (GHMM) class that encapsulates neural network
+    components for modeling sequences with latent variables. The model can be used
+    for both classification and regression tasks.
 
-    Attributes:
-        z_dim (int): Dimensionality of the latent state.
-        emission_dim (int): Dimensionality of the hidden layers in the emission model.
-        transition_dim (int): Dimensionality of the hidden layers in the transition model.
-        dropout (float): Dropout rate used in the neural network components.
-        variance (float): The variance used in the latent state initialization.
-        activation (str): The type of activation function to use.
-        bias (bool): Whether to include bias parameters in the neural network layers.
-        seq_len (int): The length of the input sequences.
-        z_0 (nn.Parameter): Initial latent state parameter for `z_1`.
-        z_q_0 (nn.Parameter): Initial latent state parameter for `q(z_1)`.
-        emitter_rgr (EmitterRegressor): Emission model for regression tasks.
-        emitter_cls (EmitterClassifier): Emission model for classification tasks.
-        transition (Transition): Transition model defining the evolution of latent states.
+    Parameters
+    ----------
+    z_dim : int
+        Dimension of the latent variable `z_t`.
+    emission_dim : int
+        Size of the hidden layer for the emission model.
+    transition_dim : int
+        Size of the hidden layer for the transition model.
+    dropout : float
+        Dropout rate for regularization.
+    variance : float
+        Variance for the latent state initialization.
+    activation : str
+        Name of the activation function to be used.
+    bias : bool
+        Flag to include bias in linear layers or not.
+    seq_len : int
+        Length of the sequences to model.
+    **kwargs
+        Additional keyword arguments.
 
-    Args:
-        z_dim (int): Dimension of the latent variable `z_t`.
-        emission_dim (int): Size of the hidden layer for the emission model.
-        transition_dim (int): Size of the hidden layer for the transition model.
-        dropout (float): Dropout rate for regularization.
-        variance (float): Variance for the latent state initialization.
-        activation (str): Name of the activation function to be used.
-        bias (bool): Flag to include bias in linear layers or not.
-        seq_len (int): Length of the sequences to model.
-        **kwargs: Additional keyword arguments.
+    Attributes
+    ----------
+    z_dim : int
+        Dimensionality of the latent state.
+    emission_dim : int
+        Dimensionality of the hidden layers in the emission model.
+    transition_dim : int
+        Dimensionality of the hidden layers in the transition model.
+    dropout : float
+        Dropout rate used in the neural network components.
+    variance : float
+        The variance used in the latent state initialization.
+    activation : str
+        The type of activation function to use.
+    bias : bool
+        Whether to include bias parameters in the neural network layers.
+    seq_len : int
+        The length of the input sequences.
+    z_0 : nn.Parameter
+        Initial latent state parameter for `z_1`.
+    z_q_0 : nn.Parameter
+        Initial latent state parameter for `q(z_1)`.
+    emitter_rgr : EmitterRegressor
+        Emission model for regression tasks.
+    emitter_cls : EmitterClassifier
+        Emission model for classification tasks.
+    transition : Transition
+        Transition model defining the evolution of latent states.
     """
 
     def __init__(self,
@@ -68,12 +94,12 @@ class GHMM(PyroModule):
 
     def initialize_module(self):
         """
-        Initializes the various neural network components of the GHMM based on the configured parameters. 
-        This includes the emission model for both regression and classification tasks, the transition model, 
-        and the initial latent state parameters.
+        Initializes the various neural network components of the GHMM based on the configured
+        parameters. This includes the emission model for both regression and classification tasks,
+        the transition model, and the initial latent state parameters.
 
-        This method should be called explicitly after creating an instance of `GHMM` and before using it 
-        for any sequence modeling tasks.
+        This method should be called explicitly after creating an instance of `GHMM` and before
+        using it for any sequence modeling tasks.
         """
 
 
@@ -107,44 +133,68 @@ class GHMM(PyroModule):
         return "rnn"
     
 class GHMMRegressor(Regressor, GHMM):
-
     """
     A regressor based on Gaussian Hidden Markov Models (GHMMs) which combines the properties
-    of a GHMM with the capabilities of a regressor. It can be used to perform sequence-based 
+    of a GHMM with the capabilities of a regressor. It can be used to perform sequence-based
     regression tasks, predicting continuous outputs from input sequences.
 
     Inherits from:
         Regressor: A base regression class that may define general regression functionalities.
         GHMM: A Gaussian Hidden Markov Model class with sequence modeling capabilities.
 
-    Attributes inherited from GHMM:
-        z_dim (int): Dimensionality of the latent state.
-        emission_dim (int): Dimensionality of the hidden layers in the emission model.
-        transition_dim (int): Dimensionality of the hidden layers in the transition model.
-        dropout (float): Dropout rate used in the neural network components.
-        variance (float): The variance used in the latent state initialization.
-        activation (str): The type of activation function to use.
-        bias (bool): Whether to include bias parameters in the neural network layers.
-        seq_len (int): The length of the input sequences.
-        z_0 (nn.Parameter): Initial latent state parameter for `z_1`.
-        z_q_0 (nn.Parameter): Initial latent state parameter for `q(z_1)`.
-        emitter_rgr (EmitterRegressor): Emission model for regression tasks.
-        transition (Transition): Transition model defining the evolution of latent states.
+    Parameters
+    ----------
+    z_dim : int
+        Dimension of the latent variable `z_t`.
+    emission_dim : int
+        Size of the hidden layer for the emission model.
+    transition_dim : int
+        Size of the hidden layer for the transition model.
+    dropout : float
+        Dropout rate for regularization.
+    variance : float
+        Variance for the latent state initialization.
+    activation : str
+        Name of the activation function to be used.
+    bias : bool
+        Flag to include bias in linear layers or not.
+    seq_len : int
+        Length of the sequences to model.
+    **kwargs
+        Additional keyword arguments specific to the Regressor base class.
 
-    Args:
-        z_dim (int): Dimension of the latent variable `z_t`.
-        emission_dim (int): Size of the hidden layer for the emission model.
-        transition_dim (int): Size of the hidden layer for the transition model.
-        dropout (float): Dropout rate for regularization.
-        variance (float): Variance for the latent state initialization.
-        activation (str): Name of the activation function to be used.
-        bias (bool): Flag to include bias in linear layers or not.
-        seq_len (int): Length of the sequences to model.
-        **kwargs: Additional keyword arguments specific to the Regressor base class.
+    Attributes
+    ----------
+    Inherits attributes from GHMM:
+        z_dim : int
+            Dimensionality of the latent state.
+        emission_dim : int
+            Dimensionality of the hidden layers in the emission model.
+        transition_dim : int
+            Dimensionality of the hidden layers in the transition model.
+        dropout : float
+            Dropout rate used in the neural network components.
+        variance : float
+            The variance used in the latent state initialization.
+        activation : str
+            The type of activation function to use.
+        bias : bool
+            Whether to include bias parameters in the neural network layers.
+        seq_len : int
+            The length of the input sequences.
+        z_0 : nn.Parameter
+            Initial latent state parameter for `z_1`.
+        z_q_0 : nn.Parameter
+            Initial latent state parameter for `q(z_1)`.
+        emitter_rgr : EmitterRegressor
+            Emission model for regression tasks.
+        transition : Transition
+            Transition model defining the evolution of latent states.
 
-    Note:
-        The initialization parameters will first initialize the `Regressor` base class 
-        with provided keyword arguments, then initialize the `GHMM` class with specified 
+    Note
+    -----
+        The initialization parameters will first initialize the `Regressor` base class
+        with provided keyword arguments, then initialize the `GHMM` class with specified
         parameters for the GHMM components.
     """
 
@@ -186,16 +236,21 @@ class GHMMRegressor(Regressor, GHMM):
         probability distribution over the latent variables `z` and observed variables `y`
         given the inputs `x`.
 
-        Args:
-            x (torch.Tensor): The input features with shape (batch_size, seq_len, num_features).
-            y (torch.Tensor): The target values with shape (batch_size, seq_len, output_size).
-            annealing_factor (float): A scaling factor for the KL divergence term to control
-                                      its influence on the loss (default: 1.0).
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input features with shape (batch_size, seq_len, num_features).
+        y : torch.Tensor
+            The target values with shape (batch_size, seq_len, output_size).
+        annealing_factor : float, optional
+            A scaling factor for the KL divergence term to control its influence on the loss.
+            Defaults to 1.0.
 
-        Note:
-            This method makes use of the Pyro's plate notation to efficiently handle mini-batches,
-            and markov to indicate conditional independencies that arise in markov models, allowing
-            for efficient inference.
+        Note
+        ----
+        This method makes use of the Pyro's plate notation to efficiently handle mini-batches,
+        and markov to indicate conditional independencies that arise in markov models, allowing
+        for more efficient inference.
         """
 
         # Number of time steps to process
@@ -239,14 +294,20 @@ class GHMMRegressor(Regressor, GHMM):
         which defines the family of distributions over the latent variables `z` that will
         be optimized to approximate the true posterior.
 
-        Args:
-            x (torch.Tensor): The input features with shape (batch_size, seq_len, num_features).
-            y (torch.Tensor): The target values (optional, not used in the guide).
-            annealing_factor (float): A scaling factor for the KL divergence term (default: 1.0).
+        Parameters
+        ----------
+        x : torch.Tensor
+            The input features with shape (batch_size, seq_len, num_features).
+        y : torch.Tensor, optional
+            The target values. This is not used in the guide and is included to match the
+            signature of the model.
+        annealing_factor : float, optional
+            A scaling factor for the KL divergence term. Defaults to 1.0.
 
-        Note:
-            This guide corresponds to the mean-field approximation where the latent variables
-            at each time step are independent given the observed data.
+        Note
+        ----
+        This guide corresponds to the mean-field approximation where the latent variables
+        at each time step are independent given the observed data.
         """
 
         # Number of time steps to process
@@ -280,12 +341,17 @@ class GHMMRegressor(Regressor, GHMM):
         """
         Defines the forward pass of the neural network.
 
-        Args:
-            x (torch.Tensor): Input tensor for the neural network.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor for the neural network.
 
-        Returns:
-            torch.Tensor: Output tensor from the neural network.
+        Returns
+        -------
+        torch.Tensor
+            Output tensor from the neural network.
         """
+
         preds = []
                 
         # Run the guide and capture the trace
@@ -309,6 +375,71 @@ class GHMMRegressor(Regressor, GHMM):
         return preds[-1, :, :]
                 
 class GHMMClassifier(Classifier, GHMM):
+    """
+    A classifier based on Gaussian Hidden Markov Models (GHMMs) which combines the properties
+    of a GHMM with the capabilities of a classifier. It can be used to perform sequence-based
+    classification tasks, predicting discrete outputs from input sequences.
+
+    Inherits from:
+        Classifier: A base classification class that may define general classification functionalities.
+        GHMM: A Gaussian Hidden Markov Model class with sequence modeling capabilities.
+
+    Parameters
+    ----------
+    z_dim : int
+        Dimension of the latent variable `z_t`.
+    emission_dim : int
+        Size of the hidden layer for the emission model.
+    transition_dim : int
+        Size of the hidden layer for the transition model.
+    dropout : float
+        Dropout rate for regularization.
+    variance : float
+        Variance for the latent state initialization.
+    activation : str
+        Name of the activation function to be used.
+    bias : bool
+        Flag to include bias in linear layers or not.
+    seq_len : int
+        Length of the sequences to model.
+    **kwargs
+        Additional keyword arguments specific to the Classifier base class.
+
+    Attributes
+    ----------
+    Inherits attributes from GHMM:
+        z_dim : int
+            Dimensionality of the latent state.
+        emission_dim : int
+            Dimensionality of the hidden layers in the emission model.
+        transition_dim : int
+            Dimensionality of the hidden layers in the transition model.
+        dropout : float
+            Dropout rate used in the neural network components.
+        variance : float
+            The variance used in the latent state initialization.
+        activation : str
+            The type of activation function to use.
+        bias : bool
+            Whether to include bias parameters in the neural network layers.
+        seq_len : int
+            The length of the input sequences.
+        z_0 : nn.Parameter
+            Initial latent state parameter for `z_1`.
+        z_q_0 : nn.Parameter
+            Initial latent state parameter for `q(z_1)`.
+        emitter_cls : EmitterClassifier
+            Emission model for classification tasks.
+        transition : Transition
+            Transition model defining the evolution of latent states.
+
+    Note
+    -----
+    The initialization parameters will first initialize the `Classifier` base class
+    with provided keyword arguments, then initialize the `GHMM` class with specified
+    parameters for the GHMM components.
+    """
+    
 
     def __init__(self,
                  z_dim=32,
@@ -321,7 +452,11 @@ class GHMMClassifier(Classifier, GHMM):
                  seq_len=20,
                  **kwargs):
         """
-        Initializes the MLPClassifier object with given or default parameters.
+        Constructor for the GHMMClassifier class, initializing the components of both
+        the Classifier and the GHMM classes with the given parameters.
+
+        The **kwargs are passed directly to the base Classifier class to allow for 
+        flexibility in configuring any additional regressor-specific settings.
         """
         Classifier.__init__(self, **kwargs)
         GHMM.__init__(self,
@@ -337,19 +472,25 @@ class GHMMClassifier(Classifier, GHMM):
         
         self.criterion = nn.NLLLoss()
 
-    def model(self, x, y, annealing_factor = 1.0):
+    def model(self, x, y, annealing_factor=1.0):
         """
         Defines the generative model p(y,z|x) which includes the observation 
-        model p(y|z) and transition model p(z_t | z_{t-1}). It also handles the 
+        model p(y|z) and the transition model p(z_t | z_{t-1}). It also handles the 
         computation of the parameters of these models.
 
-        Args:
-            x_data (torch.Tensor): Input tensor for the model.
-            y_data (Optional[torch.Tensor]): Optional observed output tensor for the model.
-            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor for the model.
+        y : Optional[torch.Tensor]
+            Optional observed output tensor for the model.
+        annealing_factor : float, optional
+            Annealing factor used in poutine.scale to handle KL annealing, by default 1.0.
 
-        Returns:
-            torch.Tensor: The sampled latent variable `z` from the last time step of the model.
+        Returns
+        -------
+        torch.Tensor
+            The sampled latent variable `z` from the last time step of the model.
         """
 
         # this is the number of time steps we need to process in the data
@@ -400,19 +541,25 @@ class GHMMClassifier(Classifier, GHMM):
                 # in the next time step so keep track of it
                 z_prev = z_t
             
-    def guide(self, x, y = None, annealing_factor = 1.0):
+    def guide(self, x, y=None, annealing_factor=1.0):
         """
         Defines the guide (also called the inference model or variational distribution) q(z|x,y)
         which is an approximation to the posterior p(z|x,y). It also handles the computation of the 
         parameters of this guide.
 
-        Args:
-            x_data (torch.Tensor): Input tensor for the guide.
-            y_data (Optional[torch.Tensor]): Optional observed output tensor for the guide.
-            annealing_factor (float, optional): Annealing factor used in poutine.scale to handle KL annealing.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor for the guide.
+        y : Optional[torch.Tensor], optional
+            Optional observed output tensor for the guide.
+        annealing_factor : float, optional
+            Annealing factor used in poutine.scale to handle KL annealing, by default 1.0.
 
-        Returns:
-            torch.Tensor: The sampled latent variable `z` from the last time step of the guide.
+        Returns
+        -------
+        torch.Tensor
+            The sampled latent variable `z` from the last time step of the guide.
         """
         
         # this is the number of time steps we need to process in the mini-batch
@@ -448,12 +595,17 @@ class GHMMClassifier(Classifier, GHMM):
         """
         Defines the forward pass of the neural network.
 
-        Args:
-            x (torch.Tensor): Input tensor for the neural network.
+        Parameters
+        ----------
+        x : torch.Tensor
+            Input tensor for the neural network.
 
-        Returns:
-            torch.Tensor: Output tensor from the neural network.
+        Returns
+        -------
+        torch.Tensor
+            Output tensor from the neural network.
         """
+        
         preds = []
                 
         # Run the guide and capture the trace

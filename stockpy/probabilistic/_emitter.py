@@ -1,8 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
-from stockpy.utils import get_activation_function
 
 class EmitterRegressor(nn.Module):
     """
@@ -13,23 +10,39 @@ class EmitterRegressor(nn.Module):
     This module generates parameters for a Gaussian distribution, predicting the mean 
     and standard deviation for the observation at time `t`.
 
-    Attributes:
-        lin_z_to_hidden_mu (nn.Linear): Linear transformation from the latent state to the hidden layer for the mean.
-        lin_x_to_hidden_mu (nn.Linear): Linear transformation from the input to the hidden layer for the mean.
-        lin_hidden_to_hidden_mu (nn.Linear): Linear transformation for processing concatenated hidden states for the mean.
-        lin_hidden_to_output_mu (nn.Linear): Linear transformation from the hidden layer to the output for the mean.
-        lin_z_to_hidden_sigma (nn.Linear): Linear transformation from the latent state to the hidden layer for the standard deviation.
-        lin_x_to_hidden_sigma (nn.Linear): Linear transformation from the input to the hidden layer for the standard deviation.
-        lin_hidden_to_hidden_sigma (nn.Linear): Linear transformation for processing concatenated hidden states for the standard deviation.
-        lin_hidden_to_output_sigma (nn.Linear): Linear transformation from the hidden layer to the output for the standard deviation.
-        relu (nn.ReLU): Rectified Linear Unit activation function.
-        softplus (nn.Softplus): Softplus activation function to ensure the standard deviation is positive.
+    Attributes
+    ----------
+    lin_z_to_hidden_mu : nn.Linear
+        Linear transformation from the latent state to the hidden layer for the mean.
+    lin_x_to_hidden_mu : nn.Linear
+        Linear transformation from the input to the hidden layer for the mean.
+    lin_hidden_to_hidden_mu : nn.Linear
+        Linear transformation for processing concatenated hidden states for the mean.
+    lin_hidden_to_output_mu : nn.Linear
+        Linear transformation from the hidden layer to the output for the mean.
+    lin_z_to_hidden_sigma : nn.Linear
+        Linear transformation from the latent state to the hidden layer for the standard deviation.
+    lin_x_to_hidden_sigma : nn.Linear
+        Linear transformation from the input to the hidden layer for the standard deviation.
+    lin_hidden_to_hidden_sigma : nn.Linear
+        Linear transformation for processing concatenated hidden states for the standard deviation.
+    lin_hidden_to_output_sigma : nn.Linear
+        Linear transformation from the hidden layer to the output for the standard deviation.
+    relu : nn.ReLU
+        Rectified Linear Unit activation function.
+    softplus : nn.Softplus
+        Softplus activation function to ensure the standard deviation is positive.
 
-    Args:
-        input_dim (int): The dimensionality of the input `x_t`.
-        z_dim (int): The dimensionality of the latent state `z_t`.
-        emission_dim (int): The size of the hidden layer used to process `z_t` and `x_t`.
-        output_dim (int): The dimensionality of the output `y_t`.
+    Parameters
+    ----------
+    input_dim : int
+        The dimensionality of the input `x_t`.
+    z_dim : int
+        The dimensionality of the latent state `z_t`.
+    emission_dim : int
+        The size of the hidden layer used to process `z_t` and `x_t`.
+    output_dim : int
+        The dimensionality of the output `y_t`.
     """
 
     def __init__(self, input_dim: int, z_dim: int, emission_dim: int, output_dim: int):
@@ -52,21 +65,27 @@ class EmitterRegressor(nn.Module):
 
     def forward(self, z_t: torch.Tensor, x_t: torch.Tensor):
         """
-        Defines the forward pass for the EmitterRegressor.
+        Perform the forward pass for the EmitterRegressor.
 
-        The network separately processes `z_t` and `x_t` through distinct pathways, each consisting
-        of a linear layer followed by a ReLU activation. The processed `z_t` and `x_t` are then
-        concatenated and further processed to predict the mean (`mu`) and the softplus-transformed 
-        standard deviation (`sigma`) for the Gaussian distribution of the observation `y_t`.
+        Processes `z_t` and `x_t` through distinct pathways, each with a linear layer
+        and ReLU activation. The results are concatenated and passed through additional
+        layers to predict the mean (`mu`) and softplus-transformed standard deviation 
+        (`sigma`) for the Gaussian distribution of the observation `y_t`.
 
-        Args:
-            z_t (torch.Tensor): The latent state at time `t`.
-            x_t (torch.Tensor): The additional input at time `t`.
+        Parameters
+        ----------
+        z_t : torch.Tensor
+            The latent state at time `t`.
+        x_t : torch.Tensor
+            The additional input at time `t`.
 
-        Returns:
-            Tuple[torch.Tensor, torch.Tensor]: A tuple of two tensors representing the predicted mean 
-            (`mu`) and standard deviation (`sigma`) for the Gaussian distribution of `y_t`.
+        Returns
+        -------
+        Tuple[torch.Tensor, torch.Tensor]
+            A tuple of two tensors representing the predicted mean (`mu`) and standard 
+            deviation (`sigma`) for the Gaussian distribution of `y_t`.
         """
+
         # Process the latent and input states through their respective pathways for the mean.
         h1_mu_z = self.relu(self.lin_z_to_hidden_mu(z_t))
         h1_mu_x = self.relu(self.lin_x_to_hidden_mu(x_t))
@@ -86,26 +105,35 @@ class EmitterRegressor(nn.Module):
     
 class EmitterClassifier(nn.Module):
     """
-    The `EmitterClassifier` module parameterizes the categorical observation likelihood 
-    `p(y_t | z_t, x_t)` by predicting the probability of each class for the observed data `y_t`
-    at each time step `t`, given the latent state `z_t` and an additional input `x_t`.
+    Parameterizes the categorical observation likelihood `p(y_t | z_t, x_t)` for classification.
 
-    The module computes logits for each class and applies a softmax function to obtain the class
-    probabilities. This module is typically used in classification tasks within the context of a 
-    generative model that deals with sequential or structured data.
+    Predicts class probabilities for observed data `y_t` at each time step `t`, given 
+    the latent state `z_t` and an additional input `x_t`. The logits for each class are 
+    computed and converted to probabilities using a softmax function.
 
-    Attributes:
-        lin_z_to_hidden (nn.Linear): Linear transformation from the latent state to the hidden layer.
-        lin_x_to_hidden (nn.Linear): Linear transformation from the input to the hidden layer.
-        lin_hidden_to_hidden (nn.Linear): Linear transformation for processing concatenated hidden states.
-        lin_hidden_to_output (nn.Linear): Linear transformation from the hidden layer to the output logits.
-        relu (nn.ReLU): Rectified Linear Unit activation function.
-    
-    Args:
-        input_dim (int): The dimensionality of the input `x_t`.
-        z_dim (int): The dimensionality of the latent state `z_t`.
-        emission_dim (int): The size of the hidden layer used to process `z_t` and `x_t`.
-        n_classes (int): The number of classes for classification.
+    Attributes
+    ----------
+    lin_z_to_hidden : nn.Linear
+        Linear layer mapping the latent state to the hidden layer.
+    lin_x_to_hidden : nn.Linear
+        Linear layer mapping the input to the hidden layer.
+    lin_hidden_to_hidden : nn.Linear
+        Linear layer for processing concatenated hidden states.
+    lin_hidden_to_output : nn.Linear
+        Linear layer mapping the hidden layer to the output logits.
+    relu : nn.ReLU
+        Activation function applied after linear transformations.
+
+    Parameters
+    ----------
+    input_dim : int
+        Dimensionality of the input `x_t`.
+    z_dim : int
+        Dimensionality of the latent state `z_t`.
+    emission_dim : int
+        Size of the hidden layer for `z_t` and `x_t` processing.
+    n_classes : int
+        Number of classes for classification.
     """
 
     def __init__(self, input_dim: int, z_dim: int, emission_dim: int, n_classes: int):
@@ -121,21 +149,25 @@ class EmitterClassifier(nn.Module):
 
     def forward(self, z_t: torch.Tensor, x_t: torch.Tensor):
         """
-        Defines the forward pass for the EmitterClassifier.
+        Compute forward pass for the EmitterClassifier.
 
-        The method computes the transformation of the latent state `z_t` and the input `x_t` 
-        through separate linear layers followed by ReLU activations. The resulting hidden states
-        are concatenated and further transformed through a hidden-to-hidden linear layer. Finally,
-        the hidden state is transformed to output logits, which are converted to probabilities using
-        the softmax function for categorical classification.
+        Transforms the latent state `z_t` and input `x_t` through distinct linear layers followed by ReLU activations. 
+        Concatenates the resulting hidden states and processes through another linear layer. The final hidden state is 
+        transformed to logits and converted to class probabilities via softmax.
 
-        Args:
-            z_t (torch.Tensor): The latent state at time `t`.
-            x_t (torch.Tensor): The additional input at time `t`.
+        Parameters
+        ----------
+        z_t : torch.Tensor
+            Latent state at time step `t`.
+        x_t : torch.Tensor
+            Additional input at time step `t`.
 
-        Returns:
-            torch.Tensor: The output tensor containing class probabilities for each class.
+        Returns
+        -------
+        torch.Tensor
+            Class probabilities for each class at time step `t`.
         """
+
         # Process the latent and input states through respective linear layers followed by ReLU activation.
         h1_z = self.relu(self.lin_z_to_hidden(z_t))
         h1_x = self.relu(self.lin_x_to_hidden(x_t))
