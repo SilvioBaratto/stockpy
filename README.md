@@ -28,8 +28,8 @@
 - Gated Recurrent Unit (GRU)
 - Bidirectional Gated Recurrent Unit (BiGRU)
 - Multilayer Perceptron (MLP)
+- Neuran Network Hidden Markov Models (NNHMM) 
 - Deep Markov Model (DMM) 
-- Gaussian Hidden Markov Models (GHMM) 
 
 ## Usage
 To use **stockpy**, start by importing the relevant models from the `stockpy.neural_network` and `stockpy.probabilistic` modules. The library can be used with various types of input data, such as CSV files, pandas dataframes, numpy arrays and torch arrays.
