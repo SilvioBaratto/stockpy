@@ -646,11 +646,12 @@ class BatchScoring(ScoringBase):
         -----
         - The method attempts to calculate the average score using the `get_avg_score` method.
         - The `_is_best_score` method is used to determine if the current average score is better
-        than all previous scores for the corresponding task (training or validation).
+          than all previous scores for the corresponding task (training or validation).
         - Updates the model's history with the average score for the current epoch.
         - If the current score is the best, updates the history with this fact.
         - The method is designed to handle the absence of valid data gracefully by using a try-except block.
         - It is annotated with `# pylint: disable=unused-argument` to prevent linting issues with unused arguments.
+
         """
         history = net.history
         try:  # don't raise if there is no valid data
@@ -934,14 +935,16 @@ class EpochScoring(ScoringBase):
         Notes
         -----
         - The method will not execute if `X_test` is None, indicating that there is no
-        data to score against.
+          data to score against.
         - Caching behavior is determined by the `use_caching` attribute and the `net`'s
-        caching policy.
+          caching policy.
         - The method updates the history with the current score by invoking the
-        `_record_score` method.
+          `_record_score` method.
         - It relies on the `_scoring` method to compute the score and uses a context manager
-        `_cache_net_forward_iter` to handle caching if necessary.
+          `_cache_net_forward_iter` to handle caching if necessary.
+
         """
+
         use_caching = self.use_caching
         if net.use_caching !=  'auto':
             use_caching = net.use_caching

@@ -148,7 +148,7 @@ class DMM(PyroModule):
         self.rnn = nn.GRU(input_size=self.n_features_in_,
                             hidden_size=self.rnn_dim,
                             batch_first=True,
-                            bidirectional=False,
+                            bidirectional=True,
                             num_layers=self.num_layers,
                             bias=self.bias,
                             )
@@ -159,7 +159,7 @@ class DMM(PyroModule):
         self.z_0 = nn.Parameter(torch.zeros(self.z_dim))
         self.z_q_0 = nn.Parameter(torch.zeros(1, self.z_dim))
         # define a (trainable) parameter for the initial hidden state of the RNN
-        self.h_0 = nn.Parameter(torch.zeros(1, 1, self.rnn_dim))
+        self.h_0 = nn.Parameter(torch.zeros(self.num_layers * 2, 1, self.rnn_dim))
 
     @property
     def model_type(self):
@@ -168,13 +168,6 @@ class DMM(PyroModule):
 class DMMRegressor(Regressor, DMM):
     """
     Specialized DMM for regression tasks using deep generative modeling.
-
-    Inherits From
-    -------------
-    Regressor
-        Base class for regression models.
-    DMM
-        Base class for deep generative models following a Markov process.
 
     Attributes
     ----------
@@ -205,8 +198,8 @@ class DMMRegressor(Regressor, DMM):
     **kwargs
         Additional arbitrary keyword arguments passed to Regressor base class.
 
-    Note
-    ----
+    Notes
+    -----
     Adjusts DMM output dimensions for regression task requirements.
     """
 
@@ -250,8 +243,6 @@ class DMMRegressor(Regressor, DMM):
                      bias=bias,
                      seq_len=seq_len,
                      **kwargs)
-        
-        self.criterion = nn.MSELoss()
 
     def model(self, x, y, annealing_factor=1.0):
         """
@@ -268,12 +259,6 @@ class DMMRegressor(Regressor, DMM):
         annealing_factor : float, optional
             Factor to anneal the KL-divergence term in the loss during training (default is 1.0).
 
-        Notes
-        -----
-        - This function is part of the Pyro model-guide pair required for stochastic variational inference (SVI).
-        - Annealing of the KL-divergence is incorporated to stabilize training in the early epochs.
-        - The `pyro.plate` construct is utilized to denote independent batches for stochastic sampling.
-        - Time dependencies within the sequence data are managed using Pyro's `markov` context manager.
         """
 
         # Determine the sequence length from the input features `x`.
@@ -314,7 +299,8 @@ class DMMRegressor(Regressor, DMM):
                 # Sample the observation `y` at time `t` from the normal distribution parameterized
                 # by the output of the emission module. The `obs=y[:, t - 1, :]` argument indicates
                 # that this sample corresponds to the actual observed data.
-                pyro.sample("obs_y_%d" % t, dist.Normal(mu, sigma).to_event(1), obs=y[:, t - 1, :])
+                pyro.sample("obs_y_%d" % t, dist.Normal(mu, sigma).to_event(1), 
+                            obs=y)
 
                 # Update `z_prev` to the current `z_t` to be used in the next time step.
                 z_prev = z_t
@@ -334,12 +320,6 @@ class DMMRegressor(Regressor, DMM):
         annealing_factor : float, optional
             Factor to anneal the KL-divergence term in the loss during training (default is 1.0).
 
-        Notes
-        -----
-        - This function is a component of the Pyro model-guide pair required for stochastic variational inference (SVI).
-        - It outlines the family of distributions for approximating the posterior.
-        - Temporal dependencies within the sequence data are managed using Pyro's `markov` context manager.
-        - Parameters for the variational distribution are computed using the RNN's hidden state.
         """
         
         # Determine the sequence length from the input features `x`.
@@ -348,13 +328,10 @@ class DMMRegressor(Regressor, DMM):
         pyro.module("dmm", self)
         
         # Prepare the initial hidden state for the RNN, ensuring it's compatible with the input's batch size.
-        h_0_contig = self.h_0.expand(self.num_layers, x.size(0), self.rnn.hidden_size).contiguous()
+        h_0_contig = self.h_0.expand(self.num_layers * 2, x.size(0), self.rnn.hidden_size).contiguous()
         
         # Process the sequence `x` through the RNN to obtain the output for each time step.
         rnn_output, _ = self.rnn(x, h_0_contig)
-
-        # Invert the sequence of the RNN output for backwards time processing if needed.
-        rnn_output = rnn_output.flip(1)
         
         # Initialize the previous latent state `z_prev` with `z_q_0`, which is a trainable parameter
         # that represents the initial state of the latent variable.
@@ -405,13 +382,6 @@ class DMMRegressor(Regressor, DMM):
             with shape (batch_size, output_dim), where `output_dim` is the dimension of the output
             features.
 
-        Notes
-        -----
-        - This method is predicated on a defined `guide` capable of providing the necessary latent
-        variables `z_t` for prediction.
-        - Only the predictions for the last time step are returned, suiting sequence-to-one prediction
-        tasks. For sequence-to-sequence predictions, modify the method to return the entire sequence
-        of predictions.
         """
         # Initialize a list to hold the predictions at each time step.
         preds = []
@@ -539,8 +509,6 @@ class DMMClassifier(Classifier, DMM):
                      bias=bias,
                      seq_len=seq_len,
                      **kwargs)
-        
-        self.criterion = nn.NLLLoss()
 
     def model(self, x, y, annealing_factor=1.0):
         """
@@ -560,19 +528,6 @@ class DMMClassifier(Classifier, DMM):
         annealing_factor : float, optional
             A factor to anneal the KL-divergence term in the variational loss during training. It can
             help in stabilizing the training in its early stages, by default 1.0.
-
-        Notes
-        -----
-        The `model` function is invoked during the training loop in the context of stochastic variational
-        inference (SVI) in Pyro. It specifies how the latent variables are generated (the prior) and how
-        they generate the observed data (the likelihood).
-
-        - It is crucial for the `model` to be paired with an appropriate guide (variational posterior)
-        during inference in Pyro's SVI.
-        - The use of `pyro.plate` indicates conditional independence of the data and helps in scaling to
-        large datasets by enabling mini-batch training.
-        - Temporal dependencies within the sequence are captured using Pyro's `markov` context manager
-        which allows for defining state transitions in the latent state space.
 
         """
 
@@ -628,25 +583,14 @@ class DMMClassifier(Classifier, DMM):
         annealing_factor : float, optional
             A factor used to anneal the KL-divergence term in the variational loss during the training
             process, by default 1.0.
-
-        Notes
-        -----
-        The `guide` function works in tandem with the `model` function during variational inference
-        using Pyro's SVI framework. The guide is optimized to minimize the KL-divergence with respect
-        to the true posterior.
-
-        - The use of `pyro.plate` indicates conditional independence of the data and supports
-        mini-batch training by denoting independent batches.
-        - The `markov` context manager from Pyro is used to model the transitions of the latent
-        Markovian states, maintaining their temporal dependency structure.
-        - While `y` is not used in the guide, it is included in the parameter list to match the
-        signature of the `model` function.
         
         Examples
         --------
         >>> def guide(self, x, y=None):
         ...     # Approximate posterior specification here.
         ...     pass
+
+
         """
         
         # Determine the maximum number of time steps from the input shape.
@@ -656,13 +600,10 @@ class DMMClassifier(Classifier, DMM):
         pyro.module("dmm", self)
 
         # Expand and reformat the initial hidden state of the RNN to match the batch size and layers.
-        h_0_contig = self.h_0.expand(self.num_layers, x.size(0), self.rnn.hidden_size).contiguous()
+        h_0_contig = self.h_0.expand(self.num_layers * 2, x.size(0), self.rnn.hidden_size).contiguous()
 
         # Process the input `x` through the RNN to obtain the output for each time step.
         rnn_output, _ = self.rnn(x, h_0_contig)
-
-        # Reverse the output of the RNN to match the reversed order of the guide relative to the model.
-        rnn_output = rnn_output.flip(1)
         
         # Expand the initial approximate latent state `z_q_0` to match the batch size.
         z_prev = self.z_q_0.expand(x.size(0), self.z_dim)
@@ -714,13 +655,6 @@ class DMMClassifier(Classifier, DMM):
         >>> predicted_classes = torch.argmax(probabilities, dim=1)
         # predicted_classes contains the most probable class for each instance in the batch.
 
-        Notes
-        -----
-        - The `guide` function must be properly defined and initialized within the class as it is critical
-        for sampling the latent variables during the variational inference process.
-        - The `emitter` is a neural network module that takes as input the latent variables `z_t` and
-        the features `x` to generate the logits for class probabilities. This module should be
-        adequately defined and initialized to enable the forward computation.
         """
 
         preds = []

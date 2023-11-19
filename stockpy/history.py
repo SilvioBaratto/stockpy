@@ -363,8 +363,8 @@ class History(list):
     >>> history[-1, 'batches', -1]  # Access the last batch of the last epoch
     >>> history[-1, 'batches', :, 'train_loss']  # Access training losses from all batches of the last epoch
 
-    Note
-    ----
+    Notes
+    -----
     Accessing non-existing keys will lead to a KeyError. Also, if multiple keys are requested,
     only the epochs or batches containing all those keys will be returned.
     """
@@ -385,22 +385,25 @@ class History(list):
 
         self.append({'batches': []})
 
-    def new_epoch(self):
+    def new_batch(self):
         """
-        Register a new epoch.
+        Add a new batch to the last recorded epoch in the history.
 
-        Appends a new dictionary to the history list, representing a new epoch. This dictionary is initialized with an empty 'batches' list.
+        This method is used to record the start of a new batch during the training of a model. It appends an empty dictionary 
+        to the 'batches' list of the last recorded epoch in the history. This dictionary will later be filled with the metrics 
+        recorded during the batch.
 
-        Examples
-        --------
-        >>> history = History()
-        >>> history.new_epoch()
-        >>> print(history)
-        [{'batches': []}]
+        Raises
+        ------
+        IndexError
+            If there are no epochs recorded in the history. This is because batches are recorded within epochs, so there must 
+            be at least one epoch recorded before a batch can be added.
+
+        Notes
+        -----
+        This method modifies the history in-place, adding a new batch to the last recorded epoch.
         """
-
-        if not self:
-            raise IndexError("Cannot add a batch to history because there are no epochs recorded.")
+        
         self[-1]['batches'].append({})
 
     def record(self, attr, value):
@@ -459,9 +462,7 @@ class History(list):
         >>> print(history)
         [{'batches': [{'batch_loss': 0.15}]}]
         """
-
-        if not self or not self[-1].get('batches'):
-            raise IndexError("Cannot record a batch value because no batch has been registered yet.")
+        
         self[-1]['batches'][-1][attr] = value
 
     def to_list(self):

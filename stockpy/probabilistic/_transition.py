@@ -1,7 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from stockpy.utils import get_activation_function
 
 class Transition(nn.Module):
     """
@@ -120,8 +118,3 @@ class Transition(nn.Module):
         scale = self.softplus(self.lin_sig(combined_for_scale))
 
         return loc, scale
-
-
-
-
-

@@ -55,6 +55,8 @@ class BiGRU(nn.Module):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Constructor for the BiGRU class.
@@ -72,6 +74,8 @@ class BiGRU(nn.Module):
         self.activation = activation
         self.bias = bias
         self.seq_len = seq_len
+        self.batch_norm = batch_norm
+        self.layer_norm = layer_norm
 
     def initialize_module(self):
         """
@@ -94,8 +98,10 @@ class BiGRU(nn.Module):
 
         if isinstance(self, Classifier):
             self.output_size = self.n_classes_
+            self.criterion_ = nn.NLLLoss()
         elif isinstance(self, Regressor):
             self.output_size = self.n_outputs_
+            self.criterion_ = nn.MSELoss()
 
         self.bigru = nn.GRU(input_size=self.n_features_in_,
                              hidden_size=self.rnn_size,
@@ -107,9 +113,14 @@ class BiGRU(nn.Module):
         layers = []
 
         fc_input_size = self.rnn_size * 2
-        # Creates the layers of the neural network
         for hidden_size in self.hidden_sizes:
             layers.append(nn.Linear(fc_input_size, hidden_size, bias=self.bias))
+            # append batch normalization layer if specified
+            if self.batch_norm:
+                layers.append(nn.BatchNorm1d(hidden_size))
+            # append layer normalization layer if specified
+            if self.layer_norm:
+                layers.append(nn.LayerNorm(hidden_size))
             layers.append(get_activation_function(self.activation))
             layers.append(nn.Dropout(self.dropout))
 
@@ -161,8 +172,8 @@ class BiGRUClassifier(Classifier, BiGRU):
     RuntimeError
         If the forward pass is called before the model is properly configured.
 
-    Note
-    ----
+    Notes
+    -----
     The rest of the methods from `Classifier` and `BiGRU` are inherited.
     """
 
@@ -174,6 +185,8 @@ class BiGRUClassifier(Classifier, BiGRU):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Initializes the MLPClassifier object with given or default parameters.
@@ -187,10 +200,10 @@ class BiGRUClassifier(Classifier, BiGRU):
                         activation=activation,
                         seq_len=seq_len,
                         bias=bias,
+                        batch_norm=batch_norm,
+                        layer_norm=layer_norm,
                         **kwargs
                         )
-
-        self.criterion = nn.NLLLoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -233,41 +246,44 @@ class BiGRUClassifier(Classifier, BiGRU):
         return out
 
 class BiGRURegressor(Regressor, BiGRU):
-
     """
     A regressor that uses a Gated Recurrent Unit (BiGRU) network for sequence regressions tasks.
 
     The `BiGRURegressor` extends both `Regressor` and `BiGRU` classes, leveraging the BiGRU capabilities for sequence 
     processing and applying it to regression problems.
 
-    Attributes (inherited):
-        rnn_size : int
-            The number of features in the hidden state `h` of each BiGRU layer.
-        hidden_size : int or list of int
-            The number of features in the hidden layer(s) of the regressor. Can be a list to specify the size of each layer.
-        num_layers : int
-            The number of stacked BiGRU layers.
-        dropout : float
-            The dropout probability for the dropout layers in the regressor.
-        activation : str
-            The activation function for the hidden layers.
-        bias : bool
-            Whether to use bias terms in the BiGRU and linear layers.
-        seq_len : int
-            The length of the input sequences.
+    Parameters
+    ----------
+    rnn_size : int
+        The number of features in the hidden state `h` of each BiGRU layer.
+    hidden_size : int or list of int
+        The number of features in the hidden layer(s) of the regressor. Can be a list to specify the size of each layer.
+    num_layers : int
+        The number of stacked BiGRU layers.
+    dropout : float
+        The dropout probability for the dropout layers in the regressor.
+    activation : str
+        The activation function for the hidden layers.
+    bias : bool
+        Whether to use bias terms in the BiGRU and linear layers.
+    seq_len : int
+        The length of the input sequences.
 
-    Methods:
-        __init__(...)
-            Constructor for `BiGRURegressor` which initializes the base BiGRU structure and regression specific layers.
+    Methods
+    -------
+    __init__(...)
+        Constructor for `BiGRURegressor` which initializes the base BiGRU structure and regression specific layers.
+    forward(x)
+        Defines the forward pass of the model.
 
-        forward(x)
-            Defines the forward pass of the model.
+    Raises
+    ------
+    RuntimeError
+        If the forward pass is called before the model is properly configured.
 
-    Raises:
-        RuntimeError
-            If the forward pass is called before the model is properly configured.
-
-    Note: The rest of the methods from `Classifier` and `BiGRU` are inherited.
+    Notes
+    -----
+    The rest of the methods from `Classifier` and `BiGRU` are inherited.
     """
 
     def __init__(self,
@@ -278,6 +294,8 @@ class BiGRURegressor(Regressor, BiGRU):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Initializes the MLPClassifier object with given or default parameters.
@@ -291,10 +309,10 @@ class BiGRURegressor(Regressor, BiGRU):
                      activation=activation, 
                      seq_len=seq_len,
                      bias=bias, 
+                     batch_norm=batch_norm,
+                     layer_norm=layer_norm,
                      **kwargs
                      )
-
-        self.criterion = nn.MSELoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

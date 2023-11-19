@@ -16,10 +16,6 @@ class NotInitializedError(StockpyException, NotFittedError):
     initialization, such as by calling its `.initialize()` method or training
     the model with `.fit(...)`, but such initialization has not yet occurred.
 
-    Inherits from
-    -------------
-    StockpyException : The base exception for the Stockpy framework.
-    NotFittedError : Exception from the scikit-learn library for unfitted estimators.
     """
 
 
@@ -31,9 +27,6 @@ class StockpyAttributeError(StockpyException):
     object within the Stockpy framework, indicating a misuse or a potential
     error in code logic.
 
-    Inherits from
-    -------------
-    StockpyException : The base exception for the Stockpy framework.
     """
 
 
@@ -45,9 +38,6 @@ class StockpyWarning(UserWarning):
     are not critical enough to raise exceptions but are meant to inform the user
     of potential issues or misconfigurations.
 
-    Inherits from
-    -------------
-    UserWarning : The base class for warnings in Python.
     """
 
 
@@ -59,9 +49,6 @@ class DeviceWarning(StockpyWarning):
     such as CUDA, indicating that the user should check the device configuration
     or availability.
 
-    Inherits from
-    -------------
-    StockpyWarning : The base warning for the Stockpy framework.
     """
 
 
@@ -73,9 +60,6 @@ class StockpyTrainingImpossibleError(StockpyException):
     being trained. This could be due to an incorrect configuration, state, or
     other issues that prevent the training process from starting or completing.
 
-    Inherits from
-    -------------
-    StockpyException : The base exception for the Stockpy framework.
     """
 
 
@@ -88,7 +72,4 @@ class LowProbabilityError(StockpyException):
     confidence in the predictions and potentially requiring review or adjustment
     of the model or its parameters.
 
-    Inherits from
-    -------------
-    StockpyException : The base exception for the Stockpy framework.
     """

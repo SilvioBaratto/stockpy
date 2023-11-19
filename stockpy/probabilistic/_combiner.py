@@ -45,9 +45,9 @@ class Combiner(nn.Module):
     def __init__(self, z_dim: int, rnn_dim: int):
         super().__init__()
         # Initialize the three linear transformations used in the neural network.
-        self.lin_z_to_hidden = nn.Linear(z_dim, rnn_dim)
-        self.lin_hidden_to_loc = nn.Linear(rnn_dim, z_dim)
-        self.lin_hidden_to_scale = nn.Linear(rnn_dim, z_dim)
+        self.lin_z_to_hidden = nn.Linear(z_dim, rnn_dim * 2)
+        self.lin_hidden_to_loc = nn.Linear(rnn_dim * 2, z_dim)
+        self.lin_hidden_to_scale = nn.Linear(rnn_dim * 2, z_dim)
         
         # Initialize the two non-linearities used in the neural network.
         self.tanh = nn.Tanh()

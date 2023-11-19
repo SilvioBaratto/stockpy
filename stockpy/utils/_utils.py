@@ -1016,11 +1016,6 @@ def is_stockpy_dataset(ds):
     >>> is_stockpy_dataset(subset_dataset)
     True
 
-    Notes
-    -----
-    - The function checks for the type recursively. If the dataset is a `Subset`, the function
-    calls itself with the underlying dataset to perform the check. This allows it to handle
-    nested `Subset` structures.
     """
     from stockpy.preprocessing import StockpyDataset  # Assuming StockpyDataset is defined here
 
@@ -1205,8 +1200,8 @@ class FirstStepAccumulator:
     >>> accumulator.get_step()
     1
 
-    Note
-    ----
+    Notes
+    -----
     This accumulator is used by default in `nn.Module or PyroModule` for optimizers that call the train step once. If using 
     an optimizer that calls the train step multiple times (e.g., LBFGS), and you wish to use a different accumulating 
     strategy (like accumulating the last step), you would need to implement a custom accumulator.
@@ -1533,17 +1528,21 @@ def _infer_predict_nonlinearity(net):
         based on the loss criterion.
 
     """
-    # At the moment, this function dispatches based on the criterion.
-    if isinstance(net.criterion, torch.nn.CrossEntropyLoss):
-        return partial(torch.softmax, dim=-1)
+    if net.prob is False:
+        # At the moment, this function dispatches based on the criterion.
+        if isinstance(net.criterion_, torch.nn.CrossEntropyLoss):
+            return partial(torch.softmax, dim=-1)
 
-    if isinstance(net.criterion, torch.nn.BCEWithLogitsLoss):
-        return _sigmoid_then_2d
+        if isinstance(net.criterion_, torch.nn.BCEWithLogitsLoss):
+            return _sigmoid_then_2d
 
-    if isinstance(net.criterion, torch.nn.BCELoss):
-        return _make_2d_probs
+        if isinstance(net.criterion_, torch.nn.BCELoss):
+            return _make_2d_probs
 
-    return _identity
+        return _identity
+    
+    else:
+        return _identity
 
 class TeeGenerator:
     """

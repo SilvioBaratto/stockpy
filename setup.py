@@ -1,34 +1,40 @@
-import setuptools 
+import os
 
-with open("README.md", "r", encoding="utf-8") as fh:
-    long_description = fh.read()
+from setuptools import setup, find_packages
 
-setuptools.setup(
-    name='stockpy-learn',
-    version='0.3.1',
-    author='Silvio Baratto',
-    author_email='silvio.baratto22@gmail.com',
-    description='stockpy: Deep Learning-Based Regression and Classification Framework built on top of PyTorch and Pyro',
-    long_description=long_description,
-    long_description_content_type="text/markdown",
+with open('VERSION', 'r') as f:
+    version = f.read().rstrip()
+
+with open('requirements.txt') as f:
+    install_requires = [l.strip() for l in f]
+
+python_requires = '>=3.8'
+
+docs_require = [
+    'Sphinx',
+    'sphinx_rtd_theme',
+    'numpydoc',
+]
+
+here = os.path.abspath(os.path.dirname(__file__))
+try:
+    README = open(os.path.join(here, 'README.rst')).read()
+except IOError:
+    README = ''
+    
+setup(
+    name='stockpy',
+    version=version,
+    description='Deep Learning Regression and Classification Library built on top of PyTorch and Pyro',
+    long_description=README,
+    license='MIT License',
+    packages=find_packages(),
+    include_package_data=True,
     url="https://github.com/SilvioBaratto/stockpy",
-    classifiers=[
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: MIT License',
-        "Operating System :: OS Independent", 
-        'Programming Language :: Python :: 3',
-        "Intended Audience :: Science/Research",
-        "Topic :: Scientific/Engineering :: Mathematics",
-    ],
-    packages=setuptools.find_packages(),
-    python_requires='>=3.6',
-    install_requires=[
-        "torch>=1.9.1",
-        "pyro-ppl>=1.7.0",
-        "numpy>=1.21.2",
-        "pandas>=1.3.3",
-        "tqdm>=4.62.3",
-        "scikit-learn>=0.24.2",
-        "safetensors>=0.4.0"
-    ],
+    zip_safe=False,
+    python_requires=python_requires,
+    install_requires=install_requires,
+    extras_require={
+        'docs': docs_require,
+    },
 )

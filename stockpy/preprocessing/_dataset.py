@@ -139,6 +139,18 @@ class StockDatasetRNN(StockpyDataset):
         The length of the data sequences to be used by the RNN.
     """
 
+    def __init__(
+            self,
+            X,
+            y,
+            length,
+            seq_len
+    ):
+
+        super(StockDatasetRNN, self).__init__(X, y, length)
+
+        self.seq_len = seq_len
+
     def __getitem__(self, i):
         """
         Retrieve the i-th time sequence from the dataset.
@@ -166,20 +178,30 @@ class StockDatasetRNN(StockpyDataset):
         # Extract the data and target for the specified index.
         X, y = self.X, self.y
 
-        # Check if 'i' is within the range of 'X'
-        if i < 0 or i >= len(self.X):
-            raise IndexError(f"Index {i} is out of bounds for dataset with length {len(self.X)}")
+        if i < 0 or i >= len(X):
+            raise IndexError(f"Index {i} is out of bounds for dataset with length {len(X)}")
 
-        # If 'i' allows for a full sequence, take a slice of 'X' directly
+        is_numpy = isinstance(X, np.ndarray)
+        is_torch = isinstance(X, torch.Tensor)
+
+        if is_numpy:
+            zero_func = np.zeros
+            concat_func = np.concatenate
+        elif is_torch:
+            zero_func = torch.zeros
+            concat_func = torch.cat
+        else:
+            raise TypeError("Unsupported data type for X. Expected numpy.ndarray or torch.Tensor")
+
         if i >= self.seq_len - 1:
             X_seq = X[i - self.seq_len + 1:i + 1, :]
         else:
-            # If not enough data points are available, pad the sequence with zeros
             padding_shape = (self.seq_len - (i + 1), X.shape[1])
-            padding = np.zeros(padding_shape, dtype=X.dtype)
-            X_seq = np.concatenate((padding, X[:i + 1, :]), axis=0)
+            padding = zero_func(padding_shape, dtype=X.dtype)
+            if is_torch:
+                padding = padding.to(X.device)  # Ensure padding is on the same device as X
+            X_seq = concat_func((padding, X[:i + 1, :]), axis=0)
 
-        # Ensure that 'X_seq' is of shape (seq_len, n_features)
         assert X_seq.shape[0] == self.seq_len, f"Sequence length mismatch: expected {self.seq_len}, got {X_seq.shape[0]}"
 
         # Get the feature sequence for the RNN

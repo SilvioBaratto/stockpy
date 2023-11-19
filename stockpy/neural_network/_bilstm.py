@@ -58,6 +58,8 @@ class BiLSTM(nn.Module):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         
         """
@@ -76,6 +78,8 @@ class BiLSTM(nn.Module):
         self.activation = activation
         self.bias = bias
         self.seq_len = seq_len
+        self.batch_norm = batch_norm
+        self.layer_norm = layer_norm
 
     def initialize_module(self):
         """
@@ -94,8 +98,10 @@ class BiLSTM(nn.Module):
 
         if isinstance(self, Classifier):
             self.output_size = self.n_classes_
+            self.criterion_ = nn.NLLLoss()
         elif isinstance(self, Regressor):
             self.output_size = self.n_outputs_
+            self.criterion_ = nn.MSELoss()
 
         self.bilstm = nn.LSTM(input_size=self.n_features_in_,
                              hidden_size=self.rnn_size,
@@ -107,9 +113,14 @@ class BiLSTM(nn.Module):
         layers = []
 
         fc_input_size = self.rnn_size * 2
-        # Creates the layers of the neural network
         for hidden_size in self.hidden_sizes:
             layers.append(nn.Linear(fc_input_size, hidden_size, bias=self.bias))
+            # append batch normalization layer if specified
+            if self.batch_norm:
+                layers.append(nn.BatchNorm1d(hidden_size))
+            # append layer normalization layer if specified
+            if self.layer_norm:
+                layers.append(nn.LayerNorm(hidden_size))
             layers.append(get_activation_function(self.activation))
             layers.append(nn.Dropout(self.dropout))
 
@@ -171,6 +182,8 @@ class BiLSTMClassifier(Classifier, BiLSTM):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Constructs an LSTMClassifier instance with specified parameters for the LSTM
@@ -187,10 +200,10 @@ class BiLSTMClassifier(Classifier, BiLSTM):
                         activation=activation,
                         seq_len=seq_len,
                         bias=bias,
+                        batch_norm=batch_norm,
+                        layer_norm=layer_norm,
                         **kwargs
                         )
-
-        self.criterion = nn.NLLLoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -279,6 +292,8 @@ class BiLSTMRegressor(Regressor, BiLSTM):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Constructs an LSTMRegressor instance with specified parameters for the LSTM
@@ -295,10 +310,10 @@ class BiLSTMRegressor(Regressor, BiLSTM):
                      activation=activation, 
                      seq_len=seq_len,
                      bias=bias, 
+                     batch_norm=batch_norm,
+                     layer_norm=layer_norm,
                      **kwargs
                      )
-
-        self.criterion = nn.MSELoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

@@ -7,7 +7,6 @@ from pyro.nn import PyroModule, PyroSample
 
 from stockpy.base import Regressor
 from stockpy.base import Classifier 
-from stockpy.utils import to_device
 from stockpy.utils import get_activation_function
 
 __all__ = ['BNNClassifier', 'BNNRegressor']
@@ -41,11 +40,6 @@ class BNN(PyroModule):
     bias : bool
         Indicates if bias parameters are included in the network layers.
 
-    Notes
-    -----
-    - This class defines the structure of a BNN where priors can be placed over weights and/or biases.
-    - The network can be constructed with one or more hidden layers based on the `hidden_size` parameter.
-    - `**kwargs` can be used to pass additional parameters that can be used in the PyroModule base class.
     """
 
     def __init__(self,
@@ -79,14 +73,6 @@ class BNN(PyroModule):
             initialization. This function presupposes the network's detailed setup as a classifier
             or regressor has been completed.
 
-        Notes
-        -----
-        - This function is usually called within the model's fit method and is not intended for 
-        direct external calls unless the network is pre-configured correctly.
-        - It is essential that the network's architecture, including input and output sizes,
-        and the number of layers, is defined before calling this method.
-        - The class instance should have attributes like `hidden_size`, `output_size`, `activation`,
-        and `dropout` set up prior to this method invocation.
         """
 
         # Checks if hidden_sizes is a single integer and, if so, converts it to a list
@@ -131,7 +117,6 @@ class BNN(PyroModule):
         layers.append(output_layer)
         # Stacks all the layers into a sequence
         self.layers = PyroModule[nn.Sequential](*layers)
-        to_device(self.layers, self.device)
 
     @property
     def model_type(self):
@@ -143,11 +128,6 @@ class BNNClassifier(Classifier, BNN):
 
     This class provides a classifier with Bayesian inference abilities using the principles outlined in the BNN class,
     bringing the uncertainty quantification of Bayesian methods to classification problems.
-
-    Inherits
-    --------
-    BNN : Base class for Bayesian Neural Network functionalities.
-    Classifier : Base class for classification specific functionalities.
 
     Attributes
     ----------
@@ -209,8 +189,6 @@ class BNNClassifier(Classifier, BNN):
                      bias=bias, 
                      **kwargs
                      )
-
-        self.criterion = nn.NLLLoss()
             
     def model(self, x, y):
         """
@@ -338,15 +316,6 @@ class BNNClassifier(Classifier, BNN):
             The tensor of averaged predictions, representing the mean of the 
             predictive distribution obtained from the Monte Carlo samples of the 
             guide function.
-
-        Notes
-        -----
-        - The `self.n_outputs_` attribute needs to be predefined and should correspond 
-        to the number of outputs for the guide function, determining the number of 
-        Monte Carlo samples to take.
-        - The guide function must be defined and properly initialized in the class, as 
-        it is used to sample the variational posterior and generate the set of 
-        predictions for averaging.
         """
 
         preds = []
@@ -385,12 +354,6 @@ class BNNRegressor(Regressor, BNN):
         Additional keyword arguments that are passed to the base Regressor and BNN classes
         to allow for more customization.
 
-    Notes
-    -----
-    - The network should be configured with its hyperparameters before calling the fitting
-      methods to ensure proper initialization of all components.
-    - The regression is performed under the Bayesian framework, which enables the model
-      to capture uncertainty in the predictions.
     """
 
     def __init__(self,
@@ -421,14 +384,6 @@ class BNNRegressor(Regressor, BNN):
         ValueError
             If the `hidden_size` is not specified or the `activation` function is not recognized.
 
-        Notes
-        -----
-        The `**kwargs` may include configurations specific to the `Regressor` class, such as
-        the number of output features (`n_outputs_`), batch size, and other hyperparameters relevant
-        to regression tasks.
-
-        The initialization method ensures that all network parameters are properly set according to the
-        Bayesian paradigm, where weights and biases are treated as distributions rather than fixed values.
         """
 
         Regressor.__init__(self, **kwargs)
@@ -440,8 +395,6 @@ class BNNRegressor(Regressor, BNN):
                      **kwargs
                      )
 
-        self.criterion = nn.MSELoss()
-        
     def model(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
         Defines the generative model for a Bayesian neural network where the weights
@@ -563,6 +516,7 @@ class BNNRegressor(Regressor, BNN):
         reflects the number of times the guide should be run to generate
         predictions. Each guide run produces a sample from the variational
         posterior which are then averaged to form the final prediction.
+        
         """
 
         preds = []

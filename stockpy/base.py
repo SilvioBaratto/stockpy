@@ -144,8 +144,8 @@ def _set_optimizer_param(optimizer, param_group, param_name, value):
     value : float
         The new value to set for the parameter.
 
-    Example
-    -------
+    Examples
+    --------
     >>> optimizer = torch.optim.Adam([...], lr=0.001)  # An example optimizer
     >>> _set_optimizer_param(optimizer, 'all', 'lr', 0.01)
     # This sets the learning rate to 0.01 for all parameter groups
@@ -340,16 +340,16 @@ class BaseEstimator:
             A list of tuples where the first element is the callback identifier (str)
             and the second element is an instance of the callback (object).
 
-        Example
-        -------
+        Examples
+        --------
         By accessing this property, you get the default callbacks:
 
         >>> model = YourModelClass()
         >>> model._default_callbacks
         [('epoch_timer', EpochTimer()), ('train_loss', PassthroughScoring(name='train_loss', on_train=True)), ...]
 
-        Note
-        ----
+        Notes
+        -----
         This is an internal property meant to be used by the training framework to maintain
         a consistent set of callbacks. Users can typically override or extend the list of callbacks
         by providing their own during the initialization or configuration of their model instance.
@@ -387,8 +387,8 @@ class BaseEstimator:
         **cb_kwargs : dict
             Arbitrary keyword arguments that will be passed to the method.
 
-        Example
-        -------
+        Examples
+        --------
         Assuming a callback is registered with a method `on_epoch_end`, it can be notified like so:
 
         >>> trainer = YourTrainingClass()
@@ -396,8 +396,8 @@ class BaseEstimator:
         >>> trainer.notify('on_epoch_end', epoch=5, logs={...})
         # This will call `on_epoch_end` on the instance and all callbacks with the provided arguments.
 
-        Note
-        ----
+        Notes
+        -----
         All callbacks registered in `self.callbacks_` are expected to have the method specified
         by `method_name`. If a callback does not have this method, an AttributeError will be raised.
         """
@@ -454,15 +454,15 @@ class BaseEstimator:
             A 3-element tuple consisting of the callback's name (str), the callback instance (object),
             and a boolean indicating whether the callback was named by the user (bool).
 
-        Example
-        -------
+        Examples
+        --------
         >>> trainer = YourTrainingClass()
         >>> for name, cb_instance, named_by_user in trainer._yield_callbacks():
         >>>     print(f"Callback Name: {name}, Named by User: {named_by_user}")
         # This will print the name of each callback and whether it was named by the user.
 
-        Note
-        ----
+        Notes
+        -----
         This is an internal method and is expected to be used by the class internally to
         process callbacks. The order of callbacks, except for `PrintLog`, is not guaranteed.
         """
@@ -509,8 +509,8 @@ class BaseEstimator:
             and lists of callback instances as values, and the second element is a set of 
             callback names that were explicitly set by the user.
 
-        Example
-        -------
+        Examples
+        --------
         >>> trainer = YourTrainingClass()
         >>> callbacks_grouped, names_set_by user = trainer._callbacks_grouped_by_name()
         >>> print(callbacks_grouped)
@@ -518,8 +518,8 @@ class BaseEstimator:
         >>> print(names_set_by_user)
         # Output might be a set of user-set callback names like {'TrainLoss', 'ValidLoss'}
 
-        Note
-        ----
+        Notes
+        -----
         This method is typically used internally to prepare and manage the state before starting
         a training process or similar routine. It ensures that callbacks can be executed or 
         retrieved efficiently by grouping them by name.
@@ -557,15 +557,15 @@ class BaseEstimator:
             If duplicate user-set callback names are found or if renaming a callback
             to ensure uniqueness results in a name that already exists.
 
-        Example
-        -------
+        Examples
+        --------
         >>> trainer = YourTrainingClass()
         >>> for unique_name, cb in trainer._uniquely_named_callbacks():
         >>>     print(f"Callback Name: {unique_name}")
         # This will print the unique name for each callback.
 
-        Note
-        ----
+        Notes
+        -----
         This is an internal method used to prepare callbacks before a process such as training
         starts. It is not meant to be used directly by the end-user.
         """
@@ -612,14 +612,14 @@ class BaseEstimator:
             If there are parameters set for a callback that does not exist or if there is
             an attempt to set a callback with a non-unique name.
 
-        Example
-        -------
+        Examples
+        --------
         >>> trainer = YourTrainingClass()
         >>> trainer.initialize_callbacks()
         # After this call, trainer.callbacks_ will have the initialized callbacks
 
-        Note
-        ----
+        Notes
+        -----
         This method is part of the setup process and should be called before starting the main
         routine (like training in machine learning) that uses callbacks.
         """
@@ -681,14 +681,14 @@ class BaseEstimator:
         object
             The initialized instance of the component.
 
-        Example
-        -------
+        Examples
+        --------
         >>> module = MyModuleClass
         >>> initialized_mod = trainer.initialized_instance(module, {'input_features': 10})
         # `initialized_mod` is now an instance of MyModuleClass with input_features set to 10
 
-        Note
-        ----
+        Notes
+        -----
         If `instance_or_cls` is already an instance and `kwargs` is provided, 
         a new instance of the same type is created with the given keyword 
         arguments. If `instance_or_cls` is a class or callable, it is 
@@ -716,8 +716,8 @@ class BaseEstimator:
         self : object
             The instance with the `criterion_` attribute set to the initialized criterion.
 
-        Example
-        -------
+        Examples
+        --------
         >>> model = YourModelClass()
         >>> model.initialize_criterion()
         # After this call, model.criterion_ will be set to the initialized criterion object
@@ -731,9 +731,7 @@ class BaseEstimator:
         """
 
         kwargs = self.get_params_for('criterion')
-        criterion = self.initialized_instance(self.criterion, kwargs)
-
-        self.criterion_ = criterion 
+        self.criterion_ = self.initialized_instance(self.criterion_, kwargs)
 
         return self
     
@@ -755,8 +753,8 @@ class BaseEstimator:
         bool
             True if the key matches any of the virtual parameter patterns, False otherwise.
 
-        Example
-        -------
+        Examples
+        --------
         >>> self._is_virtual_param('learning_rate')
         True  # If 'learning_rate' is a virtual parameter
         """
@@ -793,8 +791,8 @@ class BaseEstimator:
             The function to handle setting the virtual parameter. Defaults to
             `_virtual_setattr`, which sets the parameter directly on the instance.
 
-        Example
-        -------
+        Examples
+        --------
         >>> self._register_virtual_param('learning_rate_*', custom_handler_function)
         """
 
@@ -816,8 +814,8 @@ class BaseEstimator:
             A dictionary where keys are parameter names and values are
             the values to be set for those parameters.
 
-        Example
-        -------
+        Examples
+        --------
         >>> self._apply_virtual_params({'learning_rate_init': 0.01})
         # Applies the virtual parameter handling for 'learning_rate_init'
         """
@@ -835,8 +833,8 @@ class BaseEstimator:
         This method sets up an empty dictionary to hold virtual parameter patterns and
         their corresponding functions.
 
-        Example
-        -------
+        Examples
+        --------
         >>> self.initialize_virtual_params()
         # After this call, `self.virtual_params_` will be an empty dictionary ready to store virtual params
         """
@@ -857,8 +855,8 @@ class BaseEstimator:
         self : object
             The instance with the initialized `elbo` attribute.
 
-        Example
-        -------
+        Examples
+        --------
         >>> self.initialize_elbo()
         # This will set the `elbo` attribute on `self` after initializing it with the appropriate parameters.
         """
@@ -1383,8 +1381,8 @@ class BaseEstimator:
         'module_.bias' <class 'torch.nn.parameter.Parameter'>
         # etc.
 
-        Note
-        ----
+        Notes
+        -----
         Custom modules or criterions with learnable parameters should ensure they implement
         the `named_parameters` method to be compatible with this generator.
 
@@ -1437,8 +1435,8 @@ class BaseEstimator:
         >>> net._initialize_optimizer()
         This returns the instance of `NeuralNet` after initializing the optimizer.
 
-        Note
-        ----
+        Notes
+        -----
         This method should not be called directly in most cases; it is intended to be used 
         internally by the network's initialization sequence.
 
@@ -1496,8 +1494,8 @@ class BaseEstimator:
         >>> net._initialize_history()
         This returns the instance of `NeuralNet` after initializing the history object.
 
-        Note
-        ----
+        Notes
+        -----
         This method should not be called directly in most cases; it is intended to be used 
         internally by the network's initialization sequence.
         """
@@ -1523,8 +1521,8 @@ class BaseEstimator:
         self
             Returns an instance of itself to allow for method chaining.
 
-        Note
-        ----
+        Notes
+        -----
         This method should be called before training the model to ensure all components
         are properly set up. It is implicitly called during the fitting process, so
         manual invocation is not typically required unless custom initialization logic
@@ -1543,15 +1541,15 @@ class BaseEstimator:
         self._initialize_virtual_params()
         self._initialize_callbacks()
         self._initialize_module()
-        self._initialize_criterion()
         self._initialize_optimizer()
-        self._initialize_history()
-        
         # Probabilistic models have additional components to initialize
         if self.prob is True:
             self.initialize_elbo()
             self.initialize_stochastic_variational_inference()
-
+        else:
+            self._initialize_criterion()
+        self._initialize_history()
+        
         # Validate all parameters to ensure proper model configuration
         self._validate_params()
 
@@ -1575,8 +1573,8 @@ class BaseEstimator:
             If the network has been trimmed for prediction
             and cannot be trained.
 
-        Note
-        ----
+        Notes
+        -----
         This method is generally called internally by the `initialize` method and
         does not need to be invoked directly by the user.
         """
@@ -2098,6 +2096,9 @@ class BaseEstimator:
         iterator_train = self.get_iterator(dataset_train, training=True)
         iterator_valid = None  # Initialize validation iterator, to be set if validation data exists
 
+        if dataset_valid is not None:
+            iterator_valid = self.get_iterator(dataset_valid, training=False)
+
         # Determine the number of epochs from the model's settings or parameters
         epochs = self.epochs if 'epochs' not in fit_params else fit_params['epochs']
         
@@ -2107,15 +2108,15 @@ class BaseEstimator:
 
         # Iterate over each epoch to train the model
         for _ in range(epochs):
+
             self.notify('on_epoch_begin', **on_epoch_kwargs)
             
             # Execute training and validation for the current epoch
             self.run_single_epoch(iterator_train, training=True, prefix="train",
                                 step_fn=self.train_step, **fit_params)
-            if dataset_valid is not None:
-                iterator_valid = self.get_iterator(dataset_valid, training=False)
-                self.run_single_epoch(iterator_valid, training=False, prefix="valid",
-                                    step_fn=self.validation_step, **fit_params)
+
+            self.run_single_epoch(iterator_valid, training=False, prefix="valid",
+                                step_fn=self.validation_step, **fit_params)
 
             # Notify listeners that the epoch has ended
             self.notify("on_epoch_end", **on_epoch_kwargs)
@@ -2532,8 +2533,8 @@ class BaseEstimator:
         torch.Tensor
             The output tensor from the module for each batch.
 
-        Note
-        ----
+        Notes
+        -----
         Remember to convert your data to the appropriate torch Tensor and device before using
         this function if your data is not in one of the supported formats.
         """
@@ -2719,7 +2720,7 @@ class BaseEstimator:
         Return the nonlinearity to be applied to the prediction.
 
         In scenarios where the model's output needs to be post-processed before predictions,
-        this method provides the necessary transformation function. For example, converting
+        this method provides the necessary transformation function. for example, converting
         logits to probabilities in a classification task.
 
         The retrieved nonlinearity is intended to be used with the `predict` and `predict_proba`
@@ -2774,7 +2775,7 @@ class BaseEstimator:
 
         # Return the nonlinearity function
         return nonlin
-
+    
     def predict_proba(self, X):
         """
         Compute the probability estimates of the given input data `X`.
@@ -2832,6 +2833,7 @@ class BaseEstimator:
         y_proba = np.concatenate(y_probas, axis=0)
 
         return y_proba
+
 
     def get_loss(self, y_pred, y_true, X=None, training=False):
         """
@@ -3284,7 +3286,7 @@ class BaseEstimator:
         Parameters
         ----------
         prefix : str
-            The prefix indicating which parameters to retrieve. For example, 'train'
+            The prefix indicating which parameters to retrieve. for example, 'train'
             would retrieve all parameters that control training configuration.
 
         Returns
@@ -3418,7 +3420,7 @@ class BaseEstimator:
         ----------
         prefix : str
             A string that identifies the optimizer configuration within the internal
-            parameter storage. For example, 'optimizer' could be a key for the default
+            parameter storage. for example, 'optimizer' could be a key for the default
             optimizer settings.
 
         named_parameters : iterator of (str, torch.nn.Parameter)
@@ -3656,7 +3658,7 @@ class BaseEstimator:
             msgs.append(tmpl.format(key, suggestion))
 
         # Additional checks for specific parameters can be included here
-        # For example:
+        # for example:
         valid_vals_use_caching = ('auto', False, True)
         if self.use_caching not in valid_vals_use_caching:
             msgs.append(
@@ -4477,7 +4479,7 @@ class BaseEstimator:
         >>> repr(my_neural_network)
         'NeuralNetwork(module_conv1=Conv2d(...), module_conv2=Conv2d(...), initialized=True)'
         
-        In the above example, `my_neural_network` is an instance that has been initialized, so the 
+        In the above Examples, `my_neural_network` is an instance that has been initialized, so the 
         representation includes initialized module attributes with their corresponding values.
         """
         # Initial list of attribute keys to include and exclude in the representation
@@ -4547,7 +4549,7 @@ class Classifier(BaseEstimator, ClassifierMixin):
     >>> print(predictions)
     [1 2 0 ...]
 
-    The above example demonstrates creating an instance of `Classifier` with specified classes,
+    The above Examples demonstrates creating an instance of `Classifier` with specified classes,
     fitting it to training data, and making predictions on test data.
 
     See Also
@@ -4622,7 +4624,7 @@ class Classifier(BaseEstimator, ClassifierMixin):
         >>> print(classifier.classes_)
         [0 1 2]
 
-        The above example assumes that `classifier` has been fitted on the training data,
+        The above Examples assumes that `classifier` has been fitted on the training data,
         showing how to access the inferred class labels.
 
         See Also
@@ -4718,6 +4720,8 @@ class Classifier(BaseEstimator, ClassifierMixin):
         Calculates loss using the model's loss criterion.
 
         If `NLLLoss` is used, applies a log transformation to `y_pred` before calculation.
+        This method is designed to be compatible with custom loss criteria provided they conform 
+        to the expected signature and usage pattern of PyTorch loss functions.
 
         Parameters
         ----------
@@ -4749,11 +4753,8 @@ class Classifier(BaseEstimator, ClassifierMixin):
 
         See Also
         --------
-        torch.nn.NLLLoss
-            Loss criterion requiring log probabilities.
+        torch.nn.NLLLoss: Loss criterion requiring log probabilities.
 
-        This method is designed to be compatible with custom loss criteria provided
-        they conform to the expected signature and usage pattern of PyTorch loss functions.
         """
         # Check if the criterion is NLLLoss (Negative Log Likelihood Loss)
         if isinstance(self.criterion_, torch.nn.NLLLoss):
@@ -4792,7 +4793,7 @@ class Classifier(BaseEstimator, ClassifierMixin):
         Parameters
         ----------
         X : Various types
-            Input data, compatible with stockpy.dataset.StockpyDataset. See notes for types.
+            Input data, compatible with stockpy.dataset.StockpyDataset. See Notes for types.
         y : Various types, optional
             Target data, same types as `X`. If included in `X` as Dataset, can be None.
         optimizer : torch.optim.Optimizer, optional

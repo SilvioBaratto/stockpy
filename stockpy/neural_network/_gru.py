@@ -56,6 +56,8 @@ class GRU(nn.Module):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Constructor for the GRU class.
@@ -73,6 +75,8 @@ class GRU(nn.Module):
         self.activation = activation
         self.bias = bias
         self.seq_len = seq_len
+        self.batch_norm = batch_norm
+        self.layer_norm = layer_norm
 
     def initialize_module(self):
         """
@@ -95,8 +99,10 @@ class GRU(nn.Module):
 
         if isinstance(self, Classifier):
             self.output_size = self.n_classes_
+            self.criterion_ = nn.NLLLoss()
         elif isinstance(self, Regressor):
             self.output_size = self.n_outputs_
+            self.criterion_ = nn.MSELoss()
 
         self.gru = nn.GRU(input_size=self.n_features_in_,
                              hidden_size=self.rnn_size,
@@ -108,9 +114,14 @@ class GRU(nn.Module):
         layers = []
 
         fc_input_size = self.rnn_size
-        # Creates the layers of the neural network
         for hidden_size in self.hidden_sizes:
             layers.append(nn.Linear(fc_input_size, hidden_size, bias=self.bias))
+            # append batch normalization layer if specified
+            if self.batch_norm:
+                layers.append(nn.BatchNorm1d(hidden_size))
+            # append layer normalization layer if specified
+            if self.layer_norm:
+                layers.append(nn.LayerNorm(hidden_size))
             layers.append(get_activation_function(self.activation))
             layers.append(nn.Dropout(self.dropout))
 
@@ -166,8 +177,8 @@ class GRUClassifier(Classifier, GRU):
     RuntimeError
         If the forward pass is called before the model is properly configured.
 
-    Note
-    ----
+    Notes
+    -----
     The rest of the methods from `Classifier` and `GRU` are inherited.
     """
 
@@ -179,6 +190,8 @@ class GRUClassifier(Classifier, GRU):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Initializes the `GRUClassifier` instance with the specified configurations.
@@ -197,10 +210,10 @@ class GRUClassifier(Classifier, GRU):
                         activation=activation,
                         seq_len=seq_len,
                         bias=bias,
+                        batch_norm=batch_norm,
+                        layer_norm=layer_norm,
                         **kwargs
                         )
-
-        self.criterion = nn.NLLLoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -282,8 +295,8 @@ class GRURegressor(Regressor, GRU):
     RuntimeError
         If the forward pass is called before the model is properly configured.
 
-    Note
-    ----
+    Notes
+    -----
     The rest of the methods from `Regressor` and `GRU` are inherited.
     """
 
@@ -295,6 +308,8 @@ class GRURegressor(Regressor, GRU):
                  activation='relu',
                  bias=True,
                  seq_len=20,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Initializes the `GRURegressor` instance with the specified configurations.
@@ -313,10 +328,10 @@ class GRURegressor(Regressor, GRU):
                      activation=activation, 
                      seq_len=seq_len,
                      bias=bias, 
+                     batch_norm=batch_norm,
+                     layer_norm=layer_norm,
                      **kwargs
                      )
-
-        self.criterion = nn.MSELoss()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

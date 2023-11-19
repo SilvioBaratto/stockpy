@@ -49,6 +49,8 @@ class MLP(nn.Module):
                  dropout=0.2,
                  activation='relu',
                  bias=True,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
 
         super().__init__()
@@ -57,6 +59,8 @@ class MLP(nn.Module):
         self.dropout = dropout
         self.activation = activation
         self.bias = bias
+        self.batch_norm = batch_norm
+        self.layer_norm = layer_norm
 
     def initialize_module(self):
         """
@@ -78,16 +82,22 @@ class MLP(nn.Module):
 
         if isinstance(self, Classifier):
             self.output_size = self.n_classes_
-            self.criterion = nn.NLLLoss()
+            self.criterion_ = nn.NLLLoss()
         elif isinstance(self, Regressor):
             self.output_size = self.n_outputs_
-            self.criterion = nn.MSELoss()
+            self.criterion_ = nn.MSELoss()
 
         layers = []
         input_size = self.n_features_in_
         # Creates the layers of the neural network
         for hidden_size in self.hidden_sizes:
             layers.append(nn.Linear(input_size, hidden_size, bias=self.bias))
+            # append batch normalization layer if specified
+            if self.batch_norm:
+                layers.append(nn.BatchNorm1d(hidden_size))
+            # append layer normalization layer if specified
+            if self.layer_norm:
+                layers.append(nn.LayerNorm(hidden_size))
             layers.append(get_activation_function(self.activation))
             layers.append(nn.Dropout(self.dropout))
             input_size = hidden_size
@@ -141,6 +151,8 @@ class MLPClassifier(Classifier, MLP):
                  dropout=0.2,
                  activation='relu',
                  bias=True,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Constructor for the MLPClassifier.
@@ -155,6 +167,8 @@ class MLPClassifier(Classifier, MLP):
                      dropout=dropout, 
                      activation=activation, 
                      bias=bias, 
+                     batch_norm=batch_norm,
+                     layer_norm=layer_norm,
                      **kwargs
                      )
             
@@ -231,6 +245,8 @@ class MLPRegressor(Regressor, MLP):
                  dropout=0.2,
                  activation='relu',
                  bias=True,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Constructor for the MLPRegressor.
@@ -245,6 +261,8 @@ class MLPRegressor(Regressor, MLP):
                      dropout=dropout, 
                      activation=activation, 
                      bias=bias, 
+                     batch_norm=batch_norm,
+                     layer_norm=layer_norm,
                      **kwargs
                      )
                 

@@ -109,7 +109,7 @@ class PrintLog(Callback):
     ----------
     keys_ignored : str or list of str, optional
         Keys from the log that should not be included in the printed table. This can
-        be a single string key or a list of string keys. Keys that start with 'event_'
+        be a single string key or a list of string keys. Keys that start with ``event_``
         or end with '_best' are automatically ignored, as they are handled
         specially. The default value is None, which means no additional keys are
         ignored beyond the defaults.
@@ -133,7 +133,7 @@ class PrintLog(Callback):
 
     Notes
     -----
-    By default, 'PrintLog' excludes keys with the 'event_' prefix and those ending
+    By default, 'PrintLog' excludes keys with the ``event_`` prefix and those ending
     with '_best' from printing since they're handled specially. It also avoids
     printing the 'batches' key by default.
 
@@ -392,17 +392,8 @@ class PrintLog(Callback):
         **kwargs : dict
             Additional arguments passed to the callback. Not used in this method.
 
-        Notes
-        -----
-        - The `tabulate` package is used to format the results into a table.
-        - This method updates the `first_iteration_` flag to False after the first
-        call to prevent the header from being printed multiple times.
-        - The `PrintLog` callback flushes the stdout buffer if `sink` is `print` to
-        ensure that the output is not delayed when printed to the console.
-        - `pylint: disable=unused-argument` is used to ignore the unused `kwargs`
-        parameter warning since it's a common pattern in callback definitions to
-        accept and not use additional keyword arguments.
         """
+
         # Retrieve the latest epoch data from history
         data = net.history[-1]  
         # Get the verbosity setting from the network

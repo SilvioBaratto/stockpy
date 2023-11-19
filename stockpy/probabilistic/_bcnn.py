@@ -209,8 +209,6 @@ class BCNNClassifier(Classifier, BCNN):
                      **kwargs
                      )
 
-        self.criterion = nn.NLLLoss()
-
     def model(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """
         Defines the probabilistic model's forward pass using Pyro primitives. It is used
@@ -417,8 +415,6 @@ class BCNNRegressor(Regressor, BCNN):
                      bias=bias, 
                      **kwargs
                      )
-
-        self.criterion = nn.MSELoss()
 
     def model(self, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         """

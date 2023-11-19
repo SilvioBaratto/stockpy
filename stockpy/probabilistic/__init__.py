@@ -1,7 +1,7 @@
 from ._bnn import *
 from ._bcnn import *
 from ._dmm import *
-from ._ghmm import *
+from ._nhmm import *
 
 __all__ = [
     'BNNRegressor',
@@ -10,6 +10,6 @@ __all__ = [
     'BCNNClassifier',
     'DMMRegressor',
     'DMMClassifier',
-    'GHMMRegressor',
-    'GHMMClassifier',
+    'NNHMMRegressor',
+    'NNHMMClassifier',
 ]

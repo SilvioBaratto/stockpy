@@ -174,11 +174,12 @@ class LRScheduler(Callback):
         Notes
         -----
         - The actual update logic for the learning rate on each step is determined by
-        the policy class that is set for the `LRScheduler`.
+          the policy class that is set for the `LRScheduler`.
         - This method does not modify the state of the `LRScheduler` instance or the
-        associated neural network model. It is purely for simulation purposes.
+          associated neural network model. It is purely for simulation purposes.
 
         """
+
         test = torch.ones(1, requires_grad=True)
         opt = torch.optim.SGD([{'params': test, 'lr': initial_lr}])
         policy_cls = self._get_policy_cls()
@@ -220,13 +221,14 @@ class LRScheduler(Callback):
         Notes
         -----
         - This method should be called before using the scheduler in the training loop
-        to ensure that the policy class is correctly determined and that the scheduler
-        is properly initialized.
+          to ensure that the policy class is correctly determined and that the scheduler
+          is properly initialized.
         - If `policy` is a string, it should be the name of a class present in the
-        namespace where the `LRScheduler` class is defined. Otherwise, it should be
-        a class that implements a learning rate scheduler.
+          namespace where the `LRScheduler` class is defined. Otherwise, it should be
+          a class that implements a learning rate scheduler.
 
         """
+
         self.policy_ = self._get_policy_cls()
         self.lr_scheduler_ = None
         self.batch_idx_ = 0
@@ -300,15 +302,6 @@ class LRScheduler(Callback):
         >>> scheduler.kwargs
         {'gamma': 0.1, 'step_size': 5}
 
-        Notes
-        -----
-        - The `kwargs` property is used internally by the `LRScheduler` class to
-        extract the necessary parameters when initializing the actual learning
-        rate scheduler object.
-        - Users can specify custom parameters for the scheduler upon instantiation
-        of the `LRScheduler` class, and these parameters will be included in the
-        output of `kwargs`.
-
         """
         excluded = ('policy', 'monitor', 'event_name', 'step_every')
         kwargs = {key: val for key, val in vars(self).items()
@@ -342,10 +335,11 @@ class LRScheduler(Callback):
         -----
         - The scheduler is only initialized if it hasn't been created previously.
         - The method takes care of resuming the batch index count from the last
-        recorded state in the training history, allowing for the continuation of
-        training seamlessly.
+          recorded state in the training history, allowing for the continuation of
+          training seamlessly.
 
         """
+
         if net.history:
             try:
                 self.batch_idx_ = sum(net.history[:, 'train_batch_count'])
@@ -427,19 +421,20 @@ class LRScheduler(Callback):
             that a Scoring callback with the specified name should be added before the
             LRScheduler callback.
 
+        Examples
+        --------
+        >>> # This method is automatically called by the net at the end of each epoch.
+
         Notes
         -----
         - If `step_every` is not set to 'epoch', the method exits without adjusting the learning rate.
         - If `event_name` is None, no event will be recorded even if the scheduler supports it.
         - For ReduceLROnPlateau, if the score is provided, it will be used to determine the
-        learning rate adjustment; otherwise, an error is raised.
+          learning rate adjustment; otherwise, an error is raised.
         - If the scheduler does not require a score, it will step without additional arguments.
 
-        Examples
-        --------
-        >>> # This method is automatically called by the net at the end of each epoch.
-
         """
+
         if self.step_every != 'epoch':
             return
         if isinstance(self.lr_scheduler_, ReduceLROnPlateau):
@@ -485,21 +480,22 @@ class LRScheduler(Callback):
         **kwargs : dict, optional
             Additional keyword arguments not used by this callback.
 
-        Notes
-        -----
-        - The learning rate is adjusted only if `training` is True, indicating that the batch is
-        part of the training process.
-        - If `step_every` is not 'batch', the method exits without making any adjustments.
-        - The current learning rate is recorded in the network's history if `event_name` is not None
-        and the learning rate scheduler supports retrieving the last learning rate.
-        - The batch index is incremented regardless of whether the learning rate was adjusted.
-        This counter can be used by other processes that need to track the number of batches.
-
         Examples
         --------
         >>> # This method is automatically called by the net at the end of each training batch.
 
+        Notes
+        -----
+        - The learning rate is adjusted only if `training` is True, indicating that the batch is
+          part of the training process.
+        - If `step_every` is not 'batch', the method exits without making any adjustments.
+        - The current learning rate is recorded in the network's history if `event_name` is not None
+          and the learning rate scheduler supports retrieving the last learning rate.
+        - The batch index is incremented regardless of whether the learning rate was adjusted.
+          This counter can be used by other processes that need to track the number of batches.
+
         """
+
         if not training or self.step_every != 'batch':
             return
         if (
@@ -615,13 +611,15 @@ class WarmRestartLR(_LRScheduler):
     Notes
     -----
     - `last_epoch` is set to -1 by default, which corresponds to starting the
-    training from scratch. When resuming from a checkpoint, set `last_epoch`
-    to the last completed epoch index.
+      training from scratch. When resuming from a checkpoint, set `last_epoch`
+      to the last completed epoch index.
     - The learning rate for each parameter group is computed as:
-    `lr = min_lr + 0.5 * (max_lr - min_lr) * (1 + cos(pi * current_epoch / period))`
+      `lr = min_lr + 0.5 * (max_lr - min_lr) * (1 + cos(pi * current_epoch / period))`
     - Ensure that `min_lr` and `max_lr` are set correctly as per the individual
-    learning rate requirements of each parameter group when passed as lists.
+      learning rate requirements of each parameter group when passed as lists.
+
     """
+
 
     def __init__(
             self, optimizer,
@@ -670,6 +668,7 @@ class WarmRestartLR(_LRScheduler):
         class and not meant to be accessed directly by users.
 
         """
+
         return min_lr + 0.5 * (max_lr - min_lr) * (
             1 + np.cos(epoch * np.pi / period))
 
@@ -687,17 +686,8 @@ class WarmRestartLR(_LRScheduler):
         list
             A list of learning rates, one for each parameter group in the optimizer.
 
-        Notes
-        -----
-        - The method computes the learning rate for each parameter group separately,
-        allowing for different learning rates for different groups.
-        - The learning rate is calculated based on the SGDR policy, which adjusts the
-        learning rate based on the progress through the current period and the number
-        of restarts.
-        - The method is typically called internally by the optimizer during the training
-        process and not meant to be accessed directly by users.
-
         """
+
         epoch_idx = float(self.last_epoch)
         current_period = float(self.base_period)
         # Reduce the epoch index to the current period by subtracting the lengths

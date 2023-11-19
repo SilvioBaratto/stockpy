@@ -106,7 +106,7 @@ class Checkpoint(Callback):
         Checks if additional keyword arguments follow the expected naming pattern and are compatible with safetensors.
 
         This method ensures that all keyword arguments that are not predefined parameters of the `Checkpoint` class
-        start with 'f_' (assuming they are intended to specify file-like objects for saving different states).
+        start with ``f_`` (assuming they are intended to specify file-like objects for saving different states).
 
         It also verifies that if `use_safetensors` is enabled, the `f_optimizer` attribute must not be set because
         `safetensors` is not capable of saving the optimizer state.
@@ -119,7 +119,7 @@ class Checkpoint(Callback):
         Raises
         ------
         TypeError
-            If any keyword arguments do not follow the 'f_' naming convention.
+            If any keyword arguments do not follow the ``f_`` naming convention.
         ValueError
             If `use_safetensors` is True and `f_optimizer` is not None, indicating an incompatible configuration.
 
@@ -196,13 +196,6 @@ class Checkpoint(Callback):
         **kwargs : dict
             Additional keyword arguments not used by this callback.
 
-        Notes
-        -----
-        - This method is automatically called by the training loop and is not intended to be
-        called manually.
-        - Loading of the best checkpoint is only performed if `load_best` is `True`, which
-        is helpful in conjunction with callbacks like early stopping.
-
         Examples
         --------
         >>> net = NeuralNet(
@@ -211,6 +204,14 @@ class Checkpoint(Callback):
         ... )
         >>> net.fit(X, y)
         >>> # After training, best model is automatically loaded
+
+        Notes
+        -----
+        - This method is automatically called by the training loop and is not intended to be
+          called manually.
+        
+        - Loading of the best checkpoint is only performed if `load_best` is `True`, which
+          is helpful in conjunction with callbacks like early stopping.
 
         """
 
@@ -242,13 +243,6 @@ class Checkpoint(Callback):
             If the monitoring parameter is not found in the history, and it is expected 
             to be there (e.g., when using validation scores for checkpointing).
 
-        Notes
-        -----
-        - This method is called automatically at the end of each epoch and is not meant 
-        for manual invocation.
-        - The decision to checkpoint can be based on a pre-defined history key, a 
-        custom callable, or every epoch if the monitor is set to `None`.
-
         Examples
         --------
         >>> net = NeuralNet(
@@ -258,7 +252,16 @@ class Checkpoint(Callback):
         >>> net.fit(X, y)
         >>> # Checkpoints might be saved based on the validation loss.
 
+        Notes
+        -----
+        - This method is called automatically at the end of each epoch and is not meant 
+          for manual invocation.
+
+        - The decision to checkpoint can be based on a pre-defined history key, a 
+          custom callable, or every epoch if the monitor is set to `None`.
+
         """
+
         if "{}_best".format(self.monitor) in net.history[-1]:
             warnings.warn(
                 "Checkpoint monitor parameter is set to '{0}' and the history "
@@ -291,7 +294,7 @@ class Checkpoint(Callback):
         """
         Collect file-related attributes from the instance.
 
-        This method retrieves all attributes of the instance whose names start with 'f_' 
+        This method retrieves all attributes of the instance whose names start with ``f_`` 
         and returns them as a dictionary, with the exception of 'f_history_'. This 
         dictionary is likely used to dynamically handle file operations for checkpointing 
         different components of the training process.
@@ -299,7 +302,7 @@ class Checkpoint(Callback):
         Returns
         -------
         dict
-            A dictionary where keys are attribute names that begin with 'f_', and values 
+            A dictionary where keys are attribute names that begin with ``f_``, and values 
             are their corresponding values from the instance.
 
         Examples
@@ -329,7 +332,7 @@ class Checkpoint(Callback):
         entire model object depending on the attributes set in the `Checkpoint` instance.
 
         The method determines which components to save based on the presence of
-        corresponding file path attributes starting with 'f_'.
+        corresponding file path attributes starting with ``f_``.
 
         Parameters
         ----------
@@ -351,15 +354,17 @@ class Checkpoint(Callback):
         Notes
         -----
         - The actual file paths are determined using the `_format_target` method
-        and support dynamic naming based on the current training state, such as 
-        epoch number.
+          and support dynamic naming based on the current training state, such as 
+          epoch number.
         - If a file path attribute is set to `None`, the corresponding component 
-        will not be saved.
+          will not be saved.
         - The history is saved in a JSON format, and the entire model object is 
-        pickled.
+          pickled.
         - This method is a part of the `Checkpoint` callback's internal logic and
-        is not intended to be invoked directly by users.
+          is not intended to be invoked directly by users.
+
         """
+
         kwargs_module, kwargs_other = _check_f_arguments(
             self.__class__.__name__, **self._f_kwargs())
 
@@ -407,13 +412,14 @@ class Checkpoint(Callback):
         Notes
         -----
         - This property is used internally to determine where to save the training 
-        history when the `save_model` method is called.
+          history when the `save_model` method is called.
         - The directory and prefix are set when the `Checkpoint` instance is 
-        initialized. If they are not set, the training history filename will 
-        just be `self.f_history`.
+          initialized. If they are not set, the training history filename will 
+          just be `self.f_history`.
         - If the checkpoint has not been initialized (i.e., `self.dirname` is not 
-        set), calling this property will still return the correct path assuming 
-        `self.f_history` is not `None`.
+          set), calling this property will still return the correct path assuming 
+          `self.f_history` is not `None`.
+
         """
         if self.f_history is None:
             return None
@@ -456,12 +462,15 @@ class Checkpoint(Callback):
         Notes
         -----
         - The method uses `self._format_target` to create the file paths, which 
-        applies any formatting rules such as including the epoch number or other 
-        placeholders.
+          applies any formatting rules such as including the epoch number or other 
+          placeholders.
+
         - The returned dictionary only includes entries for file types that have
-        been specified in the checkpoint configuration. If a file type is set to
-        `None`, it will not appear in the returned dictionary.
+          been specified in the checkpoint configuration. If a file type is set to
+          `None`, it will not appear in the returned dictionary.
+
         """
+
         idx = -1  # Default index to the last element if no event is recorded
         if self.event_name is not None and net.history:
             # Iterate backwards through history to find the last true `event_name`

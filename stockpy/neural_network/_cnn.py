@@ -35,8 +35,6 @@ class CNN(nn.Module):
         The number of convolutional layers in the network.
     num_channels : int
         The number of input channels (e.g., 1 for grayscale or 3 for RGB images).
-    dim : int
-        The dimensionality of the convolution (e.g., 1 for sequences, 2 for images).
     bias : bool
         Whether or not to include bias parameters in the convolutional layers.
     **kwargs : dict
@@ -63,8 +61,9 @@ class CNN(nn.Module):
                  activation='relu',
                  num_layers=1,
                  num_channels=1,
-                 dim=1,
                  bias=True,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Constructs the CNN with the specified parameters. This includes setting up
@@ -82,7 +81,8 @@ class CNN(nn.Module):
         self.bias = bias
         self.num_layers = num_layers
         self.num_channels = num_channels
-        self.dim = dim
+        self.batch_norm = batch_norm
+        self.layer_norm = layer_norm
 
     def initialize_module(self):
         """
@@ -98,8 +98,10 @@ class CNN(nn.Module):
         """
         if isinstance(self, Classifier):
             self.output_size = self.n_classes_
+            self.criterion_ = nn.NLLLoss()
         elif isinstance(self, Regressor):
             self.output_size = self.n_outputs_
+            self.criterion_ = nn.MSELoss()
 
         # Check if hidden_sizes is a single integer and, if so, converts it to a list
         if isinstance(self.hidden_size, int):
@@ -111,40 +113,51 @@ class CNN(nn.Module):
         self.input_size = self.n_features_in_
         layers = []
 
-        layers.extend([
-            nn.Conv1d(1, self.num_filters, self.kernel_size, bias=self.bias),
-            get_activation_function(self.activation),
-            nn.MaxPool1d(self.pool_size),
-        ])
+        # Initial convolutional layer
+        layers.append(nn.Conv1d(1, self.num_filters, self.kernel_size, bias=self.bias))
+        if self.batch_norm:
+            layers.append(nn.BatchNorm1d(self.num_filters))
+        if self.layer_norm:
+            layers.append(nn.LayerNorm(self.num_filters))
 
-        input_size = self.num_filters  # Update the number of channels for the next layer
+        layers.append(get_activation_function(self.activation))
+        layers.append(nn.MaxPool1d(self.pool_size))
+
+        input_size = self.num_filters
         flattened_size = (self.input_size - self.kernel_size + 1) // self.pool_size
 
-        for i in range(self.num_layers - 1):
-            # Calculate what the new flattened_size would be if you added another layer
+        # Additional convolutional layers
+        for i in range(1, self.num_layers):  # Adjusted to start from 1 since we already have the initial conv layer
             new_flattened_size = (flattened_size - self.kernel_size + 1) // self.pool_size
-            
-            # Check if adding another layer would result in a negative flattened_size
             if new_flattened_size <= 0:
                 warnings.warn("Cannot add more layers; doing so would result in negative dimension size.")
                 break
 
-            layers.extend([
-                nn.Conv1d(input_size, self.num_filters, self.kernel_size, bias=self.bias),
-                get_activation_function(self.activation),
-                nn.MaxPool1d(self.pool_size),
-            ])
+            layers.append(nn.Conv1d(input_size, self.num_filters, self.kernel_size, bias=self.bias))
+            if self.batch_norm:
+                layers.append(nn.BatchNorm1d(self.num_filters))
+            if self.layer_norm:
+                layers.append(nn.LayerNorm(self.num_filters))
 
-            input_size = self.num_filters  # Update the number of channels for the next layer
-            flattened_size = (flattened_size - self.kernel_size + 1) // self.pool_size  # Update flattened_size
+            layers.append(get_activation_function(self.activation))
+            layers.append(nn.MaxPool1d(self.pool_size))
+
+            input_size = self.num_filters
+            flattened_size = new_flattened_size
 
             if i < self.num_layers - 1:
-                layers.append(nn.Dropout(self.dropout))  # Add dropout layers in between
+                layers.append(nn.Dropout(self.dropout))
 
-        # Add Flatten and Linear layers
+        # Flatten the output of the convolutional layers
         layers.append(nn.Flatten())
+
+        # # Fully connected layers
+        if self.layer_norm:
+            # Calculate the fully connected layer's input size
+            fc_input_size = self.num_filters * flattened_size
+            layers.append(nn.LayerNorm(fc_input_size))
         layers.append(nn.Linear(self.num_filters * flattened_size, self.output_size))
-        
+
         # Create the Sequential model
         self.layers = nn.Sequential(*layers)
 
@@ -188,18 +201,8 @@ class CNNClassifier(Classifier, CNN):
     criterion : torch.nn.modules.loss
         The loss function used for the classification task, set to negative log likelihood loss (NLLLoss).
 
-    Methods
-    -------
-    __init__(hidden_size=32, num_filters=32, kernel_size=3, pool_size=2, dropout=0.2,
-            activation='relu', num_layers=1, num_channels=1, dim=1, bias=True, **kwargs)
-        Constructor for the CNNClassifier class.
-    forward(x)
-        Defines the forward pass of the classifier.
-    initialize_module()
-        Initializes the layers of the CNN with the specified configuration.
-
-    Note
-    ----
+    Notes
+    -----
     The rest of the methods from `Classifier` and `CNN` are inherited.
     """
 
@@ -214,6 +217,8 @@ class CNNClassifier(Classifier, CNN):
                  num_channels=1,
                  dim=1,
                  bias=True,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Initializes the CNNClassifier with the specified parameters for the convolutional neural network.
@@ -233,10 +238,10 @@ class CNNClassifier(Classifier, CNN):
                      num_channels=num_channels,
                      dim=dim,
                      bias=bias, 
+                     batch_norm=batch_norm,
+                     layer_norm=layer_norm,
                      **kwargs
                      )
-
-        self.criterion = nn.NLLLoss()
             
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -309,18 +314,9 @@ class CNNRegressor(Regressor, CNN):
     criterion : torch.nn.modules.loss
         The loss function used for the regression task, set to mean squared error loss (MSELoss).
 
-    Methods
-    -------
-    __init__(hidden_size=32, num_filters=32, kernel_size=3, pool_size=2, dropout=0.2,
-            activation='relu', num_layers=1, num_channels=1, dim=1, bias=True, **kwargs)
-        Constructor for the CNNRegressor class.
-    forward(x)
-        Defines the forward pass of the regressor.
-    initialize_module()
-        Initializes the layers of the CNN with the specified configuration.
 
-    Note
-    ----
+    Notes
+    -----
     The rest of the methods from `Regressor` and `CNN` are inherited.
     """
 
@@ -335,6 +331,8 @@ class CNNRegressor(Regressor, CNN):
                  num_channels=1,
                  dim=1,
                  bias=True,
+                 batch_norm=False,
+                 layer_norm=False,
                  **kwargs):
         """
         Initializes the CNNRegressor with the specified parameters for the convolutional neural network.
@@ -354,10 +352,10 @@ class CNNRegressor(Regressor, CNN):
                      num_channels=num_channels,
                      dim=dim,
                      bias=bias, 
+                     batch_norm=batch_norm,
+                     layer_norm=layer_norm,
                      **kwargs
                      )
-
-        self.criterion = nn.MSELoss()
             
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """

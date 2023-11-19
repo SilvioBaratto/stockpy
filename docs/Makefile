@@ -6,8 +6,8 @@ SPHINXOPTS    =
 SPHINXBUILD   = python -msphinx
 APIDOC        = sphinx-apidoc
 SPHINXPROJ    = stockpy
-SOURCEDIR     = source
-BUILDDIR	  = _build
+SOURCEDIR     = .
+BUILDDIR      = _build
 
 # Put it first so that "make" without argument is like "make help".
 help:
