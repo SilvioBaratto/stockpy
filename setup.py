@@ -2,6 +2,9 @@ import os
 
 from setuptools import setup, find_packages
 
+with open("README.md", "r", encoding="utf-8") as fh:
+    long_description = fh.read()
+
 with open('VERSION', 'r') as f:
     version = f.read().rstrip()
 
@@ -16,21 +19,26 @@ docs_require = [
     'numpydoc',
 ]
 
-here = os.path.abspath(os.path.dirname(__file__))
-try:
-    README = open(os.path.join(here, 'README.rst')).read()
-except IOError:
-    README = ''
-    
 setup(
-    name='stockpy',
+    name='stockpy-learn',
     version=version,
+    author='Silvio Baratto',
+    author_email='silvio.baratto22@gmail.com',
     description='Deep Learning Regression and Classification Library built on top of PyTorch and Pyro',
-    long_description=README,
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     license='MIT License',
     packages=find_packages(),
     include_package_data=True,
     url="https://github.com/SilvioBaratto/stockpy",
+    classifiers=[
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: MIT License',
+        "Operating System :: OS Independent", 
+        'Programming Language :: Python :: 3',
+        "Intended Audience :: Science/Research",
+        "Topic :: Scientific/Engineering :: Mathematics",
+    ],
     zip_safe=False,
     python_requires=python_requires,
     install_requires=install_requires,

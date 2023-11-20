@@ -28,7 +28,7 @@
 - Gated Recurrent Unit (GRU)
 - Bidirectional Gated Recurrent Unit (BiGRU)
 - Multilayer Perceptron (MLP)
-- Neuran Network Hidden Markov Models (NNHMM) 
+- Neural Network Hidden Markov Models (NNHMM) 
 - Deep Markov Model (DMM) 
 
 ## Usage
