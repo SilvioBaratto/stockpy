@@ -6,7 +6,7 @@
 [![GitHub license](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)](https://github.com/Naereen/StrapDown.js/blob/master/LICENSE)
 <img src='https://img.shields.io/badge/Code%20style-Black-%23000000'/>
 [![Documentation Status](https://readthedocs.org/projects/stockpy/badge/?version=latest)](https://stockpy.readthedocs.io/?badge=latest)
-[![PyPI version](https://badge.fury.io/py/stockpy-learn.svg)](https://badge.fury.io/py/stockpy-learn)
+[![PyPI version](https://badge.fury.io/py/stockpy-learn.svg)](https://pypi.org/project/stockpy-learn/)
 
 ## Table of Contents
 * [Description](#description)
