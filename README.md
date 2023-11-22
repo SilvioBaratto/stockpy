@@ -23,6 +23,7 @@
 **stockpy** is a versatile Python Machine Learning library initially designed for stock market data analysis and predictions. It has now evolved to handle a wider range of datasets, supporting tasks such as regression and classification. It currently supports the following algorithms, each with regression and classification implementations:
 
 - Bayesian Neural Networks (BNN)
+- Bayesian Convolutional Neural Networks (BCNN)
 - Long Short Term Memory (LSTM)
 - Bidirectional Long Short Term Memory (BiLSTM)
 - Gated Recurrent Unit (GRU)
