@@ -6,7 +6,7 @@
 [![GitHub license](https://img.shields.io/github/license/Naereen/StrapDown.js.svg)](https://github.com/Naereen/StrapDown.js/blob/master/LICENSE)
 <img src='https://img.shields.io/badge/Code%20style-Black-%23000000'/>
 [![Documentation Status](https://readthedocs.org/projects/stockpy/badge/?version=latest)](https://stockpy.readthedocs.io/?badge=latest)
-[![PyPI version](https://badge.fury.io/py/stockpy-learn.svg)](https://pypi.org/project/stockpy-learn/)
+[![PyPI version](https://badge.fury.io/py/stockpy-learn.svg)](https://badge.fury.io/py/stockpy-learn)
 
 ## Table of Contents
 * [Description](#description)
@@ -23,7 +23,6 @@
 **stockpy** is a versatile Python Machine Learning library initially designed for stock market data analysis and predictions. It has now evolved to handle a wider range of datasets, supporting tasks such as regression and classification. It currently supports the following algorithms, each with regression and classification implementations:
 
 - Bayesian Neural Networks (BNN)
-- Bayesian Convolutional Neural Networks (BCNN)
 - Long Short Term Memory (LSTM)
 - Bidirectional Long Short Term Memory (BiLSTM)
 - Gated Recurrent Unit (GRU)
@@ -35,7 +34,7 @@
 ## Usage
 To use **stockpy**, start by importing the relevant models from the `stockpy.neural_network` and `stockpy.probabilistic` modules. The library can be used with various types of input data, such as CSV files, pandas dataframes, numpy arrays and torch arrays.
 
-Here's an example to demonstrate the usage of stockpy for regression. In this example, we read a CSV file containing stock market data for Apple (AAPL), split the data into training and testing sets, fit an CNN model to the training data, and use the model to make predictions on the test data:
+Here's an example to demonstrate the usage of stockpy for regression. In this example, we read a CSV file containing stock market data for Apple (AAPL), split the data into training and testing sets, fit an LSTM model to the training data, and use the model to make predictions on the test data:
 
 ```Python
 from stockpy.neural_network import CNNRegressor
@@ -140,6 +139,40 @@ To install the package:
 ```bash
 > cd stockpy
 > pip install .
+```
+
+## Data downloader
+The data downloader is a command-line application located named `data.py`, which can be used to download and update stock market data. The downloader has been tested and verified using Ubuntu 22.04 LTS.
+
+| Parameter       | Explanation
+|-----------------|-------------------------------------|
+| `--download`| Download all the S&P 500 stocks. If no start and end dates are specified, the default range is between "2017-01-01" and today's date.                |
+| `--stock`| Download a specific stock specified by the user. If no start and end dates are specified, the default range is between "2017-01-01" and today's date.                |
+| `--update`| Update all the stocks present in the folder containing the files. It is possible to update the files to any range of dates. If a stock wasn't listed before a specific date, it will be downloaded from the day it enters the public market. |
+|`--update.stock`| Update a specific stock specified by the user. It is possible to update the files to any range of dates by specifying the start and end dates. |
+|`--start`| Specify the start date for downloading or updating data. |
+|`--end`| Specify the end date for downloading or updating data. |
+|`--delete`| Delete all files present in the files folder. | 
+|`--delete-stock`| Delete a specific stock present in the files folder. | 
+|`--folder`| Choose the folder where to read or download all the files. |
+### Usage example
+Below are some examples of how to use the downloader:
+```Python
+# Download all the data between "2017-01-01" and "2018-01-01"
+python3 data.py --download --start="2017-01-01" --end="2018-01-01"
+
+# Download data for Apple (AAPL) from "2017-01-01" to today's date
+python3 data.py --stock="AAPL" --end="today"
+
+# Update all the data between "2014-01-01" and "2020-01-01"
+python3 data.py --update --start="2014-01-01" --end="2020-01-01"
+
+# Update a specific stock from "2014-01-01" until the last day present in the stock file
+python3 data.py --update-stock --stock="AAPL" --start="2014-01-01"
+
+# Download all the data between "2017-01-01" and today's date, 
+# choosing the folder where to download the files
+python3 data.py --download --folder="../../example"
 ```
 
 ## TODOs
