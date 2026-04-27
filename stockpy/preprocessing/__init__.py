@@ -1,10 +1,11 @@
 from ._base import *
 from ._dataset import *
+from ._transforms import *
 
 __all__ = [
     'StockpyDataset',
     'unpack_data',
-    'StockDatasetFFNN',
-    'StockDatasetRNN',
-    'StockDatasetCNN',
+    'TimeSeriesDataset',
+    'StandardScalerTransform',
+    'DifferenceTransform',
 ]

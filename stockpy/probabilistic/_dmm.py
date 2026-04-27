@@ -5,14 +5,13 @@ import pyro
 import pyro.distributions as dist
 from pyro.nn import PyroModule
 
-from stockpy.base import Regressor
-from stockpy.base import Classifier 
+from stockpy.base import EncoderDecoderForecaster
 
 from ._combiner import Combiner
-from ._emitter import EmitterRegressor, EmitterClassifier
+from ._emitter import EmitterRegressor
 from ._transition import Transition
 
-__all__ = ['DMMRegressor', 'DMMClassifier']
+__all__ = ['DMMRegressor']
 
 class DMM(PyroModule):
     """
@@ -67,8 +66,6 @@ class DMM(PyroModule):
         Sequence length for input data.
     emitter_rgr : PyroModule
         Regression module for emissions.
-    emitter_cls : PyroModule
-        Classification module for emissions.
     transition : PyroModule
         Transition state module.
     combiner : PyroModule
@@ -85,7 +82,7 @@ class DMM(PyroModule):
     Notes
     -----
     Inherits from PyroModule for integration of deep learning with probabilistic modeling.
-    Operates as regressor or classifier based on emitter module type.
+    Operates as a regressor using the emitter_rgr module.
     """
 
     def __init__(self,
@@ -121,26 +118,18 @@ class DMM(PyroModule):
         Raises
         ------
         TypeError
-            If instance is neither `Classifier` nor `Regressor`.
+            If instance is not an `EncoderDecoderForecaster`.
         """
 
-        if isinstance(self, Classifier):
-            self.output_size = self.n_classes_
-        elif isinstance(self, Regressor):
-            self.output_size = self.n_outputs_
+        self.output_size = self.n_outputs_
 
         self.emitter_rgr = EmitterRegressor(self.n_features_in_,
-                                        self.z_dim, 
+                                        self.z_dim,
                                         self.emission_dim,
                                         self.output_size)
 
-        self.emitter_cls = EmitterClassifier(self.n_features_in_,
-                                        self.z_dim, 
-                                        self.emission_dim,
-                                        self.output_size)
-
-        self.transition = Transition(self.z_dim, 
-                                     self.n_features_in_, 
+        self.transition = Transition(self.z_dim,
+                                     self.n_features_in_,
                                      self.transition_dim)
         
         self.combiner = Combiner(self.z_dim, self.rnn_dim)
@@ -165,7 +154,7 @@ class DMM(PyroModule):
     def model_type(self):
         return "rnn"
     
-class DMMRegressor(Regressor, DMM):
+class DMMRegressor(EncoderDecoderForecaster, DMM):
     """
     Specialized DMM for regression tasks using deep generative modeling.
 
@@ -196,7 +185,7 @@ class DMMRegressor(Regressor, DMM):
     seq_len : int, optional
         Input sequence length (default is 20).
     **kwargs
-        Additional arbitrary keyword arguments passed to Regressor base class.
+        Additional arbitrary keyword arguments passed to EncoderDecoderForecaster base class.
 
     Notes
     -----
@@ -219,7 +208,7 @@ class DMMRegressor(Regressor, DMM):
         Constructor method for the DMMRegressor class.
         
         This method initializes a new instance of DMMRegressor with the specified
-        parameters or their default values. It first initializes the Regressor base class
+        parameters or their default values. It first initializes the EncoderDecoderForecaster base class
         and then the DMM class with the provided arguments.
 
         Raises
@@ -230,7 +219,7 @@ class DMMRegressor(Regressor, DMM):
             If an invalid value is passed to an argument.
         """
 
-        Regressor.__init__(self, **kwargs)
+        EncoderDecoderForecaster.__init__(self, **kwargs)
         DMM.__init__(self,
                      z_dim=z_dim,
                      emission_dim=emission_dim,
@@ -410,271 +399,21 @@ class DMMRegressor(Regressor, DMM):
 
         # Return the predictions for the last time step for each element in the batch.
         return preds[-1, :, :]
-                
-class DMMClassifier(Classifier, DMM):
-    """
-    DMMClassifier implements a deep Markov model for classification tasks, encapsulating
-    the strengths of deep Markov models in capturing temporal dependencies and uncertainties
-    in sequential data.
 
-    Parameters
-    ----------
-    z_dim : int, optional
-        Size of the latent state space, by default 32.
-    emission_dim : int, optional
-        Size of the emission's output space, by default 32.
-    transition_dim : int, optional
-        Size of the transition's output space, by default 32.
-    rnn_dim : int, optional
-        Size of the RNN's hidden layer, by default 32.
-    num_layers : int, optional
-        Number of RNN layers, by default 1.
-    dropout : float, optional
-        Dropout rate for regularization, by default 0.2.
-    variance : float, optional
-        Initial variance of the probabilistic layers, by default 0.1.
-    activation : str, optional
-        Activation function type, by default 'relu'.
-    bias : bool, optional
-        Whether to use bias in the RNN layers, by default True.
-    seq_len : int, optional
-        Length of the input sequences, by default 20.
-    **kwargs : dict, optional
-        Additional keyword arguments for the Classifier base class.
-
-    Attributes
-    ----------
-    n_classes_ : int
-        Number of classes for classification. This is set during the fitting process.
-    n_features_in_ : int
-        Number of expected features during fitting. This is set during the fitting process.
-    z_0 : torch.nn.Parameter
-        Initial latent state parameter.
-    z_q_0 : torch.nn.Parameter
-        Initial latent state parameter for the guide.
-    h_0 : torch.nn.Parameter
-        Initial hidden state parameter for the RNN.
-
-    Notes
-    -----
-    DMMClassifier integrates the Classifier and DMM functionalities to provide a specialized
-    approach to sequence classification. It leverages a deep Markov model framework to effectively
-    model sequence data and its temporal characteristics for classification purposes.
-
-    Examples
-    --------
-    >>> from stockpy import DMMClassifier
-    >>> model = DMMClassifier(z_dim=50, rnn_dim=64, num_layers=2)
-    >>> model.fit(X_train, y_train)
-    >>> y_pred = model.predict(X_test)
-    """
-
-    def __init__(self,
-                 z_dim=32,
-                 emission_dim=32,
-                 transition_dim=32,
-                 rnn_dim=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 variance=0.1,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 **kwargs):
+    def predict(self, X, predict_nonlinearity='auto'):
         """
-        Constructor method for the DMMClassifier class.
-        
-        This method initializes a new instance of DMMClassifier with the specified
-        parameters or their default values. It first initializes the Classifier base class
-        and then the DMM class with the provided arguments.
-
-        Raises
-        ------
-        TypeError
-            If an argument is not of the expected type.
-        ValueError
-            If an invalid value is passed to an argument.
-        """
-
-        Classifier.__init__(self, **kwargs)
-        DMM.__init__(self,
-                     z_dim=z_dim,
-                     emission_dim=emission_dim,
-                     transition_dim=transition_dim,
-                     rnn_dim=rnn_dim,
-                     num_layers=num_layers,
-                     dropout=dropout,
-                     variance=variance,
-                     activation=activation,
-                     bias=bias,
-                     seq_len=seq_len,
-                     **kwargs)
-
-    def model(self, x, y, annealing_factor=1.0):
-        """
-        Defines the generative part of the deep Markov model for sequence regression.
-
-        This is a core component of the variational inference process where the prior distribution
-        over the latent states and the likelihood of the observed data given the latent states are specified.
+        Forecast future values for the given input sequences.
 
         Parameters
         ----------
-        x : torch.Tensor
-            Input features with shape (batch_size, T_max, input_dim), where T_max is the maximum
-            sequence length in the batch, and input_dim is the dimension of the input features.
-        y : torch.Tensor
-            Target variable with shape (batch_size, T_max, output_dim), where T_max is the maximum
-            sequence length in the batch, and output_dim is the dimension of the output space.
-        annealing_factor : float, optional
-            A factor to anneal the KL-divergence term in the variational loss during training. It can
-            help in stabilizing the training in its early stages, by default 1.0.
-
-        """
-
-        # Determine the maximum number of time steps from the input shape.
-        T_max = x.size(1)
-
-        # Expand the initial latent state `z_0` to match the batch size.
-        z_prev = self.z_0.expand(x.size(0), self.z_0.size(0))
-
-        # Use the `pyro.plate` construct to handle batches of data for conditional independence.
-        with pyro.plate("z_minibatch", len(x)):
-            # Loop over each time step while considering the previous state (Markovian assumption).
-            for t in pyro.markov(range(1, T_max + 1)):
-                # Obtain the location and scale for the latent state `z` at time `t`.
-                z_loc, z_scale = self.transition(z_prev, x[:, t - 1, :])
-
-                # Apply annealing to the KL divergence term to potentially stabilize training.
-                with pyro.poutine.scale(scale=annealing_factor):
-                    # Sample the latent variable `z_t` using the Normal distribution parameterized by `z_loc` and `z_scale`.
-                    z_t = pyro.sample(
-                        f"z_{t}",
-                        dist.Normal(z_loc, z_scale).to_event(1)
-                    )
-
-                # Using the current latent state `z_t`, predict the categorical probabilities for the observation at time `t`.
-                probs_t = self.emitter_cls(z_t, x[:, t - 1, :])
-
-                # Instruct Pyro to observe the actual target `y` using the predicted categorical distribution.
-                pyro.sample(
-                    f"obs_y_{t}",
-                    dist.Categorical(probs=probs_t).to_event(1),
-                    obs=y
-                )
-
-                # Update the previous latent state to the current one for the next time step.
-                z_prev = z_t
-            
-    def guide(self, x, y=None, annealing_factor=1.0):
-        """
-        Specifies the variational guide, a parameterized approximate posterior, for the deep Markov model.
-
-        This guide is a critical part of the stochastic variational inference process, providing a tractable
-        proxy for the intractable true posterior over the latent states.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Observed input features with shape (batch_size, T_max, input_dim), where T_max is the
-            maximum sequence length in the batch, and input_dim is the dimension of the input features.
-        y : torch.Tensor, optional
-            Target variable which is not utilized in the guide but is kept for consistency with the
-            model's API. By default, it is None.
-        annealing_factor : float, optional
-            A factor used to anneal the KL-divergence term in the variational loss during the training
-            process, by default 1.0.
-        
-        Examples
-        --------
-        >>> def guide(self, x, y=None):
-        ...     # Approximate posterior specification here.
-        ...     pass
-
-
-        """
-        
-        # Determine the maximum number of time steps from the input shape.
-        T_max = x.size(1)
-
-        # Register the module with Pyro to enable optimization of its parameters.
-        pyro.module("dmm", self)
-
-        # Expand and reformat the initial hidden state of the RNN to match the batch size and layers.
-        h_0_contig = self.h_0.expand(self.num_layers * 2, x.size(0), self.rnn.hidden_size).contiguous()
-
-        # Process the input `x` through the RNN to obtain the output for each time step.
-        rnn_output, _ = self.rnn(x, h_0_contig)
-        
-        # Expand the initial approximate latent state `z_q_0` to match the batch size.
-        z_prev = self.z_q_0.expand(x.size(0), self.z_dim)
-        
-        # Use the `pyro.plate` construct to handle batches of data for conditional independence.
-        with pyro.plate("z_minibatch", len(x)):
-            # Loop over each time step while considering the previous state (Markovian assumption).
-            for t in pyro.markov(range(1, T_max + 1)):
-                # Obtain the location and scale for the latent state `z` at time `t` using the RNN output.
-                z_loc, z_scale = self.combiner(z_prev, rnn_output[:, t - 1, :])
-
-                # Define the Normal distribution for the latent variable `z` at time `t`.
-                z_dist = dist.Normal(z_loc, z_scale)
-
-                # Temporarily adjust the scale of the score function, here it's effectively not adjusted (None).
-                with pyro.poutine.scale(None, annealing_factor):
-                    # Sample the latent variable `z_t` from the defined distribution `z_dist`.
-                    z_t = pyro.sample(f"z_{t}", z_dist.to_event(1))
-
-                # Update the previous latent state to the current one for the next time step.
-                z_prev = z_t
-
-    def forward(self, x):
-        """
-        Computes the forward pass, predicting the class logits for each time step of the input sequence.
-
-        This method integrates the learned latent representations with the emitter network to output
-        the raw scores (logits) for each class.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            Input tensor with shape (batch_size, sequence_length, num_features), where sequence_length
-            is the length of the time series and num_features is the number of features at each time step.
+        X : array-like
+            Input data for forecasting.
+        predict_nonlinearity : callable or None, optional
+            Nonlinearity to apply to predictions.
 
         Returns
         -------
-        torch.Tensor
-            A tensor with shape (batch_size, num_classes) representing the averaged logits for class probabilities
-            across the sequence for each batch instance. These logits are suitable for passing through a softmax
-            to obtain normalized probabilities.
-
-        Examples
-        --------
-        >>> x = torch.rand(32, 20, 10)  # A batch of 32 sequences, each 20 time steps long with 10 features.
-        >>> model = DMMClassifier(...)
-        >>> logits = model.forward(x)
-        >>> probabilities = torch.nn.functional.softmax(logits, dim=1)
-        >>> predicted_classes = torch.argmax(probabilities, dim=1)
-        # predicted_classes contains the most probable class for each instance in the batch.
-
+        numpy.ndarray
+            Forecasted values.
         """
-
-        preds = []
-                
-        # Run the guide and capture the trace
-        guide_trace = pyro.poutine.trace(self.guide).get_trace(x)
-
-        # This is the number of time steps we need to process in the mini-batch
-        T_max = x.size(1)
-
-        # Extract the latent variables from the trace and pass them to the emitter
-        for t in pyro.markov(range(1, T_max + 1)):
-
-            z_t = guide_trace.nodes[f"z_{t}"]["value"]
-                
-            class_logits_t = self.emitter_cls(z_t, x[:, t - 1, :])
-            
-            preds.append(class_logits_t)
-                
-        # Stack and average the predictions
-        preds = torch.stack(preds)
-
-        return preds.mean(0)
+        return super().predict(X, predict_nonlinearity)

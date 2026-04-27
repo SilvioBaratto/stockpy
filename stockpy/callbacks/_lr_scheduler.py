@@ -115,7 +115,7 @@ class LRScheduler(Callback):
     >>> from torch.optim.lr_scheduler import StepLR
     >>> from stockpy.callbacks import LRScheduler
     >>> lr_scheduler = LRScheduler(policy=StepLR, step_size=1)
-    >>> net = NeuralNet(classifier, criterion, optimizer, lr=0.05,
+    >>> net = NeuralNet(regressor, criterion, optimizer, lr=0.05,
                         callbacks=[lr_scheduler])
 
     Notes

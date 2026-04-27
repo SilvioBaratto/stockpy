@@ -166,8 +166,8 @@ def convert_sklearn_metric_function(scoring):
 
     Examples
     --------
-    >>> from sklearn.metrics import accuracy_score
-    >>> scorer = convert_sklearn_metric_function(accuracy_score)
+    >>> from sklearn.metrics import mean_squared_error
+    >>> scorer = convert_sklearn_metric_function(mean_squared_error)
     >>> print(type(scorer))
     <class 'sklearn.metrics._scorer._PredictScorer'>
 
@@ -248,17 +248,17 @@ class ScoringBase(Callback):
 
     Examples
     --------
-    >>> class AccuracyScoring(ScoringBase):
+    >>> class MSEScoring(ScoringBase):
     ...     def on_epoch_end(self, net, dataset_train, dataset_valid, **kwargs):
     ...         # Assuming self.on_train is False
     ...         y_true = [y for _, y in dataset_valid]
     ...         y_pred = net.predict(dataset_valid)
-    ...         score = accuracy_score(y_true, y_pred)
-    ...         print(f'Validation Accuracy: {score}')
+    ...         score = mean_squared_error(y_true, y_pred)
+    ...         print(f'Validation MSE: {score}')
     ...
-    >>> net = NeuralNetClassifier(
+    >>> net = EncoderDecoderForecaster(
     ...     module=MyModule,
-    ...     callbacks=[AccuracyScoring(scoring='accuracy')],
+    ...     callbacks=[MSEScoring(scoring='neg_mean_squared_error')],
     ... )
 
     Notes
@@ -502,7 +502,7 @@ class BatchScoring(ScoringBase):
     scoring : None, str, or callable
         The scoring method to use.
         - If None, the model's own `score` method is used.
-        - If a string, it must correspond to a valid scikit-learn metric, e.g., "f1_score" or "accuracy_score".
+        - If a string, it must correspond to a valid scikit-learn metric, e.g., "mean_squared_error" or "mean_absolute_error".
         - If a callable, it must accept three arguments (model, X, y) and return a scalar score.
     lower_is_better : bool, optional (default=True)
         Indicates if a lower score is better (True) or if a higher score is better (False).
@@ -699,14 +699,14 @@ class EpochScoring(ScoringBase):
     --------
     Using a predefined scoring function:
 
-    >>> net = NeuralNetClassifier(callbacks=[EpochScoring('f1')])
+    >>> net = EncoderDecoderForecaster(callbacks=[EpochScoring('neg_mean_squared_error')])
 
     Using a custom scoring function:
 
     >>> def custom_score(net, X, y):
     ...     # Your custom scoring logic here
     ...     return score_value
-    >>> net = NeuralNetClassifier(callbacks=[EpochScoring(custom_score)])
+    >>> net = EncoderDecoderForecaster(callbacks=[EpochScoring(custom_score)])
 
     Notes
     -----

@@ -1,0 +1,10 @@
+- #3 [priority:high] chore: delete classifier classes and ClassifierMixin usage — agent: python-pro
+- #4 [priority:high] chore: delete flat-regression and deprecated probabilistic models — agent: python-pro
+- #5 [priority:high] chore: migrate packaging from setup.py to pyproject.toml — agent: python-pro
+- #6 [priority:high] feat: implement EncoderDecoderForecaster base class — agent: python-pro
+- #7 [priority:high] feat: implement TimeSeriesDataset with context_len and pred_len windows — agent: python-pro
+- #8 [priority:high] feat: reorganize package into stockpy/forecasters/ with stub files — agent: python-pro
+- #9 [priority:medium] feat: add preprocessing transforms (normalization and differencing) — agent: python-pro
+- #10 [priority:high] test: create conftest.py with synthetic multivariate sine-wave fixtures — agent: python-pro
+- #11 [priority:high] test: create test_dataset.py for TimeSeriesDataset — agent: python-pro
+- #12 [priority:high] test: create test_callbacks.py for callback system — agent: python-pro

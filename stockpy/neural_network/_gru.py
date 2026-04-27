@@ -2,11 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from stockpy.base import Regressor
-from stockpy.base import Classifier 
+from stockpy.base import EncoderDecoderForecaster
 from stockpy.utils import get_activation_function
 
-__all__ = ['GRUClassifier', 'GRURegressor']
+__all__ = ['GRURegressor']
 
 class GRU(nn.Module):
     """
@@ -86,8 +85,7 @@ class GRU(nn.Module):
         to process the input sequences followed by a series of fully connected layers for further processing
         or output generation.
 
-        The method automatically determines the output size based on whether the model instance is for classification
-        or regression, derived from `Classifier` or `Regressor`.
+        The method automatically determines the output size for forecasting, derived from `EncoderDecoderForecaster`.
 
         """
 
@@ -97,10 +95,7 @@ class GRU(nn.Module):
         else:
             self.hidden_sizes = self.hidden_size
 
-        if isinstance(self, Classifier):
-            self.output_size = self.n_classes_
-            self.criterion_ = nn.NLLLoss()
-        elif isinstance(self, Regressor):
+        if isinstance(self, EncoderDecoderForecaster):
             self.output_size = self.n_outputs_
             self.criterion_ = nn.MSELoss()
 
@@ -136,135 +131,17 @@ class GRU(nn.Module):
     def model_type(self):
         return "rnn"
 
-class GRUClassifier(Classifier, GRU):
-    """
-    A classifier that uses a Gated Recurrent Unit (GRU) network for sequence classification tasks.
 
-    The `GRUClassifier` extends both `Classifier` for generic classification functionalities and `GRU` for handling
-    sequential data. It is tailored for sequence classification, making it suitable for tasks such as time series 
-    classification, text categorization, and more.
+class GRURegressor(EncoderDecoderForecaster, GRU):
+    """
+    A forecaster that uses a Gated Recurrent Unit (GRU) network for sequence forecasting tasks.
+
+    The `GRURegressor` extends both `EncoderDecoderForecaster` and `GRU` classes, leveraging the GRU capabilities for sequence
+    processing and applying it to forecasting problems.
 
     Parameters
     ----------
-    rnn_size : int
-        The number of features in the hidden state `h` of each GRU layer.
-    hidden_size : int or list of int
-        The number of features in the hidden layer(s) of the classifier. Can be a list to specify the size of each layer.
-    num_layers : int
-        The number of stacked GRU layers.
-    dropout : float
-        The dropout probability for the dropout layers in the classifier.
-    activation : str
-        The activation function for the hidden layers.
-    bias : bool
-        Whether to use bias terms in the GRU and linear layers.
-    seq_len : int
-        The length of the input sequences.
-    **kwargs : dict, optional
-        Additional arguments passed to the `Classifier` and `GRU` base classes.
-
-    Attributes
-    ----------
-    Inherits all attributes from the `Classifier` and `GRU` classes.
-
-    Methods
-    -------
-    forward(x)
-        Defines the forward pass of the model.
-
-    Raises
-    ------
-    RuntimeError
-        If the forward pass is called before the model is properly configured.
-
-    Notes
-    -----
-    The rest of the methods from `Classifier` and `GRU` are inherited.
-    """
-
-    def __init__(self,
-                 rnn_size = 32,
-                 hidden_size=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 batch_norm=False,
-                 layer_norm=False,
-                 **kwargs):
-        """
-        Initializes the `GRUClassifier` instance with the specified configurations.
-
-        Calls the constructor of `Classifier` and `GRU` to set up the necessary parameters and structures for a
-        GRU-based classification model.
-
-        """
-
-        Classifier.__init__(self, **kwargs)
-        GRU.__init__(self,
-                        rnn_size=rnn_size,
-                        hidden_size=hidden_size,
-                        num_layers=num_layers,
-                        dropout=dropout,
-                        activation=activation,
-                        seq_len=seq_len,
-                        bias=bias,
-                        batch_norm=batch_norm,
-                        layer_norm=layer_norm,
-                        **kwargs
-                        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Defines the forward pass of the classifier.
-
-        The input data `x` is passed through the GRU layers, and the output of the last GRU layer is then
-        fed into the fully connected layers. The final output is passed through a softmax layer to obtain 
-        the classification probabilities.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            The input tensor containing the features of shape (batch_size, seq_len, features).
-
-        Returns
-        -------
-        torch.Tensor
-            The output tensor containing the class probabilities of shape (batch_size, num_classes).
-
-        Raises
-        ------
-        RuntimeError
-            If the input tensor `x` does not have the correct shape or type.
-        """
-
-        # Initializing the initial hidden state for GRU layers with zeros
-        h_0 = torch.zeros(self.num_layers, x.size(0), self.rnn_size, requires_grad=True)
-
-        # Passing the input and initial hidden state through the GRU layers
-        # The GRU returns the output for each time step as well as the last hidden state
-        out, _ = self.gru(x, h_0)
-
-        # Taking the output of the last time step after the final GRU layer
-        # and passing it through the fully connected layer stack
-        out = self.layers(out[:, -1, :])  # (batch_size, rnn_size) -> (batch_size, hidden_sizes[-1])
-
-        # Applying softmax to the output layer to get the probability distribution over classes
-        out = F.softmax(out, dim=-1)  # (batch_size, hidden_sizes[-1]) -> (batch_size, num_classes)
-
-        return out
-
-class GRURegressor(Regressor, GRU):
-    """
-    A regressor that uses a Gated Recurrent Unit (GRU) network for sequence regressions tasks.
-
-    The `GRURegressor` extends both `Regressor` and `GRU` classes, leveraging the GRU capabilities for sequence 
-    processing and applying it to regression problems.
-
-    Parameters
-    ----------
-    Inherits all parameters from the `Regressor` and `GRU` classes.
+    Inherits all parameters from the `EncoderDecoderForecaster` and `GRU` classes.
 
     Attributes
     ----------
@@ -297,7 +174,7 @@ class GRURegressor(Regressor, GRU):
 
     Notes
     -----
-    The rest of the methods from `Regressor` and `GRU` are inherited.
+    The rest of the methods from `EncoderDecoderForecaster` and `GRU` are inherited.
     """
 
     def __init__(self,
@@ -314,12 +191,12 @@ class GRURegressor(Regressor, GRU):
         """
         Initializes the `GRURegressor` instance with the specified configurations.
 
-        Calls the constructor of `Classifier` and `GRU` to set up the necessary parameters and structures for a
-        GRU-based regression model.
+        Calls the constructor of `EncoderDecoderForecaster` and `GRU` to set up the necessary parameters and structures for a
+        GRU-based forecasting model.
 
         """
 
-        Regressor.__init__(self, **kwargs)
+        EncoderDecoderForecaster.__init__(self, **kwargs)
         GRU.__init__(self, 
                      rnn_size=rnn_size,
                      hidden_size=hidden_size, 
@@ -367,5 +244,23 @@ class GRURegressor(Regressor, GRU):
         
         # Pass the final hidden state through the fully connected layers
         out = self.layers(out[:, -1, :])
-    
+
         return out
+
+    def predict(self, X, predict_nonlinearity='auto'):
+        """
+        Forecast future values for the given input sequences.
+
+        Parameters
+        ----------
+        X : array-like
+            Input data for forecasting.
+        predict_nonlinearity : callable or None, optional
+            Nonlinearity to apply to predictions.
+
+        Returns
+        -------
+        numpy.ndarray
+            Forecasted values.
+        """
+        return super().predict(X, predict_nonlinearity)

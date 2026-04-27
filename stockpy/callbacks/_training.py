@@ -97,8 +97,8 @@ class Checkpoint(Callback):
         self.sink = sink
         self.load_best = load_best
         self.use_safetensors = use_safetensors
-        self._check_kwargs(kwargs)
         vars(self).update(**kwargs)
+        self._check_kwargs(kwargs)
         self._validate_filenames()
 
     def _check_kwargs(self, kwargs):
@@ -141,7 +141,7 @@ class Checkpoint(Callback):
                 raise TypeError(
                     "{cls_name} got an unexpected argument '{key}', did you mean "
                     "'f_{key}'?".format(cls_name=self.__class__.__name__, key=key))
-        if self.use_safetensors and self.f_optimizer is not None:
+        if self.use_safetensors and getattr(self, 'f_optimizer', None) is not None:
             raise ValueError(
                 "Cannot save optimizer state when using safetensors, "
                 "please set f_optimizer=None or don't use safetensors.")
@@ -687,7 +687,7 @@ class EarlyStopping(Callback):
     --------
     >>> from stockpy.callbacks import EarlyStopping
     >>> early_stopping = EarlyStopping(patience=10, threshold=1e-2, threshold_mode='abs')
-    >>> net = NeuralNet(classifier, criterion, callbacks=[early_stopping])
+    >>> net = NeuralNet(regressor, criterion, callbacks=[early_stopping])
     >>> net.fit(X, y)
     # Stops if the validation loss does not improve by at least 0.01 within 10 epochs.
     """

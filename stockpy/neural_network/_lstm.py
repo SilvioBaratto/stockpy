@@ -2,11 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
-from stockpy.base import Regressor
-from stockpy.base import Classifier 
+from stockpy.base import EncoderDecoderForecaster
 from stockpy.utils import get_activation_function
 
-__all__ = ['LSTMClassifier', 'LSTMRegressor']
+__all__ = ['LSTMRegressor']
 
 class LSTM(nn.Module):
     """
@@ -94,10 +93,7 @@ class LSTM(nn.Module):
         else:
             self.hidden_sizes = self.hidden_size
 
-        if isinstance(self, Classifier):
-            self.output_size = self.n_classes_
-            self.criterion_ = nn.NLLLoss()
-        elif isinstance(self, Regressor):
+        if isinstance(self, EncoderDecoderForecaster):
             self.output_size = self.n_outputs_
             self.criterion_ = nn.MSELoss()
 
@@ -134,118 +130,9 @@ class LSTM(nn.Module):
     def model_type(self):
         return "rnn"
 
-class LSTMClassifier(Classifier, LSTM):
+class LSTMRegressor(EncoderDecoderForecaster, LSTM):
     """
-    LSTMClassifier is a neural network module for sequence classification tasks.
-
-    It uses an LSTM (Long Short-Term Memory) layer followed by a fully connected layer.
-    It is suitable for tasks where the input data is a sequence and the output is a discrete class.
-
-    Parameters
-    ----------
-    rnn_size : int
-        The number of units in the LSTM layer.
-    hidden_size : int
-        The number of units in the hidden layer(s) following the LSTM layer.
-    num_layers : int
-        The number of layers in the LSTM.
-    dropout : float
-        If non-zero, introduces a dropout layer on the outputs of each LSTM layer
-        except the last layer, with dropout probability equal to `dropout`.
-    activation : str
-        The activation function to use on the outputs of the hidden layers.
-    bias : bool
-        If `False`, then the layer does not use bias weights b_ih and b_hh.
-        Default: `True`.
-    seq_len : int
-        The length of the input sequences.
-    **kwargs : dict, optional
-        Additional arguments passed to the `Classifier` base class.
-
-    Attributes
-    ----------
-    criterion : torch.nn.Module
-        The criterion that is used to compute the loss of the model.
-
-    Methods
-    -------
-    forward(x)
-        Defines the forward pass of the LSTM classifier.
-    """
-
-    def __init__(self,
-                 rnn_size = 32,
-                 hidden_size=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 batch_norm=False,
-                 layer_norm=False,
-                 **kwargs):
-        """
-        Constructs an LSTMClassifier instance with specified parameters for the LSTM
-        and fully connected layers. It initializes base Classifier attributes and
-        sets up the criterion as Negative Log-Likelihood Loss (NLLLoss).
-        """
-        Classifier.__init__(self, **kwargs)
-        LSTM.__init__(self,
-                        rnn_size=rnn_size,
-                        hidden_size=hidden_size,
-                        num_layers=num_layers,
-                        dropout=dropout,
-                        activation=activation,
-                        seq_len=seq_len,
-                        bias=bias,
-                        batch_norm=batch_norm,
-                        layer_norm=layer_norm,
-                        **kwargs
-                        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Forward pass through the LSTM and fully connected layers.
-
-        This method takes an input sequence, processes it through the LSTM layer(s), and passes the final
-        hidden state through the fully connected layer(s) to produce the output.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            The input data tensor for sequence classification. Expected to have
-            dimensions (batch_size, seq_len, input_size).
-
-        Returns
-        -------
-        torch.Tensor
-            The output tensor after processing through LSTM and fully connected layers.
-            It contains the log probabilities of the classes for each sequence in the batch.
-
-        Raises
-        ------
-        RuntimeError
-            If the input tensor does not match the expected dimensions or if an operation
-            within the forward pass fails.
-        """
-        # Ensures LSTM initial states h_0 and c_0 are reset to zeros at each forward call
-        h_0 = torch.zeros(self.num_layers, x.size(0), self.rnn_size, requires_grad=True)
-        c_0 = torch.zeros(self.num_layers, x.size(0), self.rnn_size, requires_grad=True)
-
-        # Processes input through the LSTM layer
-        out, (hn, cn) = self.lstm(x, (h_0.detach(), c_0.detach()))
-
-        # Takes the output of the last sequence step from LSTM layer
-        out = self.layers(out[:, -1, :])
-
-        # Applies softmax to output layer to obtain log probabilities for classification
-        out = F.softmax(out, dim=-1)
-
-        return out
-
-class LSTMRegressor(Regressor, LSTM):
-    """
-    LSTMRegressor is a neural network module for sequence regression tasks.
+    LSTMRegressor is a neural network module for sequence forecasting tasks.
 
     It uses an LSTM (Long Short-Term Memory) layer followed by a fully connected layer.
     It is suitable for tasks where the input data is a sequence and the output is a continuous value.
@@ -269,7 +156,7 @@ class LSTMRegressor(Regressor, LSTM):
     seq_len : int
         The length of the input sequences.
     **kwargs : dict, optional
-        Additional arguments passed to the `Regressor` base class.
+        Additional arguments passed to the `EncoderDecoderForecaster` base class.
 
     Attributes
     ----------
@@ -296,11 +183,11 @@ class LSTMRegressor(Regressor, LSTM):
                  **kwargs):
         """
         Constructs an LSTMRegressor instance with specified parameters for the LSTM
-        and fully connected layers. It initializes base Regressor attributes and
+        and fully connected layers. It initializes base EncoderDecoderForecaster attributes and
         sets up the criterion as Mean Squared Error Loss (MSELoss).
         """
 
-        Regressor.__init__(self, **kwargs)
+        EncoderDecoderForecaster.__init__(self, **kwargs)
         LSTM.__init__(self, 
                      rnn_size=rnn_size,
                      hidden_size=hidden_size, 
@@ -352,3 +239,21 @@ class LSTMRegressor(Regressor, LSTM):
 
         # Returns the final output for regression
         return out
+
+    def predict(self, X, predict_nonlinearity='auto'):
+        """
+        Forecast future values for the given input sequences.
+
+        Parameters
+        ----------
+        X : array-like
+            Input data for forecasting.
+        predict_nonlinearity : callable or None, optional
+            Nonlinearity to apply to predictions.
+
+        Returns
+        -------
+        numpy.ndarray
+            Forecasted values.
+        """
+        return super().predict(X, predict_nonlinearity)

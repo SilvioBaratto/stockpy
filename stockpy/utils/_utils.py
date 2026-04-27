@@ -16,9 +16,6 @@ from sklearn.utils.validation import check_is_fitted as sk_check_is_fitted
 import torch
 from torch import nn
 
-from torch.nn import BCELoss
-from torch.nn import BCEWithLogitsLoss
-from torch.nn import CrossEntropyLoss
 from pyro.nn import PyroModule
 from torch.nn.utils.rnn import PackedSequence
 from torch.utils.data.dataset import Subset
@@ -67,9 +64,7 @@ __all__ = [
     'unfreeze_parameter', 
     'get_map_location', 
     'check_is_fitted', 
-    '_identity', 
-    '_make_2d_probs', 
-    '_sigmoid_then_2d', 
+    '_identity',
     '_infer_predict_nonlinearity', 
     'TeeGenerator', 
     '_check_f_arguments', 
@@ -948,10 +943,10 @@ def data_from_dataset(dataset, X_indexing=None, y_indexing=None):
 
     Examples
     --------
-    >>> from stockpy import NeuralNetClassifier
+    >>> from stockpy import EncoderDecoderForecaster
     >>> from stockpy.dataset import Dataset
     >>> from torch.utils.data import Subset
-    >>> net = NeuralNetClassifier(...)
+    >>> net = EncoderDecoderForecaster(...)
     >>> ds = Dataset(X, y)
     >>> X, y = data_from_dataset(ds)
         
@@ -1117,8 +1112,8 @@ def train_loss_score(net, X=None, y=None):
 
     Examples
     --------
-    >>> from stockpy import NeuralNetClassifier
-    >>> net = NeuralNetClassifier(module=MyModule, callbacks={'train_loss': train_loss_score})
+    >>> from stockpy import EncoderDecoderForecaster
+    >>> net = EncoderDecoderForecaster(module=MyModule, callbacks={'train_loss': train_loss_score})
     >>> net.fit(X_train, y_train)
     >>> last_train_loss = train_loss_score(net)
 
@@ -1154,8 +1149,8 @@ def valid_loss_score(net, X=None, y=None):
 
     Examples
     --------
-    >>> from stockpy import NeuralNetClassifier
-    >>> net = NeuralNetClassifier(module=MyModule, callbacks={'valid_loss': valid_loss_score})
+    >>> from stockpy import EncoderDecoderForecaster
+    >>> net = EncoderDecoderForecaster(module=MyModule, callbacks={'valid_loss': valid_loss_score})
     >>> net.fit(X_train, y_train)
     >>> last_valid_loss = valid_loss_score(net)
 
@@ -1445,76 +1440,12 @@ def _identity(x):
     """
     return x
 
-def _make_2d_probs(prob):
-    """
-    Convert a 1-dimensional probability tensor into a 2-dimensional one.
-
-    This function is designed to prepare the output of a binary classifier
-    to match scikit-learn's convention of expecting two probabilities for each
-    instance, one for each class.
-
-    Parameters
-    ----------
-    prob : torch.Tensor
-        A 1-dimensional tensor containing probabilities of the positive class.
-
-    Returns
-    -------
-    torch.Tensor
-        A 2-dimensional tensor with the first column containing the probabilities
-        of the negative class and the second column the probabilities of the
-        positive class.
-
-    Examples
-    --------
-    >>> _make_2d_probs(torch.tensor([0.2, 0.5, 0.8]))
-    tensor([[0.8000, 0.2000],
-            [0.5000, 0.5000],
-            [0.2000, 0.8000]])
-    """
-    y_proba = torch.stack((1 - prob, prob), 1)
-    return y_proba
-
-
-
-def _sigmoid_then_2d(x):
-    """
-    Apply sigmoid function to logits and format the output as a 2D probability array.
-
-    This function applies the sigmoid function to convert raw logits to probabilities,
-    then formats these probabilities into a 2D array where the sum of probabilities in
-    each row is 1. This is required for compatibility with scikit-learn's expectation
-    for output of predict_proba method in classifiers.
-
-    Parameters
-    ----------
-    x : torch.Tensor
-        A 1-dimensional torch tensor of raw logits.
-
-    Returns
-    -------
-    torch.Tensor
-        A 2-dimensional torch tensor with probabilities. Each row corresponds to a
-        sample, and the two columns represent the probabilities of the negative and
-        positive classes respectively.
-
-    Examples
-    --------
-    >>> _sigmoid_then_2d(torch.tensor([0.2, 0.5, 0.8]))
-    tensor([[0.5498, 0.4502],
-            [0.6225, 0.3775],
-            [0.6899, 0.3101]])
-    """
-    prob = torch.sigmoid(x)
-    return _make_2d_probs(prob)
-
 def _infer_predict_nonlinearity(net):
     """
     Infer the appropriate nonlinearity to apply based on the loss criterion of the net.
 
     This function determines which nonlinearity should be applied to the output of the
-    neural network model before making a prediction or returning probabilities. This is
-    only applied when using the `predict` or `predict_proba` methods of `NeuralNetClassifier`.
+    neural network model before making a prediction.
 
     Parameters
     ----------
@@ -1528,21 +1459,7 @@ def _infer_predict_nonlinearity(net):
         based on the loss criterion.
 
     """
-    if net.prob is False:
-        # At the moment, this function dispatches based on the criterion.
-        if isinstance(net.criterion_, torch.nn.CrossEntropyLoss):
-            return partial(torch.softmax, dim=-1)
-
-        if isinstance(net.criterion_, torch.nn.BCEWithLogitsLoss):
-            return _sigmoid_then_2d
-
-        if isinstance(net.criterion_, torch.nn.BCELoss):
-            return _make_2d_probs
-
-        return _identity
-    
-    else:
-        return _identity
+    return _identity
 
 class TeeGenerator:
     """

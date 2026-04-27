@@ -1,0 +1,14 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+stockpy/__init__.py
+stockpy/base.py
+stockpy/exceptions.py
+stockpy/history.py
+stockpy_learn.egg-info/PKG-INFO
+stockpy_learn.egg-info/SOURCES.txt
+stockpy_learn.egg-info/dependency_links.txt
+stockpy_learn.egg-info/not-zip-safe
+stockpy_learn.egg-info/requires.txt
+stockpy_learn.egg-info/top_level.txt

@@ -1,4 +1,5 @@
 import fnmatch
+from abc import abstractmethod
 from collections.abc import Mapping
 from collections import defaultdict
 from functools import partial
@@ -11,9 +12,7 @@ import tempfile
 import warnings
 
 import numpy as np
-from sklearn.base import BaseEstimator as SkBaseEstimator 
-from sklearn.base import ClassifierMixin
-from sklearn.base import RegressorMixin
+from sklearn.base import BaseEstimator as SkBaseEstimator
 from scipy.stats import mode
 import torch
 from torch.utils.data import DataLoader
@@ -28,9 +27,7 @@ from stockpy.callbacks import EpochTimer
 from stockpy.callbacks import PrintLog
 from stockpy.callbacks import EpochScoring
 from stockpy.callbacks import PassthroughScoring
-from stockpy.preprocessing import StockDatasetFFNN
-from stockpy.preprocessing import StockDatasetRNN
-from stockpy.preprocessing import StockDatasetCNN
+from stockpy.preprocessing import TimeSeriesDataset
 from stockpy.preprocessing import ValidSplit
 from stockpy.preprocessing import get_len
 from stockpy.preprocessing import unpack_data
@@ -61,7 +58,6 @@ from sklearn.utils.validation import (
     check_X_y,
 )
 
-from sklearn.utils.multiclass import unique_labels
 
 import re
 
@@ -2383,8 +2379,6 @@ class BaseEstimator:
         # Ensure y is 2D
         if get_dim(y) == 1:
             y = y.reshape((-1, 1))
-            if isinstance(self, Classifier):
-                self.n_classes_ = len(unique_labels(y))
 
         self.n_outputs_ = y.shape[1]
         
@@ -2925,10 +2919,8 @@ class BaseEstimator:
 
         # Dataset classes based on model type
         self.datasets = {
-            'rnn': StockDatasetRNN,
-            'ffnn': StockDatasetFFNN,
-            'cnn': StockDatasetCNN,
-            # 'seq2seq': StockDatasetSeq2Seq,
+            'rnn': TimeSeriesDataset,
+            'cnn': TimeSeriesDataset,
         }
 
         # Select and potentially instantiate the dataset
@@ -2944,12 +2936,12 @@ class BaseEstimator:
 
         # Initialize with additional parameters if required
         if not is_initialized:
-            if issubclass(dataset_cls, StockDatasetRNN):
-                # Initialize with sequence length for RNN and Seq2Seq models
-                return dataset_cls(X, y, length=None, seq_len=self.seq_len, **dataset_kwargs)
-
-            # Initialize for other types without sequence length
-            return dataset_cls(X, y, **dataset_kwargs)
+            return dataset_cls(
+                X, y, length=None,
+                context_len=self.context_len,
+                pred_len=self.pred_len,
+                **dataset_kwargs,
+            )
 
         # Return the already initialized dataset
         return dataset_cls
@@ -3250,7 +3242,7 @@ class BaseEstimator:
         if checkpoint is not None:
             if not self.initialized_:
                 self.initialize()
-            if f_history is None and checkpoint.f_history is not None:
+            if f_history is None and getattr(checkpoint, 'f_history', None) is not None:
                 self.history = History.from_file(checkpoint.f_history_)
             kwargs_full.update(**checkpoint.get_formatted_files(self))
 
@@ -4515,468 +4507,40 @@ class BaseEstimator:
         parts.append(')')
         return '\n'.join(parts)
     
-class Classifier(BaseEstimator, ClassifierMixin):
+class EncoderDecoderForecaster(BaseEstimator):
     """
-    A classifier built upon base estimators, enhanced with classification-specific capabilities.
+    Abstract base class for encoder-decoder time-series forecasting models.
 
-    Inherits from `BaseEstimator` and `ClassifierMixin` to conform to the common interface
-    for estimators in a machine learning framework, while providing added functionalities for
-    classification tasks.
+    This class defines the contract for all forecasting models in stockpy.
+    Each subclass must implement ``predict()`` to return forecasts of shape
+    ``(n_samples, pred_len, n_features)``.
+
+    The training loop, callback system, history tracking, device management,
+    and safetensors-based save/load are inherited from ``BaseEstimator``.
 
     Parameters
     ----------
-    *args : list, optional
-        Variable length argument list for parent `BaseEstimator` initializer.
-    classes : array-like, optional
-        Represents possible classes. Inferred from data during `fit` if not provided.
-    **kwargs : dict, optional
-        Arbitrary keyword arguments for parent `BaseEstimator` initializer.
-
-    Attributes
-    ----------
-    classes_ : array-like
-        Labels for classes, determined post-fit.
-
-    Examples
-    --------
-    >>> from sklearn.datasets import load_iris
-    >>> from sklearn.model_selection import train_test_split
-    >>> X, y = load_iris(return_X_y=True)
-    >>> X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2)
-    >>> classifier = Classifier(classes=np.unique(y))
-    >>> classifier.fit(X_train, y_train)
-    >>> predictions = classifier.predict(X_test)
-    >>> print(predictions)
-    [1 2 0 ...]
-
-    The above Examples demonstrates creating an instance of `Classifier` with specified classes,
-    fitting it to training data, and making predictions on test data.
-
-    See Also
-    --------
-    BaseEstimator : Parent class providing foundational estimator functionality.
-    ClassifierMixin : Mixin providing standardized classification functionalities.
-    """
-
-    def __init__(
-            self,
-            *args,
-            classes=None,
-            **kwargs
-    ):
-        """
-        Constructs the Classifier instance with optional class labels and additional arguments.
-        """
-
-        super(Classifier, self).__init__(
-            *args,
-            **kwargs
-        )
-
-        self.classes = classes  
-
-    @property
-    def _default_callbacks(self):
-        return [
-            ('epoch_timer', EpochTimer()),
-            ('train_loss', PassthroughScoring(
-                name='train_loss',
-                on_train=True,
-            )),
-            ('valid_loss', PassthroughScoring(
-                name='valid_loss',
-            )),
-            ('valid_acc', EpochScoring(
-                'accuracy',
-                name='valid_acc',
-                lower_is_better=False,
-            )),
-            ('print_log', PrintLog()),
-        ]
-    
-    @property
-    def classes_(self):
-        """
-        Accessor for the class labels used by the classifier.
-
-        Provides the class labels if specified during initialization, otherwise, it
-        attempts to retrieve the inferred class labels from the training data.
-
-        Returns
-        -------
-        array-like
-            The class labels.
-
-        Raises
-        ------
-        AttributeError
-            If class labels were neither provided nor inferred, or if the classifier
-            was not trained with `y`.
-
-        Notes
-        -----
-        To ensure class labels can be inferred, training must include the `y` target data.
-
-        Examples
-        --------
-        >>> classifier = Classifier()
-        >>> classifier.fit(X_train, y_train)
-        >>> print(classifier.classes_)
-        [0 1 2]
-
-        The above Examples assumes that `classifier` has been fitted on the training data,
-        showing how to access the inferred class labels.
-
-        See Also
-        --------
-        Classifier : This property is associated with the Classifier class.
-        """
-        if self.classes is not None:
-            if not len(self.classes):
-                raise AttributeError("{} has no attribute 'classes_'".format(
-                    self.__class__.__name__))
-            return self.classes
-
-        try:
-            return self.classes_inferred_
-        except AttributeError as exc:
-            # It's not easily possible to track exactly what circumstances led
-            # to this, so try to make an educated guess and provide a possible
-            # solution.
-            msg = (
-                f"{self.__class__.__name__} could not infer the classes from y; "
-                "this error probably occurred because the net was trained without y "
-                "and some function tried to access the '.classes_' attribute; "
-                "a possible solution is to provide the 'classes' argument when "
-                f"initializing {self.__class__.__name__}"
-            )
-            raise AttributeError(msg) from exc
-
-    def check_data(self, X, y):
-        """
-        Validates training data and labels before model fitting.
-
-        Ensures `y` is not `None`, validates compatibility of `X` with expected formats,
-        and infers unique class labels where applicable.
-
-        Parameters
-        ----------
-        X : array-like or Dataset
-            Training data.
-        y : array-like, optional
-            Labels for training data. Can be `None`.
-
-        Raises
-        ------
-        ValueError
-            If `y` is `None` and `X` is not a `Dataset` with labels or a custom `DataLoader`.
-
-        Notes
-        -----
-        - Sets `classes_inferred_` attribute based on unique labels in `y` or extracted from `X`.
-        - Suppressed `AttributeError` may occur during dataset-specific label extraction.
-
-        Examples
-        --------
-        >>> net = NeuralNetwork(...)
-        >>> X, y = load_some_data()
-        >>> net.check_data(X, y)  # Performs validation on X and y
-
-        This function is typically called internally before fitting a model to ensure
-        data validity and compatibility with the training process.
-
-        """
-        # Check if y is None, X is not a Dataset, and the iterator for training is DataLoader
-        if (
-                (y is None) and
-                (not is_dataset(X)) and
-                (self.iterator_train is DataLoader)
-        ):
-            # Raise an error, suggesting the user to supply a DataLoader or Dataset
-            msg = ("No y-values are given (y=None). You must either supply a "
-                  "Dataset as X or implement your own DataLoader for "
-                  "training (and your validation) and supply it using the "
-                  "``iterator_train`` and ``iterator_valid`` parameters "
-                  "respectively.")
-            raise ValueError(msg)
-
-        # If y is None but X is a Dataset, try to extract y from X
-        if (y is None) and is_dataset(X):
-            try:
-                # Extract data and labels from the dataset
-                _, y_ds = data_from_dataset(X)
-                # Infer unique classes from the extracted labels and store it
-                self.classes_inferred_ = np.unique(to_numpy(y_ds))
-            except AttributeError:
-                # If extraction fails, continue without raising an error
-                pass
-
-        # If y is provided, find the unique classes in y and store them
-        if y is not None:
-            self.classes_inferred_ = np.unique(to_numpy(y))
-
-    def get_loss(self, y_pred, y_true, *args, **kwargs):
-        """
-        Calculates loss using the model's loss criterion.
-
-        If `NLLLoss` is used, applies a log transformation to `y_pred` before calculation.
-        This method is designed to be compatible with custom loss criteria provided they conform 
-        to the expected signature and usage pattern of PyTorch loss functions.
-
-        Parameters
-        ----------
-        y_pred : torch.Tensor
-            Predicted outputs from the model.
-        y_true : torch.Tensor
-            True labels for the data.
-        *args
-            Variable length argument list for loss criterion.
-        **kwargs
-            Arbitrary keyword arguments for loss criterion.
-
-        Returns
-        -------
-        torch.Tensor
-            Computed loss between `y_pred` and `y_true`.
-
-        Notes
-        -----
-        Assumes `criterion_` is set. Override if using custom criteria.
-
-        Examples
-        --------
-        >>> net = Classifier(criterion=torch.nn.NLLLoss())
-        >>> y_pred = torch.tensor([[0.8, 0.2], [0.1, 0.9]])
-        >>> y_true = torch.tensor([0, 1])
-        >>> loss = net.get_loss(y_pred, y_true)
-        >>> print(loss)
-
-        See Also
-        --------
-        torch.nn.NLLLoss: Loss criterion requiring log probabilities.
-
-        """
-        # Check if the criterion is NLLLoss (Negative Log Likelihood Loss)
-        if isinstance(self.criterion_, torch.nn.NLLLoss):
-            # Small value to avoid log(0)
-            eps = torch.finfo(y_pred.dtype).eps
-            # Apply log transformation to y_pred
-            y_pred = torch.log(y_pred + eps)
-        
-        y_true = y_true.squeeze()
-        # Call the superclass' get_loss method to compute the loss
-        return super().get_loss(y_pred, y_true, *args, **kwargs)
-
-    def fit(self, 
-            X, 
-            y=None, 
-            optimizer=torch.optim.SGD,
-            elbo=TraceMeanField_ELBO,
-            callbacks=None,
-            lr=0.01,
-            epochs=10,
-            batch_size=32,
-            shuffle=False,
-            verbose=1,
-            model_params=None,
-            warm_start=False,
-            train_split=ValidSplit(5),
-            **fit_params):
-        """
-        Fit the model to the input data.
-
-        The method initializes and trains the model on the provided dataset. It handles the
-        initialization of the optimizer and training parameters and orchestrates the training
-        process over the specified number of epochs and batches. If `warm_start` is set to True
-        and the model has been previously fitted, the training will resume from the last state.
-
-        Parameters
-        ----------
-        X : Various types
-            Input data, compatible with stockpy.dataset.StockpyDataset. See Notes for types.
-        y : Various types, optional
-            Target data, same types as `X`. If included in `X` as Dataset, can be None.
-        optimizer : torch.optim.Optimizer, optional
-            Optimizer for model training. Default: `torch.optim.SGD`.
-        elbo : Callable, optional
-            ELBO function for variational Bayesian methods. Default: `TraceMeanField_ELBO`.
-        callbacks : list, optional
-            List of stockpy.callbacks.Callback instances. Default: None.
-        lr : float, optional
-            Learning rate for the optimizer. Default: 0.01.
-        epochs : int, optional
-            Number of epochs for training. Default: 10.
-        batch_size : int, optional
-            Batch size for gradient computation. Default: 32.
-        shuffle : bool, optional
-            If True, shuffle data each epoch. Default: False.
-        verbose : int, optional
-            Verbosity level. More detail at higher levels. Default: 1.
-        model_params : dict, optional
-            Model-specific parameters. Default: None.
-        warm_start : bool, optional
-            If True, continue training from last state. Default: False.
-        train_split : stockpy.helper.ValidSplit, optional
-            `ValidSplit` instance for validation splits. Default: `ValidSplit(5)`.
-        **fit_params
-            Extra parameters for `forward` method and `train_split` method.
-
-        Returns
-        -------
-        self : object
-            Classifier instance after fitting.
-
-        Examples
-        --------
-        >>> X, y = load_data()  # Placeholder for actual data loading.
-        >>> model = Classifier()
-        >>> model.fit(X, y)
-
-        Notes
-        -----
-        Actual types for `X` and `y` are dependent on model and dataset implementation.
-        Ensure data is in the expected format.
-
-        See Also
-        --------
-        partial_fit : Incremental fit without re-initializing module.
-        """
-        # Call to the actual fitting logic remains unchanged
-        return super(Classifier, self).fit(X,
-                                           y, 
-                                           optimizer,
-                                           elbo,
-                                           callbacks,
-                                           lr,
-                                           epochs,
-                                           batch_size,
-                                           shuffle,
-                                           verbose,
-                                           model_params,
-                                           warm_start,
-                                           train_split,
-                                           **fit_params)
-
-    def predict_proba(self, X):
-        """
-        Return probability estimates for samples.
-
-        The method computes probability estimates for each class on the provided data. It is
-        assumed that the `forward` method of the neural network returns a tuple where the first 
-        element is a tensor of raw probabilities, which are then processed to form the output of 
-        this method.
-
-        Parameters
-        ----------
-        X : {array-like, torch.Tensor, pandas.DataFrame/Series, scipy.sparse.csr_matrix, dict, list/tuple, Dataset}
-            The input data to predict probabilities for, which should be compatible with `stockpy.dataset.StockpyDataset`.
-            The supported types are as follows:
-            - numpy arrays
-            - torch tensors
-            - pandas DataFrame or Series
-            - scipy sparse CSR matrices
-            - dictionaries containing any of the above
-            - lists or tuples containing any of the above
-            - Dataset objects
-            For other data types, a custom Dataset should be provided.
-
-        Returns
-        -------
-        y_proba : numpy.ndarray
-            An array of shape (n_samples, n_classes) with the probability estimates that the samples belong to each class.
-
-        Notes
-        -----
-        - This method assumes that the `forward` method of the neural network returns the raw probabilities as its first output.
-        - If `forward` returns additional outputs that are required, this method should not be used; instead, one should use the `NeuralNet.forward` method to get all outputs.
-        - The implementation uses the `predict_proba` method from the superclass for the actual prediction.
-
-        Examples
-        --------
-        >>> X = load_data()  # Placeholder for actual data loading.
-        >>> model = Classifier()
-        >>> probabilities = model.predict_proba(X)
-        """
-        # Call to superclass to get probability predictions
-        return super().predict_proba(X)
-
-    def predict(self, X, predict_nonlinearity='auto'):
-        """
-        Return class labels for samples in X.
-
-        The method predicts class labels for the input samples by first obtaining the probability
-        estimates and then selecting the class with the highest probability as the predicted class.
-
-        Parameters
-        ----------
-        X : {array-like, torch.Tensor, pandas.DataFrame/Series, scipy.sparse.csr_matrix, dict, list/tuple, Dataset}
-            The input data for which to predict class labels, which should be compatible with `stockpy.dataset.StockpyDataset`.
-            Supported data types include:
-            - numpy arrays
-            - torch tensors
-            - pandas DataFrame or Series
-            - scipy sparse CSR matrices
-            - dictionaries containing any of the above types
-            - lists or tuples containing any of the above types
-            - Dataset objects
-            Custom Dataset implementations should be used for data types not listed here.
-
-        predict_nonlinearity : {'auto', callable, None}, default 'auto'
-            The nonlinearity function to be applied to the network's output before determining the predicted class.
-            Can be 'auto' to use the default from stockpy, a callable for a custom nonlinearity, or None to apply no nonlinearity.
-
-        Returns
-        -------
-        y_pred : numpy.ndarray
-            Predicted class labels for the samples, with shape (n_samples,).
-
-        Notes
-        -----
-        - The network's `forward` method is expected to return the class scores or probabilities as the first element of a tuple.
-        - The prediction process applies a nonlinearity (typically softmax) to the network's output, followed by an argmax operation to derive the class labels.
-        - If a `predict_nonlinearity` is specified, it is applied before the argmax step.
-
-        Examples
-        --------
-        >>> X = load_data()  # Placeholder for actual data loading.
-        >>> model = Classifier()
-        >>> predictions = model.predict(X)
-        """
-        # Assuming 'X' and 'predict_nonlinearity' are already defined above this snippet
-        if not isinstance(X, torch.utils.data.dataset.Subset) and X.ndim == 1:
-            X = X.reshape(1, -1)
-
-        self.predict_nonlinearity = predict_nonlinearity
-        
-        return self.predict_proba(X).argmax(axis=1)
-
-class Regressor(BaseEstimator, RegressorMixin):
-    """
-    A regressor that conforms to scikit-learn's estimator interface.
-
-    This class is designed to work with PyTorch modules for regression tasks,
-    wrapping a neural network model and providing an sklearn-like API.
-
-    The class is derived from `BaseEstimator` and `RegressorMixin`, which provide
-    base functionality for all scikit-learn estimators and regression-specific
-    functionality, respectively.
-
-    Parameters
-    ----------
+    context_len : int, default=20
+        Number of past time steps used as input (encoder window).
+    pred_len : int, default=1
+        Number of future time steps to predict (decoder window).
     *args
-        Variable length argument list passed to the `BaseEstimator` constructor.
-
+        Variable length argument list passed to the ``BaseEstimator`` constructor.
     **kwargs
-        Arbitrary keyword arguments passed to the `BaseEstimator` constructor.
+        Arbitrary keyword arguments passed to the ``BaseEstimator`` constructor.
     """
 
     def __init__(
             self,
+            context_len=20,
+            pred_len=1,
             *args,
             **kwargs
     ):
-    
-        super(Regressor, self).__init__(
+        self.context_len = context_len
+        self.pred_len = pred_len
+
+        super(EncoderDecoderForecaster, self).__init__(
             *args,
             **kwargs
         )
@@ -5120,7 +4684,7 @@ class Regressor(BaseEstimator, RegressorMixin):
         You should override this method if your workflow demands a pre-fit or post-fit processing.
         """
             
-        return super(Regressor, self).fit(X,
+        return super(EncoderDecoderForecaster, self).fit(X,
                                           y, 
                                           optimizer,
                                           elbo,
@@ -5135,57 +4699,40 @@ class Regressor(BaseEstimator, RegressorMixin):
                                           train_split,
                                           **fit_params)
     
-    def predict(self, 
+    @abstractmethod
+    def predict(self,
                 X,
                 predict_nonlinearity='auto'):
-        
         """
-        Predict continuous target values for samples in X.
+        Forecast future time steps for the given input sequences.
 
-        The `predict` method is designed for regression tasks where the output
-        is a continuous variable. If the module's `forward` method returns multiple
-        outputs as a tuple, it is assumed that the first output contains the
-        prediction values.
+        Subclasses must implement this method to produce predictions of shape
+        ``(n_samples, pred_len, n_features)``.
 
         Parameters
         ----------
         X : array-like, DataFrame, sparse matrix, or Dataset
-            The input data for making predictions. The data must be compatible with
-            the format expected by the `Dataset` used within the `NeuralNet` class.
-            This includes:
-
-            - numpy arrays
-            - torch tensors
-            - pandas DataFrame or Series
-            - scipy sparse CSR matrices
-            - a dictionary containing any of the above
-            - a list/tuple containing any of the above
-            - a Dataset object
-
-            If your data doesn't fit into these categories, you should pass a custom
-            `Dataset` that can handle your data format.
+            The input data for making predictions, typically of shape
+            ``(n_samples, context_len, n_features)``.
 
         predict_nonlinearity : callable or None, optional
             A callable that applies a nonlinearity to the output of the model's
-            forward method. This can be used to apply a final activation function
-            to the predictions. If set to None, no nonlinearity is applied.
+            forward method. If set to None, no nonlinearity is applied.
 
         Returns
         -------
-        y_pred : numpy ndarray
-            The predicted values as a one-dimensional array.
+        y_pred : numpy.ndarray
+            Forecasted values of shape ``(n_samples, pred_len, n_features)``.
 
         """
-        # Assuming 'X' and 'predict_nonlinearity' are already defined above this snippet
-        if not isinstance(X, torch.utils.data.dataset.Subset) and X.ndim == 1:
+        if not isinstance(X, torch.utils.data.dataset.Subset) and hasattr(X, 'ndim') and X.ndim == 1:
             X = X.reshape(1, -1)
-            
-        # initialize non linearity
+
         self.predict_nonlinearity = predict_nonlinearity
 
         return super().predict_proba(X)
     
-# class NumericalGenerator(BaseEstimator, RegressorMixin):
+# class NumericalGenerator(BaseEstimator):
 
 #     def __init__(
 #             self,
@@ -5306,7 +4853,7 @@ class Regressor(BaseEstimator, RegressorMixin):
 
 #         Examples
 #         --------
-#         >>> net = Regressor(MyModule)
+#         >>> net = EncoderDecoderForecaster(MyModule)
 #         >>> X = np.random.rand(100, 20)
 #         >>> y = np.random.rand(100)
 #         >>> net.fit(X, y)  # Should fit the model to the data
@@ -5568,7 +5115,7 @@ class Regressor(BaseEstimator, RegressorMixin):
 
 #         Examples
 #         --------
-#         >>> net = Regressor(MyModule)
+#         >>> net = EncoderDecoderForecaster(MyModule)
 #         >>> X = np.random.rand(100, 20)
 #         >>> y = np.random.rand(100)
 #         >>> net.fit(X, y)  # Should fit the model to the data
