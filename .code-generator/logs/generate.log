@@ -71,3 +71,7 @@
 2026-04-27 19:27:30,868 ERROR Cycle 1 (Foundation & Core Infrastructure) failed: Missing required field in assistant message: 'signature'. Aborting further cycles.
 2026-04-27 22:36:45,937 INFO run_multi_cycle: start_cycle=1 start_phase=7 total_cycles=3 resumed_from=state.cycles[0].phase=6
 2026-04-27 22:36:45,941 INFO Starting cycle 1 (Foundation & Core Infrastructure).
+2026-04-27 22:37:46,970 INFO Cycle 1 phases 1-7 complete.
+2026-04-27 22:37:47,558 INFO Closed milestone #1 for cycle 1.
+2026-04-27 22:37:47,562 INFO Cycle 1 (Foundation & Core Infrastructure) completed.
+2026-04-27 22:37:47,566 INFO Starting cycle 2 (Deterministic Forecasters).

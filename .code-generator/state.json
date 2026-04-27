@@ -1,16 +1,16 @@
 {
   "mode": "multi-cycle",
   "started_at": "2026-04-27T09:55:58Z",
-  "updated_at": "2026-04-27T20:36:50Z",
-  "current_cycle": 1,
+  "updated_at": "2026-04-27T23:03:35Z",
+  "current_cycle": 2,
   "cycles": [
     {
       "id": 1,
       "name": "Foundation & Core Infrastructure",
       "milestone_number": 1,
       "milestone_title": "Cycle 1 \u2014 Foundation & Core Infrastructure",
-      "status": "open",
-      "phase": 6,
+      "status": "completed",
+      "phase": 7,
       "issues": [
         {
           "number": 3,
@@ -210,17 +210,24 @@
           "cache_read": 0,
           "cache_write": 0,
           "num_turns": 11
+        },
+        "phase7": {
+          "input": 60276,
+          "output": 1679,
+          "cache_read": 0,
+          "cache_write": 0,
+          "num_turns": 1
         }
       },
       "started_at": "2026-04-27T10:11:30Z",
-      "finished_at": "2026-04-27T17:27:30Z",
+      "finished_at": "2026-04-27T20:37:46Z",
       "cache_telemetry": {
-        "input": 17553648,
-        "output": 83612,
+        "input": 17613924,
+        "output": 85291,
         "cache_read": 0,
         "cache_write": 0,
         "cache_hit_pct": 0.0,
-        "wall_seconds": 5438.834574716981
+        "wall_seconds": 5492.687576595985
       },
       "phase2_batch_id": null,
       "ollama_model": "kimi-k2.6:cloud"
@@ -228,11 +235,152 @@
     {
       "id": 2,
       "name": "Deterministic Forecasters",
-      "milestone_number": null,
+      "milestone_number": 2,
       "milestone_title": "Cycle 2 \u2014 Deterministic Forecasters",
       "status": "open",
-      "phase": 0,
-      "issues": [],
+      "phase": 6,
+      "issues": [
+        {
+          "number": 14,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:api",
+            "phase:implement",
+            "agent:python-pro"
+          ],
+          "reviewed": true,
+          "comments": "",
+          "title": "feat: implement GRUForecaster with encoder-decoder and teacher-forcing"
+        },
+        {
+          "number": 15,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:api",
+            "phase:implement",
+            "agent:python-pro"
+          ],
+          "reviewed": true,
+          "comments": "",
+          "title": "feat: implement BiLSTMForecaster with bidirectional encoder and unidirectional decoder"
+        },
+        {
+          "number": 19,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:tests",
+            "phase:test",
+            "agent:python-pro"
+          ],
+          "reviewed": true,
+          "comments": "",
+          "title": "test: add comprehensive tests for GRUForecaster"
+        },
+        {
+          "number": 23,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:medium",
+            "area:api",
+            "phase:implement",
+            "agent:python-pro"
+          ],
+          "reviewed": true,
+          "comments": "",
+          "title": "feat: update stockpy public API exports for Cycle 2 forecasters"
+        },
+        {
+          "number": 22,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:tests",
+            "phase:test",
+            "agent:python-pro"
+          ],
+          "reviewed": false,
+          "comments": "",
+          "title": ""
+        },
+        {
+          "number": 21,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:tests",
+            "phase:test",
+            "agent:python-pro"
+          ],
+          "reviewed": false,
+          "comments": "",
+          "title": ""
+        },
+        {
+          "number": 18,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:tests",
+            "phase:test",
+            "agent:python-pro"
+          ],
+          "reviewed": false,
+          "comments": "",
+          "title": ""
+        },
+        {
+          "number": 17,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:api",
+            "phase:implement",
+            "agent:python-pro"
+          ],
+          "reviewed": false,
+          "comments": "",
+          "title": ""
+        },
+        {
+          "number": 16,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:api",
+            "phase:implement",
+            "agent:python-pro"
+          ],
+          "reviewed": false,
+          "comments": "",
+          "title": ""
+        },
+        {
+          "number": 13,
+          "status": "closed",
+          "agent": "python-pro",
+          "labels": [
+            "priority:high",
+            "area:api",
+            "phase:implement",
+            "agent:python-pro"
+          ],
+          "reviewed": false,
+          "comments": "",
+          "title": ""
+        }
+      ],
       "commit_sha": null,
       "depends_on": [
         1
@@ -252,17 +400,53 @@
           "effort": "low"
         }
       ],
-      "base_commit": null,
-      "token_usage": {},
-      "started_at": null,
+      "base_commit": "bc67b810a26a1021efdcd9bbd244611542429263",
+      "token_usage": {
+        "phase1": {
+          "input": 833067,
+          "output": 11019,
+          "cache_read": 0,
+          "cache_write": 0,
+          "num_turns": 37
+        },
+        "phase2": {
+          "input": 1724373,
+          "output": 20513,
+          "cache_read": 0,
+          "cache_write": 0,
+          "num_turns": 45
+        },
+        "phase3_4": {
+          "input": 8136125,
+          "output": 34943,
+          "cache_read": 0,
+          "cache_write": 0,
+          "num_turns": 105
+        },
+        "phase5": {
+          "input": 3225193,
+          "output": 8778,
+          "cache_read": 0,
+          "cache_write": 0,
+          "num_turns": 38
+        },
+        "phase6": {
+          "input": 464675,
+          "output": 1018,
+          "cache_read": 0,
+          "cache_write": 0,
+          "num_turns": 10
+        }
+      },
+      "started_at": "2026-04-27T20:37:47Z",
       "finished_at": null,
       "cache_telemetry": {
-        "input": 0,
-        "output": 0,
+        "input": 49268771,
+        "output": 184658,
         "cache_read": 0,
         "cache_write": 0,
         "cache_hit_pct": 0.0,
-        "wall_seconds": 0
+        "wall_seconds": 8703.265424219004
       },
       "phase2_batch_id": null,
       "ollama_model": "kimi-k2.6:cloud"
@@ -333,7 +517,7 @@
     }
   },
   "session_mode": "shared",
-  "client_alive_at": "2026-04-27T20:36:50+00:00",
+  "client_alive_at": "2026-04-27T20:37:49+00:00",
   "phase2_batch_id": null,
   "repo": {
     "host": "github.com",

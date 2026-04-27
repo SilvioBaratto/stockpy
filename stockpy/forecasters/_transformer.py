@@ -60,6 +60,7 @@ class TransformerForecaster(EncoderDecoderForecaster):
             pred_len=pred_len,
             **kwargs,
         )
+        self._modules = ['module']
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Placeholder forward pass."""

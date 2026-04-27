@@ -2440,7 +2440,7 @@ class BaseEstimator:
 
         if attributes is None:
             if self._modules:
-                attributes = [module for module in self._modules.keys()]
+                attributes = [module + '_' for module in self._modules]
             else:
                 attributes = ['module_']
         
@@ -3264,6 +3264,10 @@ class BaseEstimator:
         f_history = kwargs_other.get('f_history')
         if f_history is not None:
             self.history = History.from_file(f_history)
+
+        for attr, f_name in kwargs_module.items():
+            state_dict = _get_state_dict(f_name)
+            self.load_state_dict(state_dict)
 
     def _get_params_for(self, prefix):
         """

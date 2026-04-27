@@ -1,0 +1,14 @@
+2026-04-27 18:55:42,271 INFO SDK session starting (model=kimi-k2.6:cloud effort=low max_turns=None).
+2026-04-27 22:36:50,073 INFO SDK session starting (model=kimi-k2.6:cloud effort=low max_turns=None).
+2026-04-27 22:37:42,852 INFO msg #21: assistant (371 chars)
+feat(foundation-core-infrastructure): restructure library to encoder-decoder forecasters
+
+- Pivot to time-series forecasting with encoder-decoder architectures only
+- Replace legacy sklearn-style estimators with unified forecaster base class
+- Modernize build system and add comprehensive tests for new components
+
+Closed issues: #3, #4, #5, #6, #7, #8, #9, #10, #11, #12
+2026-04-27 22:37:43,554 INFO msg #22: ResultMessage (tokens_in=60276 tokens_out=1679 cache_read=0 cache_write=0 is_error=False subtype=success stop_reason=end_turn num_turns=1)
+2026-04-27 22:37:43,928 INFO SDK session complete.
+2026-04-27 22:37:46,554 INFO Phase 7 complete: in=60276 cache_read=0 cache_write=0 out=1679 total=61955
+2026-04-27 22:37:46,556 INFO Phase 7: committed and pushed to development.
