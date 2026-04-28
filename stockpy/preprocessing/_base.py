@@ -1,49 +1,48 @@
-import warnings
 from collections.abc import Mapping
 from functools import partial
 from numbers import Number
 
 import numpy as np
-from scipy import sparse
-from sklearn.model_selection import ShuffleSplit
-from sklearn.model_selection import StratifiedKFold
-from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.model_selection import check_cv
 import torch
 import torch.utils.data
+from scipy import sparse
+from sklearn.model_selection import (
+    ShuffleSplit,
+    StratifiedKFold,
+    StratifiedShuffleSplit,
+    check_cv,
+)
 from torch.utils.data import Dataset
 
-from stockpy.utils import flatten
-from stockpy.utils import is_pandas_ndframe
-from stockpy.utils import check_indexing
-from stockpy.utils import to_numpy
+from stockpy.utils import check_indexing, flatten, is_pandas_ndframe, to_numpy
+
 
 def _apply_to_data(data, func, unpack_dict=False):
     """
     Apply a given function to the input data.
 
     This function supports data in the form of mappings (like dictionaries),
-    lists, tuples, or a single value. If the input is a mapping and `unpack_dict` 
+    lists, tuples, or a single value. If the input is a mapping and `unpack_dict`
     is True, it applies the function to the values of the dictionary.
 
     Parameters
     ----------
     data : Any
-        The input data on which to apply the function. This can be a mapping, 
+        The input data on which to apply the function. This can be a mapping,
         list, tuple, or a single value.
     func : Callable
-        The function to apply to the elements of `data`. This function must 
+        The function to apply to the elements of `data`. This function must
         take a single argument and return a value.
     unpack_dict : bool, optional
-        Determines whether to apply the function to the values of a mapping or 
-        not. If False, the function is applied to the entire item (key-value pair). 
+        Determines whether to apply the function to the values of a mapping or
+        not. If False, the function is applied to the entire item (key-value pair).
         Default is False.
 
     Returns
     -------
     Any
-        The result of applying `func` to `data`. The return type matches the 
-        structure of `data`: if `data` is a dictionary, a dictionary is returned; 
+        The result of applying `func` to `data`. The return type matches the
+        structure of `data`: if `data` is a dictionary, a dictionary is returned;
         if a list or tuple, a list is returned; otherwise, a single value is returned.
 
     Examples
@@ -67,7 +66,7 @@ def _apply_to_data(data, func, unpack_dict=False):
 
     Notes
     -----
-    - If `data` is a list or tuple containing types that `func` cannot handle, 
+    - If `data` is a list or tuple containing types that `func` cannot handle,
       a TypeError will be raised.
     - The function does not apply `func` to the keys of a mapping.
     """
@@ -85,6 +84,7 @@ def _apply_to_data(data, func, unpack_dict=False):
             return func(data)
 
     return func(data)
+
 
 def _is_sparse(x):
     """
@@ -120,6 +120,7 @@ def _is_sparse(x):
     except AttributeError:
         return False
 
+
 def _len(x):
     """
     Get the length of the input data.
@@ -152,6 +153,7 @@ def _len(x):
     if _is_sparse(x):
         return x.shape[0]
     return len(x)
+
 
 def get_len(data):
     """
@@ -188,9 +190,9 @@ def get_len(data):
     >>> get_len(data)
     ValueError: Dataset does not have consistent lengths.
     """
-    if isinstance(data, Mapping) and (data.get('input_ids') is not None):
+    if isinstance(data, Mapping) and (data.get("input_ids") is not None):
         # Special casing for Huggingface BatchEncodings
-        return len(data['input_ids'])
+        return len(data["input_ids"])
 
     lens = [_apply_to_data(data, _len, unpack_dict=True)]
     lens = list(flatten(lens))
@@ -200,6 +202,7 @@ def get_len(data):
         raise ValueError("Dataset does not have consistent lengths.")
 
     return list(len_set)[0]
+
 
 class StockpyDataset(Dataset):
     """
@@ -305,9 +308,10 @@ class StockpyDataset(Dataset):
         # PyTorch doesn't work well with sparse matrices, make it dense.
         if sparse.issparse(X):
             X = X.toarray().squeeze(0)
-        
+
         return X, y
-        
+
+
 class ValidSplit:
     """
     Class to perform internal train/validation split on a dataset.
@@ -323,19 +327,19 @@ class ValidSplit:
         Determines the cross-validation splitting strategy. Options include:
         - None: Uses default 3-fold cross-validation.
         - int: Specifies the number of folds in a (Stratified)KFold.
-        - float: Represents the proportion of the dataset to include in the 
+        - float: Represents the proportion of the dataset to include in the
         validation split (ShuffleSplit strategy).
         - An object to be used as a cross-validation generator.
         - An iterable yielding train/test splits.
 
     stratified : bool, default=False
-        Whether to use stratified splits. This is only applicable for binary or 
-        multiclass classification problems to ensure that each fold retains the 
+        Whether to use stratified splits. This is only applicable for binary or
+        multiclass classification problems to ensure that each fold retains the
         percentage of samples for each class.
 
     random_state : int, RandomState instance or None, default=None
-        Random state to control the randomness of the training/validation splits. 
-        This is only applicable when a float is passed to `cv`, signifying a 
+        Random state to control the randomness of the training/validation splits.
+        This is only applicable when a float is passed to `cv`, signifying a
         ShuffleSplit strategy.
 
     Attributes
@@ -373,10 +377,10 @@ class ValidSplit:
     """
 
     def __init__(
-            self,
-            cv=5,
-            stratified=False,
-            random_state=None,
+        self,
+        cv=5,
+        stratified=False,
+        random_state=None,
     ):
         """
         Constructs the ValidSplit object.
@@ -390,8 +394,10 @@ class ValidSplit:
         self.random_state = random_state  # Random state for shuffling
 
         if isinstance(cv, Number) and (cv <= 0):
-            raise ValueError("Numbers less than 0 are not allowed for cv "
-                             "but ValidSplit got {}".format(cv))
+            raise ValueError(
+                "Numbers less than 0 are not allowed for cv "
+                "but ValidSplit got {}".format(cv)
+            )
 
         if not self._is_float(cv) and random_state is not None:
             raise ValueError(
@@ -504,8 +510,8 @@ class ValidSplit:
 
         Notes
         -----
-        This method does not support float `cv` values. For floating-point values of `cv`, 
-        use the `_check_cv_float` method instead. The `y` parameter is only needed if `self.stratified` 
+        This method does not support float `cv` values. For floating-point values of `cv`,
+        use the `_check_cv_float` method instead. The `y` parameter is only needed if `self.stratified`
         is True and stratification of splits is required.
         """
         return check_cv(
@@ -610,7 +616,8 @@ class ValidSplit:
         """
 
         bad_y_error = ValueError(
-            "Stratified CV requires explicitly passing a suitable y.")
+            "Stratified CV requires explicitly passing a suitable y."
+        )
         if (y is None) and self.stratified:
             raise bad_y_error
 
@@ -623,8 +630,10 @@ class ValidSplit:
         if y is not None:
             len_y = get_len(y)
             if len_dataset != len_y:
-                raise ValueError("Cannot perform a CV split if dataset and y "
-                                 "have different lengths.")
+                raise ValueError(
+                    "Cannot perform a CV split if dataset and y "
+                    "have different lengths."
+                )
 
         args = (np.arange(len_dataset),)
         if self._is_stratified(cv):

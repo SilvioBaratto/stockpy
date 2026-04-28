@@ -1,30 +1,25 @@
-""" Callbacks for printing, logging and log information."""
+"""Callbacks for printing, logging and log information."""
 
 import sys
 import time
-import tempfile
-from contextlib import suppress
-from numbers import Number
 from itertools import cycle
-from pathlib import Path
+from numbers import Number
 
-import numpy as np
-import tqdm
 from tabulate import tabulate
 
-from stockpy.utils import Ansi
-from stockpy.preprocessing import get_len
 from stockpy.callbacks import Callback
+from stockpy.utils import Ansi
 
-__all__ = ['EpochTimer', 'PrintLog']
+__all__ = ["EpochTimer", "PrintLog"]
+
 
 def filter_log_keys(keys, keys_ignored=None):
     """
     Yield keys from an iterable that are not designated to be ignored for logging.
 
-    This utility function is used within callbacks to filter out certain keys from a 
-    collection based on predefined criteria. Keys associated with epochs, those specified 
-    in `keys_ignored`, keys ending with '_best', keys ending with '_batch_count', or 
+    This utility function is used within callbacks to filter out certain keys from a
+    collection based on predefined criteria. Keys associated with epochs, those specified
+    in `keys_ignored`, keys ending with '_best', keys ending with '_batch_count', or
     keys starting with 'event_' are excluded from the output.
 
     Parameters
@@ -32,7 +27,7 @@ def filter_log_keys(keys, keys_ignored=None):
     keys : iterable of str
         An iterable containing keys that are to be considered for filtering.
     keys_ignored : iterable of str, optional
-        An additional set of keys that should be ignored during filtering. If None 
+        An additional set of keys that should be ignored during filtering. If None
         is given, no additional keys are ignored beyond the default criteria.
 
     Yields
@@ -52,26 +47,27 @@ def filter_log_keys(keys, keys_ignored=None):
     Notes
     -----
     The default keys ignored are epoch numbers, the best values of metrics, batch counts,
-    and any keys that begin with 'event_'. Additional keys to be ignored can be specified 
+    and any keys that begin with 'event_'. Additional keys to be ignored can be specified
     through the `keys_ignored` parameter.
     """
 
     keys_ignored = keys_ignored or ()
     for key in keys:
         if not (
-                key == 'epoch' or
-                (key in keys_ignored) or
-                key.endswith('_best') or
-                key.endswith('_batch_count') or
-                key.startswith('event_')
+            key == "epoch"
+            or (key in keys_ignored)
+            or key.endswith("_best")
+            or key.endswith("_batch_count")
+            or key.startswith("event_")
         ):
             yield key
+
 
 class EpochTimer(Callback):
     """
     Callback for tracking the duration of each training epoch.
 
-    This callback measures the time taken for each epoch during the model's training 
+    This callback measures the time taken for each epoch during the model's training
     process and records it into the history object under the key 'dur'.
 
     Attributes
@@ -84,6 +80,7 @@ class EpochTimer(Callback):
     -----
     The duration is stored in seconds.
     """
+
     def __init__(self, **kwargs):
         super(EpochTimer, self).__init__(**kwargs)
         self.epoch_start_time_ = None
@@ -94,7 +91,8 @@ class EpochTimer(Callback):
 
     def on_epoch_end(self, net, **kwargs):
         """Calculate and record the end time of the epoch, storing the duration."""
-        net.history.record('dur', time.time() - self.epoch_start_time_)
+        net.history.record("dur", time.time() - self.epoch_start_time_)
+
 
 class PrintLog(Callback):
     """
@@ -142,12 +140,12 @@ class PrintLog(Callback):
     """
 
     def __init__(
-            self,
-            keys_ignored=None,
-            sink=print,
-            tablefmt='simple',
-            floatfmt='.4f',
-            stralign='right',
+        self,
+        keys_ignored=None,
+        sink=print,
+        tablefmt="simple",
+        floatfmt=".4f",
+        stralign="right",
     ):
         self.keys_ignored = keys_ignored
         self.sink = sink
@@ -174,7 +172,7 @@ class PrintLog(Callback):
         if isinstance(keys_ignored, str):
             keys_ignored = [keys_ignored]
         self.keys_ignored_ = set(keys_ignored or [])
-        self.keys_ignored_.add('batches')
+        self.keys_ignored_.add("batches")
         return self
 
     def format_row(self, row: dict, key: str, color: Ansi) -> str:
@@ -208,17 +206,17 @@ class PrintLog(Callback):
         value = row[key]
 
         if isinstance(value, bool) or value is None:
-            return '+' if value else ''
+            return "+" if value else ""
 
         if not isinstance(value, Number):
             return value
 
         # determine if integer value
         is_integer = float(value).is_integer()
-        template = '{}' if is_integer else '{:' + self.floatfmt + '}'
+        template = "{}" if is_integer else "{:" + self.floatfmt + "}"
 
         # if numeric, there could be a 'best' key
-        key_best = key + '_best'
+        key_best = key + "_best"
         if (key_best in row) and row[key_best]:
             template = color + template + Ansi.ENDC.value
         return template.format(value)
@@ -246,22 +244,22 @@ class PrintLog(Callback):
         sorted_keys = []
 
         # make sure 'epoch' comes first
-        if ('epoch' in keys) and ('epoch' not in self.keys_ignored_):
-            sorted_keys.append('epoch')
+        if ("epoch" in keys) and ("epoch" not in self.keys_ignored_):
+            sorted_keys.append("epoch")
 
         # ignore keys like *_best or event_*
         for key in filter_log_keys(sorted(keys), keys_ignored=self.keys_ignored_):
-            if key != 'dur':
+            if key != "dur":
                 sorted_keys.append(key)
 
         # add event_* keys
         for key in sorted(keys):
-            if key.startswith('event_') and (key not in self.keys_ignored_):
+            if key.startswith("event_") and (key not in self.keys_ignored_):
                 sorted_keys.append(key)
 
         # make sure 'dur' comes last
-        if ('dur' in keys) and ('dur' not in self.keys_ignored_):
-            sorted_keys.append('dur')
+        if ("dur" in keys) and ("dur" not in self.keys_ignored_):
+            sorted_keys.append("dur")
 
         return sorted_keys
 
@@ -295,7 +293,7 @@ class PrintLog(Callback):
             formatted = self.format_row(row, key, color=color)
 
             # Clean up the 'event_' prefix from event keys for display purposes
-            if key.startswith('event_'):
+            if key.startswith("event_"):
                 key = key[6:]
 
             # Yield the cleaned key and formatted value as a tuple
@@ -328,16 +326,16 @@ class PrintLog(Callback):
 
         # Use the generator function to process each key-value pair
         for key, formatted_row in self._yield_keys_formatted(row):
-            headers.append(key)          # Collect the header
+            headers.append(key)  # Collect the header
             formatted.append(formatted_row)  # Collect the formatted value
 
         # Use the `tabulate` library to create a formatted table from the collected data
         return tabulate(
-            [formatted],                 # The row data, expected as a list of lists
-            headers=headers,             # The headers for the table
-            tablefmt=self.tablefmt,      # The table format to use
-            floatfmt=self.floatfmt,      # The float format for numeric values
-            stralign=self.stralign,      # The string alignment for headers
+            [formatted],  # The row data, expected as a list of lists
+            headers=headers,  # The headers for the table
+            tablefmt=self.tablefmt,  # The table format to use
+            floatfmt=self.floatfmt,  # The float format for numeric values
+            stralign=self.stralign,  # The string alignment for headers
         )
 
     def _sink(self, text, verbose):
@@ -395,27 +393,27 @@ class PrintLog(Callback):
         """
 
         # Retrieve the latest epoch data from history
-        data = net.history[-1]  
+        data = net.history[-1]
         # Get the verbosity setting from the network
-        verbose = net.verbose  
+        verbose = net.verbose
 
         # Create a string representation of the table
-        tabulated = self.table(data)  
+        tabulated = self.table(data)
 
         # Print the header and first line if it's the first epoch
         if self.first_iteration_:
-            header, lines = tabulated.split('\n', 2)[:2]
+            header, lines = tabulated.split("\n", 2)[:2]
             # Print the header
             self._sink(header, verbose)
-            # Print the first line of the table  
-            self._sink(lines, verbose) 
-            # Update the flag to avoid reprinting the header  
-            self.first_iteration_ = False 
+            # Print the first line of the table
+            self._sink(lines, verbose)
+            # Update the flag to avoid reprinting the header
+            self.first_iteration_ = False
 
         # Print the latest results
-        self._sink(tabulated.rsplit('\n', 1)[-1], verbose)
+        self._sink(tabulated.rsplit("\n", 1)[-1], verbose)
 
         # Flush the stdout buffer if the output is being printed to the console
         if self.sink is print:
             # Ensures real-time output on the console
-            sys.stdout.flush()  
+            sys.stdout.flush()

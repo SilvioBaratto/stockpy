@@ -1,11 +1,10 @@
-""" Post-process regularization steps such as gradient normalizing. """
+"""Post-process regularization steps such as gradient normalizing."""
 
 from torch.nn.utils import clip_grad_norm_
 
 from stockpy.callbacks import Callback
 
-
-__all__ = ['GradientNormClipping']
+__all__ = ["GradientNormClipping"]
 
 
 class GradientNormClipping(Callback):
@@ -29,11 +28,11 @@ class GradientNormClipping(Callback):
       Norm to use when gradient clipping is active. The default is
       to use L2-norm. Can be 'inf' for infinity norm. Default is 2.
     """
-    
+
     def __init__(
-            self,
-            gradient_clip_value=None,
-            gradient_clip_norm_type=2,
+        self,
+        gradient_clip_value=None,
+        gradient_clip_norm_type=2,
     ):
         self.gradient_clip_value = gradient_clip_value
         self.gradient_clip_norm_type = gradient_clip_norm_type

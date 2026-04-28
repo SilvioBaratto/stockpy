@@ -1,9 +1,8 @@
 import torch
-import torch.nn as nn
 
 from stockpy.base import EncoderDecoderForecaster
 
-__all__ = ['TransformerForecaster']
+__all__ = ["TransformerForecaster"]
 
 
 class TransformerForecaster(EncoderDecoderForecaster):
@@ -42,7 +41,7 @@ class TransformerForecaster(EncoderDecoderForecaster):
         num_decoder_layers=2,
         dim_feedforward=256,
         dropout=0.1,
-        activation='relu',
+        activation="relu",
         context_len=20,
         pred_len=1,
         **kwargs,
@@ -60,7 +59,7 @@ class TransformerForecaster(EncoderDecoderForecaster):
             pred_len=pred_len,
             **kwargs,
         )
-        self._modules = ['module']
+        self._modules = ["module"]
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Placeholder forward pass."""
@@ -70,4 +69,4 @@ class TransformerForecaster(EncoderDecoderForecaster):
 
     @property
     def model_type(self):
-        return 'rnn'
+        return "rnn"

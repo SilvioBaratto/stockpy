@@ -1,25 +1,24 @@
-""" Callbacks for calculating scores."""
+"""Callbacks for calculating scores."""
 
-from contextlib import contextmanager
-from contextlib import suppress
-from functools import partial
 import warnings
+from contextlib import contextmanager
+from functools import partial
 
 import numpy as np
-import sklearn
-from sklearn.metrics import make_scorer, check_scoring
+from sklearn.metrics import check_scoring, make_scorer
+from sklearn.metrics._scorer import _BaseScorer
 
 from stockpy.callbacks import Callback
 from stockpy.preprocessing import unpack_data
-from sklearn.metrics._scorer import _BaseScorer
-from stockpy.utils import data_from_dataset
-from stockpy.utils import is_stockpy_dataset
-from stockpy.utils import to_numpy
-from stockpy.utils import check_indexing
-from stockpy.utils import to_device
+from stockpy.utils import (
+    check_indexing,
+    data_from_dataset,
+    is_stockpy_dataset,
+    to_device,
+    to_numpy,
+)
 
-
-__all__ = ['PassthroughScoring', 'EpochScoring', 'BatchScoring']
+__all__ = ["PassthroughScoring", "EpochScoring", "BatchScoring"]
 
 
 @contextmanager
@@ -82,7 +81,7 @@ def cache_net_infer(net, use_caching, y_preds):
     finally:
         # Restore the original `infer` method
         # This step is crucial for cleaning up after using the context
-        del net.__dict__['infer']  # Remove the temporary attribute
+        del net.__dict__["infer"]  # Remove the temporary attribute
 
 
 @contextmanager
@@ -119,7 +118,7 @@ def _cache_net_forward_iter(net, use_caching, y_preds):
     """
 
     # Determine caching policy based on net's settings if 'auto'
-    if net.use_caching != 'auto':
+    if net.use_caching != "auto":
         use_caching = net.use_caching
 
     # If not using caching, yield the net unchanged
@@ -143,7 +142,7 @@ def _cache_net_forward_iter(net, use_caching, y_preds):
         yield net  # Yield the net with the overridden method for use within the context
     finally:
         # Restore the original forward_iter method after exiting the context
-        del net.__dict__['forward_iter']  # Remove the temporary attribute
+        del net.__dict__["forward_iter"]  # Remove the temporary attribute
 
 
 def convert_sklearn_metric_function(scoring):
@@ -180,18 +179,18 @@ def convert_sklearn_metric_function(scoring):
     # Check if scoring is a callable, i.e., a function
     if callable(scoring):
         # Retrieve the module where the function is defined
-        module = getattr(scoring, '__module__', None)
+        module = getattr(scoring, "__module__", None)
 
         # Define known scorer class names to exclude
-        scorer_names = ('_PredictScorer', '_ProbaScorer', '_ThresholdScorer')
+        scorer_names = ("_PredictScorer", "_ProbaScorer", "_ThresholdScorer")
 
         # Check if the scoring function is from sklearn.metrics and not already a known scorer
         if (
-            hasattr(module, 'startswith') and
-            module.startswith('sklearn.metrics.') and
-            not module.startswith('sklearn.metrics.scorer') and
-            not module.startswith('sklearn.metrics.tests.') and
-            not scoring.__class__.__name__ in scorer_names
+            hasattr(module, "startswith")
+            and module.startswith("sklearn.metrics.")
+            and not module.startswith("sklearn.metrics.scorer")
+            and not module.startswith("sklearn.metrics.tests.")
+            and scoring.__class__.__name__ not in scorer_names
         ):
             # Convert to a scorer object
             return make_scorer(scoring)
@@ -270,13 +269,13 @@ class ScoringBase(Callback):
     """
 
     def __init__(
-            self,
-            scoring,
-            lower_is_better=True,
-            on_train=False,
-            name=None,
-            target_extractor=to_numpy,
-            use_caching=True,
+        self,
+        scoring,
+        lower_is_better=True,
+        on_train=False,
+        name=None,
+        target_extractor=to_numpy,
+        use_caching=True,
     ):
         self.scoring = scoring
         self.lower_is_better = lower_is_better
@@ -314,20 +313,22 @@ class ScoringBase(Callback):
         if self.name is not None:
             return self.name
         if self.scoring_ is None:
-            return 'score'
+            return "score"
         if isinstance(self.scoring_, str):
             return self.scoring_
         if isinstance(self.scoring_, partial):
             return self.scoring_.func.__name__
         if isinstance(self.scoring_, _BaseScorer):
-            if hasattr(self.scoring_._score_func, '__name__'):
+            if hasattr(self.scoring_._score_func, "__name__"):
                 # sklearn < 0.22
                 return self.scoring_._score_func.__name__
             # sklearn >= 0.22
             return self.scoring_._score_func._score_func.__name__
         if isinstance(self.scoring_, dict):
-            raise ValueError("Dict not supported as scorer for multi-metric scoring."
-                             " Register multiple scoring callbacks instead.")
+            raise ValueError(
+                "Dict not supported as scorer for multi-metric scoring."
+                " Register multiple scoring callbacks instead."
+            )
         return self.scoring_.__name__
 
     def initialize(self):
@@ -399,14 +400,14 @@ class ScoringBase(Callback):
         # The best score is indicated by a `*_best` suffix in the history keys.
         try:
             # Extract the history column that corresponds to the best scores.
-            best_name_history = net.history[:, '{}_best'.format(self.name_)]
-            
+            best_name_history = net.history[:, "{}_best".format(self.name_)]
+
             # Find the last (rightmost) index where the best score flag is True.
             idx_best_reverse = best_name_history[::-1].index(True)
-            
+
             # Calculate the actual index in normal order.
             idx_best = len(best_name_history) - idx_best_reverse - 1
-            
+
             # Update the best score with the value from the history at the best index.
             self.best_score_ = net.history[idx_best, self.name_]
         except (ValueError, IndexError, KeyError):
@@ -484,7 +485,8 @@ class ScoringBase(Callback):
         if self.lower_is_better:
             return current_score < self.best_score_
         return current_score > self.best_score_
-    
+
+
 class BatchScoring(ScoringBase):
     """
     Callback for computing scores after each batch during training or validation.
@@ -557,12 +559,12 @@ class BatchScoring(ScoringBase):
         - If `y` is None, it assumes that the scoring function can handle `y=None`.
         - If the scoring function raises a KeyError (e.g., due to a missing metric), it passes silently.
         """
-        
+
         if training != self.on_train:
             return
 
         X, y = unpack_data(batch)
-        y_preds = [kwargs['y_pred']]
+        y_preds = [kwargs["y_pred"]]
         with _cache_net_forward_iter(net, self.use_caching, y_preds) as cached_net:
             # In case of y=None we will not have gathered any samples.
             # We expect the scoring function to deal with y=None.
@@ -594,7 +596,7 @@ class BatchScoring(ScoringBase):
         Raises
         ------
         ValueError
-            If the `history` object does not contain the required information (batch sizes and scores), 
+            If the `history` object does not contain the required information (batch sizes and scores),
             a `ValueError` may be raised due to invalid indexing or missing keys.
 
         See Also
@@ -608,12 +610,11 @@ class BatchScoring(ScoringBase):
         - The method calculates the weighted average using NumPy's `np.average` function with batch sizes as weights.
         """
         if self.on_train:
-            bs_key = 'train_batch_size'
+            bs_key = "train_batch_size"
         else:
-            bs_key = 'valid_batch_size'
+            bs_key = "valid_batch_size"
 
-        weights, scores = list(zip(
-            *history[-1, 'batches', :, [bs_key, self.name_]]))
+        weights, scores = list(zip(*history[-1, "batches", :, [bs_key, self.name_]]))
         score_avg = np.average(scores, weights=weights)
         return score_avg
 
@@ -655,7 +656,7 @@ class BatchScoring(ScoringBase):
         """
         history = net.history
         try:  # don't raise if there is no valid data
-            history[-1, 'batches', :, self.name_]
+            history[-1, "batches", :, self.name_]
         except KeyError:
             return
 
@@ -666,7 +667,8 @@ class BatchScoring(ScoringBase):
 
         history.record(self.name_, score_avg)
         if is_best is not None:
-            history.record(self.name_ + '_best', bool(is_best))
+            history.record(self.name_ + "_best", bool(is_best))
+
 
 class EpochScoring(ScoringBase):
     """
@@ -791,7 +793,7 @@ class EpochScoring(ScoringBase):
             Additional arguments passed to the callback.
         """
         use_caching = self.use_caching
-        if net.use_caching !=  'auto':
+        if net.use_caching != "auto":
             use_caching = net.use_caching
 
         if (not use_caching) or (training != self.on_train):
@@ -904,16 +906,11 @@ class EpochScoring(ScoringBase):
         if is_best is None:
             return
 
-        history.record(self.name_ + '_best', bool(is_best))
+        history.record(self.name_ + "_best", bool(is_best))
         if is_best:
             self.best_score_ = current_score
 
-    def on_epoch_end(
-            self,
-            net,
-            dataset_train,
-            dataset_valid,
-            **kwargs):
+    def on_epoch_end(self, net, dataset_train, dataset_valid, **kwargs):
         """
         Compute and record the scoring metric at the end of each epoch.
 
@@ -946,7 +943,7 @@ class EpochScoring(ScoringBase):
         """
 
         use_caching = self.use_caching
-        if net.use_caching !=  'auto':
+        if net.use_caching != "auto":
             use_caching = net.use_caching
 
         X_test, y_test, y_pred = self.get_test_data(
@@ -1017,16 +1014,16 @@ class PassthroughScoring(Callback):
     ...     ],
     ... )
     >>> net.fit(X, y)
-        
+
     In the example above, `BatchScorer` computes 'accuracy' at the batch level,
     and `PassthroughScoring` passes this score through to the epoch level.
     """
 
     def __init__(
-            self,
-            name,
-            lower_is_better=True,
-            on_train=False,
+        self,
+        name,
+        lower_is_better=True,
+        on_train=False,
     ):
         self.name = name
         self.lower_is_better = lower_is_better
@@ -1125,10 +1122,10 @@ class PassthroughScoring(Callback):
         perform any scoring by itself.
         """
         # Determine the batch size key based on whether we're looking at training or validation data
-        bs_key = 'train_batch_size' if self.on_train else 'valid_batch_size'
+        bs_key = "train_batch_size" if self.on_train else "valid_batch_size"
 
         # Unpack weights (batch sizes) and scores from the history for the last epoch
-        weights, scores = list(zip(*history[-1, 'batches', :, [bs_key, self.name]]))
+        weights, scores = list(zip(*history[-1, "batches", :, [bs_key, self.name]]))
 
         # Calculate the weighted average of the scores
         score_avg = np.average(scores, weights=weights)
@@ -1171,7 +1168,7 @@ class PassthroughScoring(Callback):
 
         history = net.history
         try:  # don't raise an exception if there is no score under self.name
-            history[-1, 'batches', :, self.name]
+            history[-1, "batches", :, self.name]
         except KeyError:
             return  # exit if the expected score is not found in history
 
@@ -1190,4 +1187,4 @@ class PassthroughScoring(Callback):
         # If we are able to determine whether it's the best score or not (is_best is not None)
         if is_best is not None:
             # Record in the history whether this is the best score so far
-            history.record(self.name + '_best', bool(is_best))
+            history.record(self.name + "_best", bool(is_best))

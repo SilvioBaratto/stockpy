@@ -5,7 +5,7 @@ from stockpy.base import EncoderDecoderForecaster
 from stockpy.preprocessing import unpack_data
 from stockpy.utils import get_activation_function
 
-__all__ = ['BiGRUForecaster']
+__all__ = ["BiGRUForecaster"]
 
 
 class BiGRUModel(nn.Module):
@@ -43,7 +43,7 @@ class BiGRUModel(nn.Module):
         hidden_size=32,
         num_layers=1,
         dropout=0.0,
-        activation='relu',
+        activation="relu",
         bias=True,
     ):
         super().__init__()
@@ -173,7 +173,7 @@ class BiGRUForecaster(EncoderDecoderForecaster):
         hidden_size=32,
         num_layers=1,
         dropout=0.2,
-        activation='relu',
+        activation="relu",
         bias=True,
         context_len=20,
         pred_len=1,
@@ -191,12 +191,13 @@ class BiGRUForecaster(EncoderDecoderForecaster):
             pred_len=pred_len,
             **kwargs,
         )
-        self._modules = ['module']
+        self._modules = ["module"]
 
     def __sklearn_tags__(self):
-        from sklearn.utils._tags import Tags, TargetTags, InputTags
+        from sklearn.utils._tags import InputTags, Tags, TargetTags
+
         return Tags(
-            estimator_type='regressor',
+            estimator_type="regressor",
             target_tags=TargetTags(required=True, multi_output=True),
             input_tags=InputTags(two_d_array=True),
         )
@@ -248,7 +249,7 @@ class BiGRUForecaster(EncoderDecoderForecaster):
             y_pred = self.infer(Xi, y=yi, **fit_params)
             loss = self.get_loss(y_pred, yi, X=Xi, training=True)
             loss.backward()
-            return {'loss': loss, 'y_pred': y_pred}
+            return {"loss": loss, "y_pred": y_pred}
         return super().train_step_single(batch, **fit_params)
 
     def state_dict(self):
@@ -261,4 +262,4 @@ class BiGRUForecaster(EncoderDecoderForecaster):
 
     @property
     def model_type(self):
-        return 'rnn'
+        return "rnn"

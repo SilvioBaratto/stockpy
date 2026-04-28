@@ -1,10 +1,9 @@
-import numpy as np
 import torch
 
-from stockpy.utils import multi_indexing
 from stockpy.preprocessing import StockpyDataset
+from stockpy.utils import multi_indexing
 
-__all__ = ['TimeSeriesDataset', 'unpack_data']
+__all__ = ["TimeSeriesDataset", "unpack_data"]
 
 
 def unpack_data(data):
@@ -106,7 +105,7 @@ class TimeSeriesDataset(StockpyDataset):
     ):
         super().__init__(X, y, length=length)
 
-        if hasattr(self.X, 'shape') and len(self.X.shape) != 2:
+        if hasattr(self.X, "shape") and len(self.X.shape) != 2:
             raise ValueError(
                 "X must be 2-dimensional with shape (time_steps, features). "
                 f"Got shape with {len(self.X.shape)} dimension(s)."
@@ -163,18 +162,12 @@ class TimeSeriesDataset(StockpyDataset):
         context_end = start_idx + self.context_len
         target_end = context_end + self.pred_len
 
-        Xi = multi_indexing(
-            self.X, slice(start_idx, context_end), self.X_indexing
-        )
+        Xi = multi_indexing(self.X, slice(start_idx, context_end), self.X_indexing)
 
         if self.y is not None:
-            yi = multi_indexing(
-                self.y, slice(context_end, target_end), self.y_indexing
-            )
+            yi = multi_indexing(self.y, slice(context_end, target_end), self.y_indexing)
         else:
-            yi = multi_indexing(
-                self.X, slice(context_end, target_end), self.X_indexing
-            )
+            yi = multi_indexing(self.X, slice(context_end, target_end), self.X_indexing)
 
         Xi, yi = self.transform(Xi, yi)
 

@@ -1,55 +1,21 @@
 import fnmatch
-from abc import abstractmethod
-from collections.abc import Mapping
-from collections import defaultdict
-from functools import partial
-from itertools import chain
-from contextlib import contextmanager
-import re
-import random
 import os
+import re
 import tempfile
 import warnings
+from abc import abstractmethod
+from collections import defaultdict
+from collections.abc import Mapping
+from contextlib import contextmanager
+from functools import partial
+from itertools import chain
 
 import numpy as np
-from sklearn.base import BaseEstimator as SkBaseEstimator
-from scipy.stats import mode
-import torch
-from torch.utils.data import DataLoader
 import pyro
-from pyro.infer.svi import SVI
+import torch
 from pyro.infer import TraceMeanField_ELBO
-from safetensors import safe_open
-from safetensors.torch import load
-from safetensors.torch import save_file, save
-
-from stockpy.callbacks import EpochTimer
-from stockpy.callbacks import PrintLog
-from stockpy.callbacks import EpochScoring
-from stockpy.callbacks import PassthroughScoring
-from stockpy.preprocessing import TimeSeriesDataset
-from stockpy.preprocessing import ValidSplit
-from stockpy.preprocessing import get_len
-from stockpy.preprocessing import unpack_data
-from stockpy.history import History
-from stockpy.exceptions import DeviceWarning
-from stockpy.exceptions import StockpyAttributeError
-from stockpy.exceptions import StockpyTrainingImpossibleError
-from stockpy.utils import _check_f_arguments
-from stockpy.utils import TeeGenerator
-from stockpy.utils import _identity
-from stockpy.utils import _infer_predict_nonlinearity
-from stockpy.utils import FirstStepAccumulator
-from stockpy.utils import check_is_fitted
-from stockpy.utils import duplicate_items
-from stockpy.utils import get_map_location
-from stockpy.utils import is_dataset
-from stockpy.utils import params_for
-from stockpy.utils import to_device
-from stockpy.utils import to_numpy
-from stockpy.utils import to_tensor
-from stockpy.utils import data_from_dataset, is_dataset, get_dim, to_numpy
-
+from pyro.infer.svi import SVI
+from sklearn.base import BaseEstimator as SkBaseEstimator
 from sklearn.utils.validation import (
     _check_y,
     _get_feature_names,
@@ -57,9 +23,33 @@ from sklearn.utils.validation import (
     check_array,
     check_X_y,
 )
+from torch.utils.data import DataLoader
 
+from stockpy.callbacks import EpochTimer, PassthroughScoring, PrintLog
+from stockpy.exceptions import (
+    DeviceWarning,
+    StockpyAttributeError,
+    StockpyTrainingImpossibleError,
+)
+from stockpy.history import History
+from stockpy.preprocessing import TimeSeriesDataset, ValidSplit, get_len, unpack_data
+from stockpy.utils import (
+    FirstStepAccumulator,
+    TeeGenerator,
+    _check_f_arguments,
+    _identity,
+    _infer_predict_nonlinearity,
+    check_is_fitted,
+    duplicate_items,
+    get_dim,
+    get_map_location,
+    is_dataset,
+    params_for,
+    to_device,
+    to_numpy,
+    to_tensor,
+)
 
-import re
 
 def _extract_optimizer_param_name_and_group(optimizer_name, param):
     """
@@ -95,7 +85,7 @@ def _extract_optimizer_param_name_and_group(optimizer_name, param):
     """
 
     # Combine both patterns into a single one using a non-capturing group for the optional part.
-    pattern = rf'{optimizer_name}__(?:param_groups__(?P<group>\d+)__)?(?P<name>.+)'
+    pattern = rf"{optimizer_name}__(?:param_groups__(?P<group>\d+)__)?(?P<name>.+)"
 
     # Compile the regular expression pattern.
     compiled_pattern = re.compile(pattern)
@@ -105,25 +95,28 @@ def _extract_optimizer_param_name_and_group(optimizer_name, param):
 
     # Raise an exception if there is no match.
     if not match:
-        raise AttributeError(f'Invalid parameter "{param}" for optimizer "{optimizer_name}"')
+        raise AttributeError(
+            f'Invalid parameter "{param}" for optimizer "{optimizer_name}"'
+        )
 
     # Extract the group dictionary from the match object.
     groups = match.groupdict()
 
     # Default to 'all' if 'group' is not found in the match.
-    param_group = groups.get('group', 'all')
+    param_group = groups.get("group", "all")
 
     # The 'name' is required, so it should be present.
-    param_name = groups['name']
+    param_name = groups["name"]
 
     # Return the extracted group and name.
     return param_group, param_name
+
 
 def _set_optimizer_param(optimizer, param_group, param_name, value):
     """
     Set a specific parameter for an optimizer's parameter group(s).
 
-    This function directly modifies the optimizer's parameter groups by setting a specific 
+    This function directly modifies the optimizer's parameter groups by setting a specific
     parameter (e.g., learning rate) to a new value. If 'all' is passed as the param_group,
     the parameter is set for all parameter groups; otherwise, it sets the parameter for
     the specified group only.
@@ -158,16 +151,24 @@ def _set_optimizer_param(optimizer, param_group, param_name, value):
     """
 
     # Obtain the appropriate optimizer parameter groups.
-    groups = optimizer.param_groups if param_group == 'all' else [optimizer.param_groups[int(param_group)]]
+    groups = (
+        optimizer.param_groups
+        if param_group == "all"
+        else [optimizer.param_groups[int(param_group)]]
+    )
 
     # Set the parameter value for the chosen groups.
     for group in groups:
         if param_name not in group:
-            raise KeyError(f'Parameter "{param_name}" not found in the optimizer parameter group.')
+            raise KeyError(
+                f'Parameter "{param_name}" not found in the optimizer parameter group.'
+            )
         group[param_name] = value
 
 
-def optimizer_setter(net, param, value, optimizer_attr='optimizer_', optimizer_name='optimizer'):
+def optimizer_setter(
+    net, param, value, optimizer_attr="optimizer_", optimizer_name="optimizer"
+):
     """
     Set the value of a specified parameter in the optimizer or directly in the network.
 
@@ -211,14 +212,16 @@ def optimizer_setter(net, param, value, optimizer_attr='optimizer_', optimizer_n
     """
 
     # First, determine if the parameter to be set is a global learning rate
-    is_global_lr = param == 'lr'
+    is_global_lr = param == "lr"
 
     # Extract or directly set the param_group and param_name
-    param_group = 'all' if is_global_lr else None
+    param_group = "all" if is_global_lr else None
     param_name = param if is_global_lr else None
 
     if not is_global_lr:
-        param_group, param_name = _extract_optimizer_param_name_and_group(optimizer_name, param)
+        param_group, param_name = _extract_optimizer_param_name_and_group(
+            optimizer_name, param
+        )
 
     # If it's a learning rate, we're setting it directly as well as on the optimizer
     if is_global_lr:
@@ -229,8 +232,9 @@ def optimizer_setter(net, param, value, optimizer_attr='optimizer_', optimizer_n
         optimizer=getattr(net, optimizer_attr),
         param_group=param_group,
         param_name=param_name,
-        value=value
+        value=value,
     )
+
 
 class BaseEstimator:
     """
@@ -275,7 +279,7 @@ class BaseEstimator:
         If there are any issues with the passed kwargs, such as name conflicts or deprecated parameters.
     """
 
-    prefixes_ = ['iterator_train', 'iterator_valid', 'callbacks', 'dataset', 'compile']
+    prefixes_ = ["iterator_train", "iterator_valid", "callbacks", "dataset", "compile"]
 
     cuda_dependent_attributes_ = []
 
@@ -286,12 +290,7 @@ class BaseEstimator:
     _optimizers = []
 
     # pylint: disable=too-many-arguments
-    def __init__(
-            self,
-            compile=False,
-            use_caching='auto',
-            **kwargs
-    ):
+    def __init__(self, compile=False, use_caching="auto", **kwargs):
         # Instance attributes
         self.compile = compile
         self.use_caching = use_caching
@@ -302,9 +301,9 @@ class BaseEstimator:
         self._check_deprecated_params(**kwargs)
 
         # Extract specific kwargs into attributes, remove them from kwargs to avoid duplication
-        self.history_ = kwargs.pop('history', None)
-        self.initialized_ = kwargs.pop('initialized_', False)
-        self.virtual_params_ = kwargs.pop('virtual_params_', dict())
+        self.history_ = kwargs.pop("history", None)
+        self.initialized_ = kwargs.pop("initialized_", False)
+        self.virtual_params_ = kwargs.pop("virtual_params_", dict())
 
         # Prepare to validate additional params
         self._params_to_validate = set(kwargs.keys())
@@ -326,8 +325,8 @@ class BaseEstimator:
         """
         Default callbacks used during training and validation processes.
 
-        This property returns a list of callback tuples. Each tuple consists of a unique string 
-        identifier and an instance of the callback class, defining specific actions to be taken 
+        This property returns a list of callback tuples. Each tuple consists of a unique string
+        identifier and an instance of the callback class, defining specific actions to be taken
         at various stages of the training process.
 
         Returns
@@ -353,15 +352,21 @@ class BaseEstimator:
 
         # Your method implementation goes here...
         return [
-            ('epoch_timer', EpochTimer()),
-            ('train_loss', PassthroughScoring(
-                name='train_loss',
-                on_train=True,
-            )),
-            ('valid_loss', PassthroughScoring(
-                name='valid_loss',
-            )),
-            ('print_log', PrintLog()),
+            ("epoch_timer", EpochTimer()),
+            (
+                "train_loss",
+                PassthroughScoring(
+                    name="train_loss",
+                    on_train=True,
+                ),
+            ),
+            (
+                "valid_loss",
+                PassthroughScoring(
+                    name="valid_loss",
+                ),
+            ),
+            ("print_log", PrintLog()),
         ]
 
     def get_default_callbacks(self):
@@ -373,7 +378,7 @@ class BaseEstimator:
 
         This method dynamically calls the method specified by `method_name` on the current instance
         and on each callback registered in `self.callbacks_`. This is typically used to signal
-        events such as the beginning or end of a training epoch, a training step, or other 
+        events such as the beginning or end of a training epoch, a training step, or other
         significant occurrences during the training process.
 
         Parameters
@@ -416,7 +421,7 @@ class BaseEstimator:
     # pylint: disable=unused-argument
     def on_epoch_begin(self, net, dataset_train=None, dataset_valid=None, **kwargs):
         self.history.new_epoch()
-        self.history.record('epoch', len(self.history))
+        self.history.record("epoch", len(self.history))
 
     # pylint: disable=unused-argument
     def on_epoch_end(self, net, dataset_train=None, dataset_valid=None, **kwargs):
@@ -430,7 +435,8 @@ class BaseEstimator:
         pass
 
     def on_grad_computed(
-            self, net, named_parameters, batch=None, training=False, **kwargs):
+        self, net, named_parameters, batch=None, training=False, **kwargs
+    ):
         pass
 
     def _yield_callbacks(self):
@@ -441,7 +447,7 @@ class BaseEstimator:
         them by their names, and yields them. `PrintLog` callbacks are treated specially and are
         yielded last to ensure logging happens after all other callbacks have been processed.
 
-        Callbacks provided by the user in tuple or list format (where the first element is the 
+        Callbacks provided by the user in tuple or list format (where the first element is the
         callback's name and the second is the instance) are distinguished from those that are not.
 
         Yields
@@ -479,30 +485,30 @@ class BaseEstimator:
             callback_dict[name].append((cb_instance, named_by_user))
 
         # Separate PrintLog callbacks to append them last.
-        print_logs = callback_dict.pop('PrintLog', [])
-        
+        print_logs = callback_dict.pop("PrintLog", [])
+
         # Yield non-PrintLog callbacks first.
         for name, cbs in callback_dict.items():
             for cb_instance, named_by_user in cbs:
                 yield name, cb_instance, named_by_user
-        
+
         # Finally, yield PrintLog callbacks.
         for cb_instance, named_by_user in print_logs:
-            yield 'PrintLog', cb_instance, named_by_user
+            yield "PrintLog", cb_instance, named_by_user
 
     def _callbacks_grouped_by_name(self):
         """
         Group callbacks by their names and identify those set by the user.
 
-        This method organizes callbacks into a dictionary keyed by their names, with each key 
-        corresponding to a list of callback instances. It also identifies which callback names have 
+        This method organizes callbacks into a dictionary keyed by their names, with each key
+        corresponding to a list of callback instances. It also identifies which callback names have
         been explicitly set by the user and collects these names into a set.
 
         Returns
         -------
         tuple
             A 2-element tuple where the first element is a dictionary with callback names as keys
-            and lists of callback instances as values, and the second element is a set of 
+            and lists of callback instances as values, and the second element is a set of
             callback names that were explicitly set by the user.
 
         Examples
@@ -517,7 +523,7 @@ class BaseEstimator:
         Notes
         -----
         This method is typically used internally to prepare and manage the state before starting
-        a training process or similar routine. It ensures that callbacks can be executed or 
+        a training process or similar routine. It ensures that callbacks can be executed or
         retrieved efficiently by grouping them by name.
         """
 
@@ -569,37 +575,39 @@ class BaseEstimator:
         grouped_cbs, names_set_by_user = self._callbacks_grouped_by_name()
         for name, cbs in grouped_cbs.items():
             if len(cbs) > 1 and name in names_set_by_user:
-                raise ValueError("Found duplicate user-set callback name "
-                                 "'{}'. Use unique names to correct this."
-                                 .format(name))
+                raise ValueError(
+                    "Found duplicate user-set callback name "
+                    "'{}'. Use unique names to correct this.".format(name)
+                )
 
             for i, cb in enumerate(cbs):
                 if len(cbs) > 1:
-                    unique_name = '{}_{}'.format(name, i+1)
+                    unique_name = "{}_{}".format(name, i + 1)
                     if unique_name in grouped_cbs:
-                        raise ValueError("Assigning new callback name failed "
-                                         "since new name '{}' exists already."
-                                         .format(unique_name))
+                        raise ValueError(
+                            "Assigning new callback name failed "
+                            "since new name '{}' exists already.".format(unique_name)
+                        )
                 else:
                     unique_name = name
                 yield unique_name, cb
-    
+
     def initialize_callbacks(self):
         """
         Initialize all callbacks and store them in the `callbacks_` attribute.
 
         This method consolidates callbacks from both `default_callbacks` and user-defined `callbacks`,
-        initializing each one and assigning a unique name if not already named. It ensures that the 
-        callback names are unique, raising a ValueError if a name conflict is detected. All callbacks 
+        initializing each one and assigning a unique name if not already named. It ensures that the
+        callback names are unique, raising a ValueError if a name conflict is detected. All callbacks
         are then initialized by calling their `initialize` method.
 
-        The result is stored as a list of tuples within the `callbacks_` attribute, where each tuple 
+        The result is stored as a list of tuples within the `callbacks_` attribute, where each tuple
         consists of a callback's name and the initialized callback object.
 
         Returns
         -------
         self : object
-            The instance with the `callbacks_` attribute set to the list of initialized 
+            The instance with the `callbacks_` attribute set to the list of initialized
             callbacks.
 
         Raises
@@ -629,16 +637,18 @@ class BaseEstimator:
 
         for name, cb in self._uniquely_named_callbacks():
             # check if callback itself is changed
-            param_callback = getattr(self, 'callbacks__' + name, Dummy)
+            param_callback = getattr(self, "callbacks__" + name, Dummy)
             if param_callback is not Dummy:  # callback itself was set
                 cb = param_callback
 
             # below: check for callback params
             # don't set a parameter for non-existing callback
-            params = self.get_params_for('callbacks__{}'.format(name))
+            params = self.get_params_for("callbacks__{}".format(name))
             if (cb is None) and params:
-                raise ValueError("Trying to set a parameter for callback {} "
-                                 "which does not exist.".format(name))
+                raise ValueError(
+                    "Trying to set a parameter for callback {} "
+                    "which does not exist.".format(name)
+                )
             if cb is None:
                 continue
 
@@ -652,24 +662,24 @@ class BaseEstimator:
         # pylint: disable=attribute-defined-outside-init
         self.callbacks_ = callbacks_
         return self
-    
+
     def initialized_instance(self, instance_or_cls, kwargs):
         """
         Initialize or re-initialize an instance or class with given parameters.
 
-        This utility method is designed to handle the initialization of components, 
-        taking into account several scenarios, such as whether the component is 
-        already an instance or a class that needs to be instantiated. It ensures 
+        This utility method is designed to handle the initialization of components,
+        taking into account several scenarios, such as whether the component is
+        already an instance or a class that needs to be instantiated. It ensures
         that the component is properly initialized with the given keyword arguments.
 
         Parameters
         ----------
         instance_or_cls : object or type
-            The component to be initialized. It can be an instance, a class, 
+            The component to be initialized. It can be an instance, a class,
             or any callable that requires initialization.
         kwargs : dict
-            Keyword arguments for initialization. If `instance_or_cls` is 
-            already an instance and `kwargs` is empty, the instance is returned 
+            Keyword arguments for initialization. If `instance_or_cls` is
+            already an instance and `kwargs` is empty, the instance is returned
             as is.
 
         Returns
@@ -685,9 +695,9 @@ class BaseEstimator:
 
         Notes
         -----
-        If `instance_or_cls` is already an instance and `kwargs` is provided, 
-        a new instance of the same type is created with the given keyword 
-        arguments. If `instance_or_cls` is a class or callable, it is 
+        If `instance_or_cls` is already an instance and `kwargs` is provided,
+        a new instance of the same type is created with the given keyword
+        arguments. If `instance_or_cls` is a class or callable, it is
         initialized with `kwargs`.
         """
 
@@ -726,11 +736,11 @@ class BaseEstimator:
         method with 'criterion' as an argument, which should return a dictionary of parameters.
         """
 
-        kwargs = self.get_params_for('criterion')
+        kwargs = self.get_params_for("criterion")
         self.criterion_ = self.initialized_instance(self.criterion_, kwargs)
 
         return self
-    
+
     def _is_virtual_param(self, key):
         """
         Checks if the given key is a virtual parameter.
@@ -756,7 +766,7 @@ class BaseEstimator:
         """
 
         return any(fnmatch.fnmatch(key, pat) for pat in self.virtual_params_)
-    
+
     def _virtual_setattr(self, param, val):
         """
         Sets an attribute on the instance as part of handling virtual parameters.
@@ -836,7 +846,7 @@ class BaseEstimator:
         """
 
         self.virtual_params_ = {}
-    
+
     def initialize_elbo(self):
         """
         Initializes the Evidence Lower Bound (ELBO) criterion.
@@ -857,15 +867,15 @@ class BaseEstimator:
         # This will set the `elbo` attribute on `self` after initializing it with the appropriate parameters.
         """
 
-        kwargs = self.get_params_for('elbo')
+        kwargs = self.get_params_for("elbo")
         self.elbo = self.initialized_instance(self.elbo, kwargs)
-        setattr(self, 'elbo', self.elbo)  # Save the updated criterion
+        setattr(self, "elbo", self.elbo)  # Save the updated criterion
 
         return self
 
     def initialize_optimizer(self, triggered_directly=None):
         """
-        Initializes the optimizer for the model. If the optimizer's learning rate (`optimizer__lr`) is 
+        Initializes the optimizer for the model. If the optimizer's learning rate (`optimizer__lr`) is
         not explicitly set, it falls back to using the learning rate specified by `self.lr`.
 
         Parameters
@@ -901,26 +911,28 @@ class BaseEstimator:
         if triggered_directly is not None:
             warnings.warn(
                 "The 'triggered_directly' argument to 'initialize_optimizer' is "
-                "deprecated, please don't use it anymore.", DeprecationWarning)
+                "deprecated, please don't use it anymore.",
+                DeprecationWarning,
+            )
 
         # Retrieve all learnable parameters of the model
         named_parameters = self.get_all_learnable_params()
         # Extract arguments for the optimizer initialization
-        args, kwargs = self.get_params_for_optimizer('optimizer', named_parameters)
+        args, kwargs = self.get_params_for_optimizer("optimizer", named_parameters)
 
         # Initialize the optimizer conditionally based on probabilistic settings
         if self.prob is False:
             self.optimizer_ = self.optimizer(*args, **kwargs)
         else:
-            optim_args = {'lr': kwargs.pop('lr')} if 'lr' in kwargs else {}
+            optim_args = {"lr": kwargs.pop("lr")} if "lr" in kwargs else {}
             self.optimizer_ = self.optimizer(optim_args)
 
         return self
-    
+
     def initialize_history(self):
         """
-        Initializes the history of the model. If the history has not been created yet, it 
-        instantiates a new History object. If the history already exists, it resets it, 
+        Initializes the history of the model. If the history has not been created yet, it
+        instantiates a new History object. If the history already exists, it resets it,
         effectively clearing any previous records.
 
         Returns
@@ -947,11 +959,11 @@ class BaseEstimator:
             self.history_.clear()
 
         return self
-        
+
     def initialize_stochastic_variational_inference(self):
         """
-        Initializes the Stochastic Variational Inference (SVI) for the model. This method 
-        sets up the SVI with the model, guide, optimizer, and the ELBO loss function. 
+        Initializes the Stochastic Variational Inference (SVI) for the model. This method
+        sets up the SVI with the model, guide, optimizer, and the ELBO loss function.
         It then applies any additional parameters specific to the SVI configuration.
 
         Returns
@@ -972,21 +984,19 @@ class BaseEstimator:
         """
         # Initialize the SVI object with model, guide, optimizer, and loss function
         svi = SVI(self.model, self.guide, self.optimizer_, loss=self.elbo)
-        # Extract any SVI-specific parameters from the instance
-        kwargs = self.get_params_for('svi')
         # Update the SVI with extracted parameters
         self.svi_ = svi
         # Save the updated SVI as an attribute of the instance
-        setattr(self, 'svi', self.svi_)
+        setattr(self, "svi", self.svi_)
 
         return self
-    
+
     def _format_reinit_msg(self, name, kwargs=None, triggered_directly=True):
         """
         Constructs a message informing the user about the re-initialization of a component.
 
-        When components such as modules or optimizers are re-initialized, this method 
-        provides a formatted message detailing which component is re-initialized and which 
+        When components such as modules or optimizers are re-initialized, this method
+        provides a formatted message detailing which component is re-initialized and which
         specific parameters, if any, triggered the re-initialization.
 
         Parameters
@@ -1011,27 +1021,28 @@ class BaseEstimator:
         Notes
         -----
         - If `kwargs` is None or empty, the message will not include information about parameters.
-        - The `triggered_directly` argument is used to include parameters in the message only 
+        - The `triggered_directly` argument is used to include parameters in the message only
         if their change is the direct reason for re-initialization.
         """
         # Constructing the base message about re-initialization
         msg = "Re-initializing {}".format(name)
         # Adding details about the parameters if any were set and caused direct re-initialization
         if triggered_directly and kwargs:
-            msg += (" because the following parameters were re-set: {}"
-                    .format(', '.join(sorted(kwargs))))
+            msg += " because the following parameters were re-set: {}".format(
+                ", ".join(sorted(kwargs))
+            )
         # Closing the message with a period
         msg += "."
         return msg
-    
+
     @contextmanager
     def _current_init_context(self, name):
         """
         A context manager to temporarily set the current initialization context.
 
-        This context manager is used to set a temporary state indicating the 
-        name of the component that is currently being initialized. It helps in 
-        keeping track of which component's initialization code is being executed, 
+        This context manager is used to set a temporary state indicating the
+        name of the component that is currently being initialized. It helps in
+        keeping track of which component's initialization code is being executed,
         especially when initialization methods can be nested or called multiple times.
 
         Parameters
@@ -1070,7 +1081,7 @@ class BaseEstimator:
         Initialize virtual parameters within a consistent initialization context.
 
         This method wraps the initialization of virtual parameters within a context manager that sets
-        the current initialization context. Although the context ('virtual_params') is not utilized 
+        the current initialization context. Although the context ('virtual_params') is not utilized
         at the moment, this approach maintains consistency with other initialization methods and
         allows for future expansion where the context might be necessary.
 
@@ -1088,25 +1099,25 @@ class BaseEstimator:
         -----
         - The method calls `initialize_virtual_params` which sets up a dictionary to manage virtual
         parameters.
-        - The context manager `_current_init_context` is used here for consistency, although the 
+        - The context manager `_current_init_context` is used here for consistency, although the
         specific context set is not actively used within the method.
         - Virtual parameters are typically used to represent parameters that do not directly map to
         attributes but are controlled via specialized setter functions.
         """
         # Use the context manager for setting initialization context
-        with self._current_init_context('virtual_params'):
+        with self._current_init_context("virtual_params"):
             # Initialize the virtual parameters
             self.initialize_virtual_params()
             # Return the instance itself
             return self
-        
+
     def _initialize_callbacks(self):
         """
         Initialize the callbacks for the instance within a consistent initialization context.
 
-        This method handles the initialization of callbacks by checking if the callbacks are 
-        explicitly disabled by the user. If not disabled, it proceeds to initialize them normally. 
-        The process is wrapped within a context manager that establishes an initialization context, 
+        This method handles the initialization of callbacks by checking if the callbacks are
+        explicitly disabled by the user. If not disabled, it proceeds to initialize them normally.
+        The process is wrapped within a context manager that establishes an initialization context,
         even though it is not directly used by the method currently.
 
         Returns
@@ -1121,16 +1132,16 @@ class BaseEstimator:
 
         Notes
         -----
-        - The initialization context ('callbacks') is set using `_current_init_context` for 
+        - The initialization context ('callbacks') is set using `_current_init_context` for
         consistency with the initialization flow of other components, despite not being used.
-        - If `self.callbacks` is set to the string "disable", all callbacks are cleared by setting 
-        `self.callbacks_` to an empty list. Otherwise, `initialize_callbacks` is called to set up 
+        - If `self.callbacks` is set to the string "disable", all callbacks are cleared by setting
+        `self.callbacks_` to an empty list. Otherwise, `initialize_callbacks` is called to set up
         the callbacks.
-        - This method allows for a user-configurable approach to managing callbacks, providing the 
+        - This method allows for a user-configurable approach to managing callbacks, providing the
         flexibility to enable or disable them as needed.
         """
         # Use the context manager for setting initialization context
-        with self._current_init_context('callbacks'):
+        with self._current_init_context("callbacks"):
             # Check if callbacks are disabled
             if self.callbacks == "disable":
                 # Clear all callbacks
@@ -1140,21 +1151,21 @@ class BaseEstimator:
                 self.initialize_callbacks()
             # Return the instance itself
             return self
-        
+
     def _initialize_criterion(self, reason=None):
         """
         Initialize the criterion within a consistent initialization context.
 
-        This method is responsible for initializing the criterion specified in the `_criteria` attribute. 
-        It gathers keyword arguments for all specified criteria and checks if any criterion requires 
-        re-initialization based on these arguments or an external reason. If verbose logging is 
-        enabled and initialization has already occurred, it will output a message indicating 
+        This method is responsible for initializing the criterion specified in the `_criteria` attribute.
+        It gathers keyword arguments for all specified criteria and checks if any criterion requires
+        re-initialization based on these arguments or an external reason. If verbose logging is
+        enabled and initialization has already occurred, it will output a message indicating
         that re-initialization is taking place.
 
         Parameters
         ----------
         reason : str, optional
-            An optional message that explains why the criterion is being re-initialized. This is particularly useful when 
+            An optional message that explains why the criterion is being re-initialized. This is particularly useful when
             re-initialization is triggered indirectly by other processes.
 
         Returns
@@ -1169,19 +1180,19 @@ class BaseEstimator:
 
         Notes
         -----
-        - The initialization context ('criterion') is used to identify which component is 
+        - The initialization context ('criterion') is used to identify which component is
         currently being initialized.
-        - The method updates the criterion based on the current device configuration and compiles 
+        - The method updates the criterion based on the current device configuration and compiles
         it if necessary using `self.torch_compile`.
-        - If a criterion is already initialized as a `torch.nn.Module`, it will be moved to the 
+        - If a criterion is already initialized as a `torch.nn.Module`, it will be moved to the
         appropriate device.
-        - If `reason` is not provided but other conditions for re-initialization are met, 
+        - If `reason` is not provided but other conditions for re-initialization are met,
         a re-initialization message is generated using `_format_reinit_msg`.
-        - It is important to provide a `reason` when the re-initialization is part of a larger 
+        - It is important to provide a `reason` when the re-initialization is part of a larger
         workflow where the criterion needs to be reset indirectly, to maintain clarity for the user.
         """
         # Context manager for initialization
-        with self._current_init_context('criterion'):
+        with self._current_init_context("criterion"):
             # Gather keyword arguments for criteria
             kwargs = {}
             for criterion_name in self._criteria:
@@ -1189,13 +1200,18 @@ class BaseEstimator:
 
             # Check if any criteria are already initialized
             has_init_criterion = any(
-                isinstance(getattr(self, criterion_name + '_', None), torch.nn.Module)
-                for criterion_name in self._criteria)
+                isinstance(getattr(self, criterion_name + "_", None), torch.nn.Module)
+                for criterion_name in self._criteria
+            )
 
             # Determine if a re-init message is needed and print if verbose
             if kwargs or reason or has_init_criterion:
                 if self.initialized_ and self.verbose:
-                    msg = reason if reason else self._format_reinit_msg("criterion", kwargs)
+                    msg = (
+                        reason
+                        if reason
+                        else self._format_reinit_msg("criterion", kwargs)
+                    )
                     print(msg)
 
             # Initialize the criterion
@@ -1203,28 +1219,28 @@ class BaseEstimator:
 
             # Set the criterion to the right device and compile
             for name in self._criteria:
-                criterion = getattr(self, name + '_')
+                criterion = getattr(self, name + "_")
                 if isinstance(criterion, torch.nn.Module):
                     criterion = to_device(criterion, self.device)
                     criterion = self.torch_compile(criterion, name=name)
-                    setattr(self, name + '_', criterion)
+                    setattr(self, name + "_", criterion)
 
             # Return the instance
             return self
-        
+
     def _initialize_module(self, reason=None):
         """
         Initialize the modules within a consistent initialization context.
 
-        This method handles the initialization or re-initialization of modules defined in the `_modules` 
-        attribute. It aggregates parameters for each module and checks if any module requires re-initialization 
-        due to new parameters or external reasons. When the instance is already initialized and verbosity is 
+        This method handles the initialization or re-initialization of modules defined in the `_modules`
+        attribute. It aggregates parameters for each module and checks if any module requires re-initialization
+        due to new parameters or external reasons. When the instance is already initialized and verbosity is
         enabled, it prints a message informing about the re-initialization.
 
         Parameters
         ----------
         reason : str, optional
-            An optional string that describes why the module is being re-initialized. This can be particularly useful 
+            An optional string that describes why the module is being re-initialized. This can be particularly useful
             when the re-initialization is a result of indirect actions within the model's workflow.
 
         Returns
@@ -1240,16 +1256,16 @@ class BaseEstimator:
         Notes
         -----
         - The initialization context ('module') specifies the component that is being initialized.
-        - This method will move the module to the configured device and compile it if necessary using 
+        - This method will move the module to the configured device and compile it if necessary using
         `self.torch_compile`.
-        - If a module has been previously initialized as a `torch.nn.Module`, it will be transferred to 
+        - If a module has been previously initialized as a `torch.nn.Module`, it will be transferred to
         the appropriate device.
-        - In case `reason` is not specified but re-initialization is triggered, a default message is 
+        - In case `reason` is not specified but re-initialization is triggered, a default message is
         created using the `_format_reinit_msg` function.
-        - Providing a `reason` is advised when module re-initialization is triggered as part of a larger 
+        - Providing a `reason` is advised when module re-initialization is triggered as part of a larger
         process, to maintain transparency and provide context to the user.
         """
-        with self._current_init_context('module'):
+        with self._current_init_context("module"):
             # Compile keyword arguments for all modules
             kwargs = {}
             for module_name in self._modules:
@@ -1257,13 +1273,16 @@ class BaseEstimator:
 
             # Determine if any modules are already initialized
             has_init_module = any(
-                isinstance(getattr(self, module_name + '_', None), torch.nn.Module)
-                for module_name in self._modules)
+                isinstance(getattr(self, module_name + "_", None), torch.nn.Module)
+                for module_name in self._modules
+            )
 
             # Log re-initialization message if necessary
             if kwargs or reason or has_init_module:
                 if self.initialized_ and self.verbose:
-                    msg = reason if reason else self._format_reinit_msg("module", kwargs)
+                    msg = (
+                        reason if reason else self._format_reinit_msg("module", kwargs)
+                    )
                     print(msg)
 
             # Proceed with module initialization
@@ -1272,30 +1291,30 @@ class BaseEstimator:
             # Assign modules to the appropriate device and compile them
             for name in self._modules:
                 try:
-                    module = getattr(self, name + '_')
+                    module = getattr(self, name + "_")
                 except AttributeError:
                     # Fallback if the module is not found with underscore
                     module = getattr(self, name)
-                    
+
                 if isinstance(module, torch.nn.Module):
                     module = to_device(module, self.device)
                     module = self.torch_compile(module, name=name)
-                    
+
                     # Set the module attribute correctly based on existing naming convention
-                    if hasattr(self, name + '_'):
-                        setattr(self, name + '_', module)
+                    if hasattr(self, name + "_"):
+                        setattr(self, name + "_", module)
                     else:
                         setattr(self, name, module)
 
             # Return the instance for chaining
             return self
-        
+
     def torch_compile(self, module, name):
         """
         Compiles a PyTorch module to potentially improve performance using the `torch.compile` API.
 
-        This method is called to compile the PyTorch modules (like `module_` and `criterion_`) 
-        when the `compile` attribute of the instance is set to `True`. If the attribute is set but 
+        This method is called to compile the PyTorch modules (like `module_` and `criterion_`)
+        when the `compile` attribute of the instance is set to `True`. If the attribute is set but
         the installed PyTorch version does not support compiling, a `ValueError` is raised.
 
         Parameters
@@ -1303,19 +1322,19 @@ class BaseEstimator:
         module : torch.nn.Module
             The PyTorch module to compile.
         name : str
-            The name identifier for the module. This parameter is currently not utilized 
+            The name identifier for the module. This parameter is currently not utilized
             in the method but can be used for conditional compilation based on module names.
 
         Returns
         -------
         torch.nn.Module or torch._dynamo.OptimizedModule
-            The original module if `compile` is set to `False`, 
+            The original module if `compile` is set to `False`,
             or the compiled module if `compile` is `True`.
 
         Raises
         ------
         ValueError
-            If `compile` is `True` but `torch.compile` is not available in the installed 
+            If `compile` is `True` but `torch.compile` is not available in the installed
             PyTorch version.
 
         Examples
@@ -1325,7 +1344,7 @@ class BaseEstimator:
 
         Notes
         -----
-        - This feature requires PyTorch version 1.14 or higher. Please ensure that the version of 
+        - This feature requires PyTorch version 1.14 or higher. Please ensure that the version of
         PyTorch installed supports the `torch.compile` function.
         """
         if not self.compile:
@@ -1333,7 +1352,7 @@ class BaseEstimator:
             return module
 
         # Check if the torch.compile function is available
-        torch_compile_available = hasattr(torch, 'compile')
+        torch_compile_available = hasattr(torch, "compile")
         if not torch_compile_available:
             raise ValueError(
                 "compile=True, but torch.compile is not available. Your installed PyTorch version is "
@@ -1341,7 +1360,7 @@ class BaseEstimator:
             )
 
         # Get parameters for the compilation process
-        params = self.get_params_for('compile')
+        params = self.get_params_for("compile")
 
         # Compile the module with the provided parameters
         module_compiled = torch.compile(module, **params)
@@ -1353,7 +1372,7 @@ class BaseEstimator:
         """
         Generates name and parameter tuples for all learnable parameters across all modules.
 
-        This method iterates over all modules defined within the neural network class and 
+        This method iterates over all modules defined within the neural network class and
         yields their named parameters. This includes parameters of the primary module (`module_`),
         as well as any additional custom modules or parameters that are part of the criterion,
         provided they are learnable. The method ensures that each parameter is only returned once,
@@ -1366,7 +1385,7 @@ class BaseEstimator:
         Yields
         ------
         tuple of (str, torch.nn.Parameter)
-            Tuples of parameter names and the corresponding 
+            Tuples of parameter names and the corresponding
             parameters that are learnable.
 
         Examples
@@ -1388,15 +1407,15 @@ class BaseEstimator:
 
         for name in self._modules:
             # Attempt to access the module with a trailing underscore
-            module = getattr(self, name + '_', None)
+            module = getattr(self, name + "_", None)
 
             # If not found, try accessing without the trailing underscore
             if module is None:
                 module = getattr(self, name, None)
-            
+
             # If the module is found, retrieve its named parameters if available
             if module is not None:
-                named_parameters = getattr(module, 'named_parameters', None)
+                named_parameters = getattr(module, "named_parameters", None)
                 if callable(named_parameters):
                     # Iterate through named parameters, filtering out duplicates
                     for param_name, param in named_parameters():
@@ -1417,14 +1436,14 @@ class BaseEstimator:
         Parameters
         ----------
         reason : str, optional
-            A message indicating the reason for re-initialization, which 
+            A message indicating the reason for re-initialization, which
             is printed out if provided. Defaults to None.
 
         Returns
         -------
         self
             Returns an instance of itself to allow for method chaining.
-        
+
         Examples
         --------
         >>> net = NeuralNet(...)
@@ -1433,12 +1452,12 @@ class BaseEstimator:
 
         Notes
         -----
-        This method should not be called directly in most cases; it is intended to be used 
+        This method should not be called directly in most cases; it is intended to be used
         internally by the network's initialization sequence.
 
         """
         # Set up the current context for initialization
-        with self._current_init_context('optimizer'):
+        with self._current_init_context("optimizer"):
             # If the net is already initialized and verbosity is enabled, print the message
             if self.initialized_ and self.verbose:
                 if reason:
@@ -1455,14 +1474,16 @@ class BaseEstimator:
             # Register virtual parameters for each optimizer for dynamic updates
             for name in self._optimizers:
                 # Define the pattern for virtual parameter names
-                param_pattern = [name + '__param_groups__*__*', name + '__*']
-                if name == 'optimizer':  # Special case: 'lr' is short for 'optimizer__lr'
-                    param_pattern.append('lr')
+                param_pattern = [name + "__param_groups__*__*", name + "__*"]
+                if (
+                    name == "optimizer"
+                ):  # Special case: 'lr' is short for 'optimizer__lr'
+                    param_pattern.append("lr")
 
                 # Set up a partial function for setting optimizer parameters
                 setter = partial(
                     optimizer_setter,
-                    optimizer_attr=name + '_',
+                    optimizer_attr=name + "_",
                     optimizer_name=name,
                 )
 
@@ -1470,7 +1491,7 @@ class BaseEstimator:
                 self._register_virtual_param(param_pattern, setter)
 
             return self
-        
+
     def _initialize_history(self):
         """
         Initializes the history object for the model.
@@ -1483,7 +1504,7 @@ class BaseEstimator:
         -------
         self
             Returns an instance of itself to allow for method chaining.
-        
+
         Examples
         --------
         >>> net = NeuralNet(...)
@@ -1492,14 +1513,14 @@ class BaseEstimator:
 
         Notes
         -----
-        This method should not be called directly in most cases; it is intended to be used 
+        This method should not be called directly in most cases; it is intended to be used
         internally by the network's initialization sequence.
         """
         # Set up the current context for initialization, although it's not used currently
-        with self._current_init_context('history'):
+        with self._current_init_context("history"):
             # Call the specific history initialization method
             self.initialize_history()
-            
+
             return self
 
     def initialize(self):
@@ -1545,13 +1566,13 @@ class BaseEstimator:
         else:
             self._initialize_criterion()
         self._initialize_history()
-        
+
         # Validate all parameters to ensure proper model configuration
         self._validate_params()
 
         # Mark the model as initialized
         self.initialized_ = True
-        
+
         return self
 
     def check_training_readiness(self):
@@ -1575,7 +1596,7 @@ class BaseEstimator:
         does not need to be invoked directly by the user.
         """
         # Check if the network was trimmed for prediction and raise an error if so
-        is_trimmed_for_prediction = getattr(self, '_trimmed_for_prediction', False)
+        is_trimmed_for_prediction = getattr(self, "_trimmed_for_prediction", False)
         if is_trimmed_for_prediction:
             msg = (
                 "The net's attributes were trimmed for prediction, thus it cannot "
@@ -1616,7 +1637,7 @@ class BaseEstimator:
         --------
         train : Inherited method from `torch.nn.Module` that is used internally to set the mode.
         """
-        
+
         self.train(training)
 
     @torch.no_grad()
@@ -1625,8 +1646,8 @@ class BaseEstimator:
         Perform a validation step, compute and return the loss, and possibly predictions.
 
         During validation, the module is set to evaluation mode (`module.eval()`) to deactivate
-        specific layers (e.g., dropout, batch normalization) that should behave differently during 
-        validation. The method assumes that `batch` contains both features and targets, and does 
+        specific layers (e.g., dropout, batch normalization) that should behave differently during
+        validation. The method assumes that `batch` contains both features and targets, and does
         not track gradients to improve performance.
 
         Parameters
@@ -1670,22 +1691,24 @@ class BaseEstimator:
         """
 
         self._set_training(False)  # Set the module to evaluation mode.
-        
+
         Xi, yi = unpack_data(batch)  # Unpack the features and labels.
-        
+
         # If we are not in probabilistic mode, predict and calculate the loss normally.
         if not self.prob:
             y_pred = self.infer(Xi, **fit_params)
             loss = self.get_loss(y_pred, yi, X=Xi, training=False)
-            return {'loss': loss, 'y_pred': y_pred}
-        
+            return {"loss": loss, "y_pred": y_pred}
+
         # For probabilistic modeling, compute the loss differently.
-        if hasattr(self, 'svi_'):
-            loss = self.svi_.evaluate_loss(x=Xi, y=yi) 
+        if hasattr(self, "svi_"):
+            loss = self.svi_.evaluate_loss(x=Xi, y=yi)
             y_pred = self.infer(Xi, **fit_params)
-            return {'loss': loss, 'y_pred': y_pred}
+            return {"loss": loss, "y_pred": y_pred}
         else:
-            raise NotImplementedError("Probabilistic validation requires an `svi_` attribute.")
+            raise NotImplementedError(
+                "Probabilistic validation requires an `svi_` attribute."
+            )
 
     def train_step_single(self, batch, **fit_params):
         """
@@ -1710,7 +1733,7 @@ class BaseEstimator:
         dict
             A dictionary with the following key-value pairs:
             - 'loss' (torch.Tensor): The computed loss for the batch as a scalar tensor.
-            - 'y_pred' (optional, torch.Tensor): The predictions made by the module for the input features. 
+            - 'y_pred' (optional, torch.Tensor): The predictions made by the module for the input features.
             This is not returned if the module is in probabilistic mode (`self.prob` is True).
 
         Raises
@@ -1739,24 +1762,26 @@ class BaseEstimator:
         """
 
         self._set_training(True)  # Ensure the module is in training mode.
-        
+
         Xi, yi = unpack_data(batch)  # Unpack input features and targets from the batch.
-        
+
         # Handle non-probabilistic mode: forward pass, loss computation, backpropagation.
         if not self.prob:
             y_pred = self.infer(Xi, **fit_params)
             loss = self.get_loss(y_pred, yi, X=Xi, training=True)
             loss.backward()  # Backpropagate to compute gradients.
-            return {'loss': loss, 'y_pred': y_pred}
-        
+            return {"loss": loss, "y_pred": y_pred}
+
         # Handle probabilistic mode: perform an SVI step.
-        if hasattr(self, 'svi_'):
+        if hasattr(self, "svi_"):
             loss = self.svi_.step(x=Xi, y=yi)
             y_pred = self.infer(Xi, **fit_params)
-            return {'loss': loss, 'y_pred': y_pred}
+            return {"loss": loss, "y_pred": y_pred}
         else:
-            raise NotImplementedError("Probabilistic training requires an `svi_` attribute with a `step` method.")
-        
+            raise NotImplementedError(
+                "Probabilistic training requires an `svi_` attribute with a `step` method."
+            )
+
     def get_train_step_accumulator(self):
         """
         Creates and returns an accumulator for the training step results.
@@ -1826,7 +1851,7 @@ class BaseEstimator:
         - It's important to ensure that all backward passes are complete and that you do not
         expect to accumulate gradients before calling this function with `set_to_none=True`.
         """
-        
+
         # Check if `set_to_none` is specified and act accordingly
         self.optimizer_.zero_grad(set_to_none=bool(set_to_none))
 
@@ -1873,7 +1898,7 @@ class BaseEstimator:
         --------
         torch.optim.Optimizer.step : The underlying method called on the optimizer.
         """
-        
+
         # If a step function is provided, use it; otherwise, call step without arguments
         if step_fn is not None:
             self.optimizer_.step(step_fn)
@@ -1893,7 +1918,7 @@ class BaseEstimator:
         batch : iterable
             A single batch of data provided by the data loader, typically a tuple of
             tensors containing input features and the corresponding target labels.
-                    
+
         **fit_params : dict
             Arbitrary keyword arguments that will be passed directly to the `forward`
             method of the model, as well as any other method that accepts `**fit_params`.
@@ -1928,43 +1953,43 @@ class BaseEstimator:
         - This method may be overridden to customize the training loop for specific requirements.
 
         """
-        
+
         # Switch model to training mode
         self._set_training(True)
-        
+
         # Initialize an accumulator to collect steps
         step_accumulator = self.get_train_step_accumulator()
-        
+
         # Define the step function to be used for optimization
         def step_fn():
             # Zero the gradients if the model is not probabilistic
-            if self.prob is False: 
+            if self.prob is False:
                 self._zero_grad_optimizer()
-            
+
             # Compute loss and potentially other metrics for a single training step
             step = self.train_step_single(batch, **fit_params)
-            
+
             # Store this step's data in the accumulator
             step_accumulator.store_step(step)
-            
+
             # Trigger any callbacks or hooks related to gradient computation
             self.notify(
-                'on_grad_computed',
+                "on_grad_computed",
                 named_parameters=TeeGenerator(self.get_all_learnable_params()),
                 batch=batch,
                 training=True,
             )
-            
+
             # The loss value is returned because it may be needed for the optimizer's `step` method
-            return step['loss']
-        
+            return step["loss"]
+
         # Execute the optimization step
         if self.prob is False:
             self._step_optimizer(step_fn)
-        else: 
+        else:
             # For probabilistic models, call step_fn directly, which might include sampling procedures
             step_fn()
-        
+
         # Return the collected steps from the accumulator
         return step_accumulator.get_step()
 
@@ -2075,29 +2100,31 @@ class BaseEstimator:
         """
         # Check if the input data is compatible with the expected format
         self.check_data(X, y)
-        
+
         # Prepare the model for training, checking initial conditions and setting states
         self.check_training_readiness()
-        
+
         # Split the data into training and validation sets if necessary
         dataset_train, dataset_valid = self.get_split_datasets(X, y, **fit_params)
-        
+
         # Construct arguments for epoch-level callbacks
         on_epoch_kwargs = {
-            'dataset_train': dataset_train,
-            'dataset_valid': dataset_valid,
+            "dataset_train": dataset_train,
+            "dataset_valid": dataset_valid,
         }
 
         # Setup the iterators for going through the training and validation datasets
         iterator_train = self.get_iterator(dataset_train, training=True)
-        iterator_valid = None  # Initialize validation iterator, to be set if validation data exists
+        iterator_valid = (
+            None  # Initialize validation iterator, to be set if validation data exists
+        )
 
         if dataset_valid is not None:
             iterator_valid = self.get_iterator(dataset_valid, training=False)
 
         # Determine the number of epochs from the model's settings or parameters
-        epochs = self.epochs if 'epochs' not in fit_params else fit_params['epochs']
-        
+        epochs = self.epochs if "epochs" not in fit_params else fit_params["epochs"]
+
         # Setup for probabilistic model training, with appropriate seeding if required
         if self.prob is True:
             pyro.clear_param_store()
@@ -2105,20 +2132,30 @@ class BaseEstimator:
         # Iterate over each epoch to train the model
         for _ in range(epochs):
 
-            self.notify('on_epoch_begin', **on_epoch_kwargs)
-            
-            # Execute training and validation for the current epoch
-            self.run_single_epoch(iterator_train, training=True, prefix="train",
-                                step_fn=self.train_step, **fit_params)
+            self.notify("on_epoch_begin", **on_epoch_kwargs)
 
-            self.run_single_epoch(iterator_valid, training=False, prefix="valid",
-                                step_fn=self.validation_step, **fit_params)
+            # Execute training and validation for the current epoch
+            self.run_single_epoch(
+                iterator_train,
+                training=True,
+                prefix="train",
+                step_fn=self.train_step,
+                **fit_params,
+            )
+
+            self.run_single_epoch(
+                iterator_valid,
+                training=False,
+                prefix="valid",
+                step_fn=self.validation_step,
+                **fit_params,
+            )
 
             # Notify listeners that the epoch has ended
             self.notify("on_epoch_end", **on_epoch_kwargs)
 
         return self
-    
+
     def run_single_epoch(self, iterator, training, prefix, step_fn, **fit_params):
         """
         Compute and record a single epoch of training or validation.
@@ -2165,7 +2202,7 @@ class BaseEstimator:
         processed, which can be useful for understanding the scale of each epoch.
 
         """
-        
+
         # If no iterator is provided, there is nothing to do for this epoch
         if iterator is None:
             return
@@ -2177,18 +2214,22 @@ class BaseEstimator:
         for batch in iterator:
             # Notify any listeners that a new batch is starting
             self.notify("on_batch_begin", batch=batch, training=training)
-            
+
             # Apply the step function to the current batch
             step = step_fn(batch, **fit_params)
 
             # Record the loss; if the model is probabilistic, the loss may not be a scalar
             loss_record = step["loss"].item() if self.prob is False else step["loss"]
             self.history.record_batch(prefix + "_loss", loss_record)
-            
+
             # Determine and record the batch size
-            batch_size = (get_len(batch[0]) if isinstance(batch, (tuple, list)) else get_len(batch))
+            batch_size = (
+                get_len(batch[0])
+                if isinstance(batch, (tuple, list))
+                else get_len(batch)
+            )
             self.history.record_batch(prefix + "_batch_size", batch_size)
-            
+
             # Notify any listeners that the batch has ended
             self.notify("on_batch_end", batch=batch, training=training, **step)
 
@@ -2197,7 +2238,7 @@ class BaseEstimator:
 
         # Record the total number of batches processed in this epoch
         self.history.record(prefix + "_batch_count", batch_count)
-    
+
     def partial_fit(self, X, y=None, **fit_params):
         """
         Partially fit the module on the provided data without re-initializing.
@@ -2254,13 +2295,13 @@ class BaseEstimator:
         will catch the interruption and the model will remain in its current state.
 
         """
-        
+
         # Ensure the model is initialized before proceeding
         if not self.initialized_:
             self.initialize()
 
         # Inform any listeners that training is about to begin
-        self.notify('on_train_begin', X=X, y=y)
+        self.notify("on_train_begin", X=X, y=y)
 
         # Attempt the fitting process within a try-except block to handle unexpected interruptions
         try:
@@ -2271,26 +2312,28 @@ class BaseEstimator:
             pass
 
         # Inform any listeners that training has finished
-        self.notify('on_train_end', X=X, y=y)
+        self.notify("on_train_end", X=X, y=y)
 
         # Return the model instance
         return self
 
-    def fit(self, 
-            X, 
-            y=None, 
-            optimizer=torch.optim.SGD,
-            elbo=TraceMeanField_ELBO,
-            callbacks=None,
-            lr=0.01,
-            epochs=10,
-            batch_size=32,
-            shuffle=False,
-            verbose=1,
-            model_params=None,
-            warm_start=False,
-            train_split=ValidSplit(5),
-            **fit_params):
+    def fit(
+        self,
+        X,
+        y=None,
+        optimizer=torch.optim.SGD,
+        elbo=TraceMeanField_ELBO,
+        callbacks=None,
+        lr=0.01,
+        epochs=10,
+        batch_size=32,
+        shuffle=False,
+        verbose=1,
+        model_params=None,
+        warm_start=False,
+        train_split=ValidSplit(5),
+        **fit_params,
+    ):
         """
         Fit the model to the input data X and target y.
 
@@ -2343,7 +2386,7 @@ class BaseEstimator:
         Returns
         -------
         self : object
-            This method returns the current object instance after completing the training process, 
+            This method returns the current object instance after completing the training process,
             which allows for method chaining.
 
         Raises
@@ -2358,7 +2401,7 @@ class BaseEstimator:
         - The `fit` method supports a warm start mechanism to continue training without resetting the model's parameters.
 
         """
-            
+
         self.optimizer = optimizer
         self.lr = lr
         self.epochs = epochs
@@ -2381,7 +2424,7 @@ class BaseEstimator:
             y = y.reshape((-1, 1))
 
         self.n_outputs_ = y.shape[1]
-        
+
         # Check if the model should be re-initialized. If warm_start is True and the
         # model is already initialized, skip the re-initialization.
         if not self.warm_start or not self.initialized_:
@@ -2389,14 +2432,16 @@ class BaseEstimator:
 
         # if model_params is not None load the model parameters
         if self.model_params is not None:
-            print('Loading model parameters...')
-            self.load_params(f_history=self.model_params.get('f_history', None),
-                             f_optimizer=self.model_params.get('f_optimizer', None),
-                             f_params=self.model_params.get('f_params', None))
-                             
+            print("Loading model parameters...")
+            self.load_params(
+                f_history=self.model_params.get("f_history", None),
+                f_optimizer=self.model_params.get("f_optimizer", None),
+                f_params=self.model_params.get("f_params", None),
+            )
+
         # Perform the partial fit, which is the actual fitting process.
         self.partial_fit(X, y, **fit_params)
-        
+
         return self
 
     def check_is_fitted(self, attributes=None, *args, **kwargs):
@@ -2440,10 +2485,10 @@ class BaseEstimator:
 
         if attributes is None:
             if self._modules:
-                attributes = [module + '_' for module in self._modules]
+                attributes = [module + "_" for module in self._modules]
             else:
-                attributes = ['module_']
-        
+                attributes = ["module_"]
+
         check_is_fitted(self, attributes, *args, **kwargs)
 
     def trim_for_prediction(self):
@@ -2471,18 +2516,18 @@ class BaseEstimator:
         re-instantiation of the model object.
 
         """
-        
+
         # Check if the model is already trimmed for prediction. If yes, do nothing.
-        if getattr(self, '_trimmed_for_prediction', False):
+        if getattr(self, "_trimmed_for_prediction", False):
             return
-        
+
         # Check if the model is initialized and has been fitted.
         self.check_is_fitted()
-        
+
         # Set internal flag to indicate that the model is trimmed for prediction.
         # pylint: disable=attribute-defined-outside-init
         self._trimmed_for_prediction = True
-        
+
         # Disable the training mode of the model.
         self._set_training(False)
 
@@ -2490,7 +2535,7 @@ class BaseEstimator:
             self.callbacks.clear()
         self.callbacks_.clear()
 
-    def forward_iter(self, X, training=False, device='cpu'):
+    def forward_iter(self, X, training=False, device="cpu"):
         """
         Iterate over the input data in batches and perform forward calls to the module.
 
@@ -2509,7 +2554,7 @@ class BaseEstimator:
             - a dictionary comprising the above types
             - a list or tuple containing the above types
             - a custom Dataset object that can handle the data
-            
+
             The method is designed to handle a wide range of input types, but custom data types
             may require a corresponding custom Dataset object.
 
@@ -2535,7 +2580,7 @@ class BaseEstimator:
 
         # Get the dataset object from the input data
         dataset = self.get_dataset(X)
-        
+
         # Create an iterator for the dataset, optionally set to training mode
         iterator = self.get_iterator(dataset, training=training)
 
@@ -2547,7 +2592,7 @@ class BaseEstimator:
             # Move the output tensor to the specified device and yield
             yield to_device(yp, device=device)
 
-    def forward(self, X, training=False, device='cpu'):
+    def forward(self, X, training=False, device="cpu"):
         """
         Perform a forward pass over the input data and concatenate the outputs.
 
@@ -2605,10 +2650,10 @@ class BaseEstimator:
         # If there are multiple outputs, concatenate each one separately.
         if is_multioutput:
             return tuple(map(torch.cat, zip(*y_infer)))
-        
+
         # For single output, concatenate to form a single tensor.
         return torch.cat(y_infer)
-    
+
     def _merge_x_and_fit_params(self, x, fit_params):
         """
         Merge input data `x` and additional fitting parameters `fit_params`.
@@ -2654,47 +2699,47 @@ class BaseEstimator:
         if duplicates:
             # Raise an error if duplicate keys are found.
             msg = "X and fit_params contain duplicate keys: "
-            msg += ', '.join(duplicates)
+            msg += ", ".join(duplicates)
             raise ValueError(msg)
 
         # Perform a shallow copy of 'x' to ensure original data is not modified.
         x_dict = dict(x)
-        
+
         # Update the copied dictionary with items from 'fit_params'.
         x_dict.update(fit_params)
-        
+
         # Return the merged dictionary.
         return x_dict
-            
+
     def infer(self, x, y=None, **fit_params):
         """
         Perform a single inference step on a batch of data.
 
-        This method processes the input data `x`, and if provided, the target data `y`, 
-        along with additional fitting parameters. It ensures the data is in tensor form 
+        This method processes the input data `x`, and if provided, the target data `y`,
+        along with additional fitting parameters. It ensures the data is in tensor form
         and conducts a forward pass through the network to generate predictions.
 
         Parameters
         ----------
         x : Any
-            Input data for inference. This can be a batch of data in various forms such as 
+            Input data for inference. This can be a batch of data in various forms such as
             numpy arrays, torch tensors, or others that are convertible to tensors.
 
         y : Any, optional
-            Target data corresponding to `x`. If provided, it is included in the forward 
-            pass, which can be useful for certain types of models where the target data 
-            might influence the inference outcome (e.g., teacher forcing in RNNs). If the 
+            Target data corresponding to `x`. If provided, it is included in the forward
+            pass, which can be useful for certain types of models where the target data
+            might influence the inference outcome (e.g., teacher forcing in RNNs). If the
             model does not utilize target data during inference, `y` can be omitted.
 
         **fit_params : dict, optional
-            Additional parameters for fine-tuning the inference process, such as dropout 
-            rates or custom layers' settings, which are passed directly to the `forward` 
+            Additional parameters for fine-tuning the inference process, such as dropout
+            rates or custom layers' settings, which are passed directly to the `forward`
             method of the module.
 
         Returns
         -------
         torch.Tensor or sequence of torch.Tensor
-            The output(s) of the network's forward pass, representing the inference results 
+            The output(s) of the network's forward pass, representing the inference results
             for the input data.
         """
         # Ensure input and target data are tensors on the correct device
@@ -2707,7 +2752,11 @@ class BaseEstimator:
             return self.forward(**x_dict)
 
         # Call the forward method with the tensor data and additional parameters
-        return self.forward(x_tensor, y_tensor, **fit_params) if y_tensor is not None else self.forward(x_tensor, **fit_params)
+        return (
+            self.forward(x_tensor, y_tensor, **fit_params)
+            if y_tensor is not None
+            else self.forward(x_tensor, **fit_params)
+        )
 
     def _get_predict_nonlinearity(self):
         """
@@ -2760,16 +2809,18 @@ class BaseEstimator:
             nonlin = _identity
 
         # Infer the nonlinearity based on model architecture and task if set to 'auto'
-        elif nonlin == 'auto':
+        elif nonlin == "auto":
             nonlin = _infer_predict_nonlinearity(self)
 
         # Ensure that the nonlinearity is a callable function
         if not callable(nonlin):
-            raise TypeError("The predict_nonlinearity attribute must be callable, 'auto', or None.")
+            raise TypeError(
+                "The predict_nonlinearity attribute must be callable, 'auto', or None."
+            )
 
         # Return the nonlinearity function
         return nonlin
-    
+
     def predict_proba(self, X):
         """
         Compute the probability estimates of the given input data `X`.
@@ -2816,18 +2867,17 @@ class BaseEstimator:
         for batch in self.forward_iter(X, training=False):
             # Select the first output if the network returns a tuple
             output = batch[0] if isinstance(batch, tuple) else batch
-            
+
             # Transform the network output to probabilities
             probabilities = nonlin(output)
-            
+
             # Convert PyTorch tensor to numpy array and store
             y_probas.append(to_numpy(probabilities))
-        
+
         # Concatenate the batch-wise probability arrays to form the final result
         y_proba = np.concatenate(y_probas, axis=0)
 
         return y_proba
-
 
     def get_loss(self, y_pred, y_true, X=None, training=False):
         """
@@ -2835,7 +2885,7 @@ class BaseEstimator:
 
         The function calculates the loss using the model's prediction and the actual target values
         for a batch of data. This computation is a fundamental part of the training and validation
-        process as it quantifies the model's performance. The specific loss function used is 
+        process as it quantifies the model's performance. The specific loss function used is
         determined by the criterion set during model configuration (`self.criterion_`).
 
         Parameters
@@ -2847,14 +2897,14 @@ class BaseEstimator:
             The true target values against which to compute the loss.
 
         X : input data, compatible with stockpy.dataset.StockpyDataset, optional
-            The input data corresponding to the target values, used for custom loss functions 
-            that require input features along with targets. Default types accepted include numpy 
-            arrays, torch tensors, pandas DataFrames or Series, scipy sparse CSR matrices, and 
-            combinations thereof within dictionaries or lists/tuples. For other data types, provide 
+            The input data corresponding to the target values, used for custom loss functions
+            that require input features along with targets. Default types accepted include numpy
+            arrays, torch tensors, pandas DataFrames or Series, scipy sparse CSR matrices, and
+            combinations thereof within dictionaries or lists/tuples. For other data types, provide
             a custom `Dataset` capable of handling them.
 
         training : bool, optional
-            Indicates whether the loss calculation is performed during training. Some loss functions 
+            Indicates whether the loss calculation is performed during training. Some loss functions
             behave differently during training and evaluation phases (e.g., dropout or batch normalization).
 
         Returns
@@ -2868,7 +2918,7 @@ class BaseEstimator:
         y_true = to_tensor(y_true, device=self.device)
 
         # Compute the loss using the criterion defined in the model configuration
-        return self.criterion_(y_pred, y_true)    
+        return self.criterion_(y_pred, y_true)
 
     def get_dataset(self, X, y=None):
         """
@@ -2877,7 +2927,7 @@ class BaseEstimator:
         This method is tasked with setting up a dataset that can be processed by the
         neural network. It either returns the dataset provided in `X`, if it's already
         a dataset object, or creates a new one using the specified `self.dataset`.
-        Custom dataset types based on the model being used (RNN, FFNN, CNN, Seq2Seq) 
+        Custom dataset types based on the model being used (RNN, FFNN, CNN, Seq2Seq)
         are supported through dynamic selection based on `self.model_type`.
 
         To customize dataset creation, this method can be overridden.
@@ -2885,24 +2935,24 @@ class BaseEstimator:
         Parameters
         ----------
         X : input data, compatible with stockpy.dataset.StockpyDataset
-            Acceptable data formats include numpy arrays, torch tensors, pandas DataFrame 
-            or Series, scipy sparse CSR matrices, and combinations of these in dictionaries 
+            Acceptable data formats include numpy arrays, torch tensors, pandas DataFrame
+            or Series, scipy sparse CSR matrices, and combinations of these in dictionaries
             or lists/tuples. If `X` is an instance of `Dataset`, it is returned as is.
 
         y : target data, compatible with stockpy.dataset.StockpyDataset, optional
-            Supports the same types as `X`. If `y` is None and `X` is a `Dataset` that 
+            Supports the same types as `X`. If `y` is None and `X` is a `Dataset` that
             contains targets, `y` does not need to be provided.
 
         Returns
         -------
         dataset : Dataset
-            An instance of the dataset containing the input and target data ready for 
+            An instance of the dataset containing the input and target data ready for
             model processing.
 
         Raises
         ------
         TypeError
-            If both an initialized dataset object and dataset arguments are passed, 
+            If both an initialized dataset object and dataset arguments are passed,
             it raises a TypeError to avoid conflicts.
 
         Notes
@@ -2919,8 +2969,8 @@ class BaseEstimator:
 
         # Dataset classes based on model type
         self.datasets = {
-            'rnn': TimeSeriesDataset,
-            'cnn': TimeSeriesDataset,
+            "rnn": TimeSeriesDataset,
+            "cnn": TimeSeriesDataset,
         }
 
         # Select and potentially instantiate the dataset
@@ -2928,16 +2978,20 @@ class BaseEstimator:
         is_initialized = not callable(dataset_cls)
 
         # Fetch parameters meant for dataset initialization
-        dataset_kwargs = self.get_params_for('dataset')
+        dataset_kwargs = self.get_params_for("dataset")
 
         # Avoid conflicting initializations
         if is_initialized and dataset_kwargs:
-            raise TypeError(f"Cannot pass initialized Dataset with additional arguments: {dataset_kwargs}")
+            raise TypeError(
+                f"Cannot pass initialized Dataset with additional arguments: {dataset_kwargs}"
+            )
 
         # Initialize with additional parameters if required
         if not is_initialized:
             return dataset_cls(
-                X, y, length=None,
+                X,
+                y,
+                length=None,
                 context_len=self.context_len,
                 pred_len=self.pred_len,
                 **dataset_kwargs,
@@ -2950,10 +3004,10 @@ class BaseEstimator:
         """
         Obtain the training and validation datasets for use within the net.
 
-        This method is responsible for splitting the input data `X` and targets `y` 
-        into datasets for training and validation. If no custom train/validation 
-        split is provided (`self.train_split` is None), then no validation will be 
-        performed. This method can be overridden to modify the way the net handles 
+        This method is responsible for splitting the input data `X` and targets `y`
+        into datasets for training and validation. If no custom train/validation
+        split is provided (`self.train_split` is None), then no validation will be
+        performed. This method can be overridden to modify the way the net handles
         data splitting.
 
         Parameters
@@ -2973,7 +3027,7 @@ class BaseEstimator:
             your data format should be passed.
 
         y : target data, compatible with stockpy.dataset.StockpyDataset, optional
-            This supports the same data formats as `X`. If `X` is a `Dataset` that 
+            This supports the same data formats as `X`. If `X` is a `Dataset` that
             already includes targets, `y` can be set to None.
 
         **fit_params : additional parameters
@@ -2991,10 +3045,10 @@ class BaseEstimator:
 
         Notes
         -----
-        This method internally calls `self.get_dataset` to create a dataset object from 
-        the input data `X` and targets `y`. It then applies `self.train_split` to 
-        this dataset to create the training and validation datasets. Custom split 
-        criteria can be provided during the net's initialization or by overriding 
+        This method internally calls `self.get_dataset` to create a dataset object from
+        the input data `X` and targets `y`. It then applies `self.train_split` to
+        this dataset to create the training and validation datasets. Custom split
+        criteria can be provided during the net's initialization or by overriding
         `self.train_split`.
         """
 
@@ -3033,7 +3087,7 @@ class BaseEstimator:
         -------
         iterator : torch.utils.data.DataLoader
             The instantiated DataLoader that can iterate over the dataset's mini-batches.
-        
+
         Notes
         -----
         The batch size for the iterator is determined in the following order of precedence:
@@ -3042,25 +3096,26 @@ class BaseEstimator:
         3. The size of the dataset if 'batch_size' is set to -1 (meaning use all data at once).
         """
         # Choose the iterator and parameters based on the training flag
-        kwargs = self.get_params_for('iterator_train' if training else 'iterator_valid')
+        kwargs = self.get_params_for("iterator_train" if training else "iterator_valid")
         iterator = DataLoader
 
         # Default to 'self.batch_size' if 'batch_size' is not specified
-        kwargs.setdefault('batch_size', self.batch_size)
+        kwargs.setdefault("batch_size", self.batch_size)
 
         # If 'batch_size' is set to -1, use the entire dataset as a single batch
-        if kwargs['batch_size'] == -1:
-            kwargs['batch_size'] = len(dataset)
+        if kwargs["batch_size"] == -1:
+            kwargs["batch_size"] = len(dataset)
 
         return iterator(dataset, **kwargs)
-    
+
     def save_params(
-            self,
-            f_params=None,
-            f_optimizer=None,
-            f_history=None,
-            use_safetensors=False,
-            **kwargs):
+        self,
+        f_params=None,
+        f_optimizer=None,
+        f_history=None,
+        use_safetensors=False,
+        **kwargs,
+    ):
         """
         Save parameters, optimizer state, and history to files.
 
@@ -3107,8 +3162,10 @@ class BaseEstimator:
 
         # Internal function to save the state dictionary using safetensors or PyTorch's save
         if use_safetensors:
+
             def _save_state_dict(state_dict, f_name):
-                from safetensors.torch import save_file, save
+                from safetensors.torch import save, save_file
+
                 try:
                     if isinstance(f_name, (str, os.PathLike)):
                         save_file(state_dict, f_name)
@@ -3124,16 +3181,19 @@ class BaseEstimator:
                         "don't use safetensors."
                     )
                     raise ValueError(msg) from exc
+
         else:
+
             def _save_state_dict(state_dict, f_name):
                 torch.save(state_dict, f_name)
 
         kwargs_module, kwargs_other = _check_f_arguments(
-            'save_params',
+            "save_params",
             f_params=f_params,
             f_optimizer=f_optimizer,
             f_history=f_history,
-            **kwargs)
+            **kwargs,
+        )
 
         if not kwargs_module and not kwargs_other:
             if self.verbose:
@@ -3143,32 +3203,29 @@ class BaseEstimator:
         msg_init = (
             "Cannot save state of an un-initialized model. "
             "Please initialize first by calling .initialize() "
-            "or by fitting the model with .fit(...).")
-        msg_module = (
-            "You are trying to save 'f_{name}' but for that to work, the net "
-            "needs to have an attribute called 'net.{name}_' that is a PyTorch "
-            "Module or Optimizer; make sure that it exists and check for typos.")
-
+            "or by fitting the model with .fit(...)."
+        )
         for attr, f_name in kwargs_module.items():
             # valid attrs can be 'module_', 'optimizer_', etc.
-            if attr.endswith('_') and not self.initialized_:
+            if attr.endswith("_") and not self.initialized_:
                 self.check_is_fitted([attr], msg=msg_init)
 
             _save_state_dict(self.state_dict(), f_name)
 
         # only valid key in kwargs_other is f_history
-        f_history = kwargs_other.get('f_history')
+        f_history = kwargs_other.get("f_history")
         if f_history is not None:
             self.history.to_file(f_history)
 
     def load_params(
-            self,
-            f_params=None,
-            f_optimizer=None,
-            f_history=None,
-            checkpoint=None,
-            use_safetensors=False,
-            **kwargs):
+        self,
+        f_params=None,
+        f_optimizer=None,
+        f_history=None,
+        checkpoint=None,
+        use_safetensors=False,
+        **kwargs,
+    ):
         """
         Load parameters, optimizer state, and history from files.
 
@@ -3217,13 +3274,14 @@ class BaseEstimator:
         """
 
         if use_safetensors:
+
             def _get_state_dict(f_name):
                 from safetensors import safe_open
                 from safetensors.torch import load
 
                 if isinstance(f_name, (str, os.PathLike)):
                     state_dict = {}
-                    with safe_open(f_name, framework='pt', device=self.device) as f:
+                    with safe_open(f_name, framework="pt", device=self.device) as f:
                         for key in f.keys():
                             state_dict[key] = f.get_tensor(key)
                 else:
@@ -3232,7 +3290,9 @@ class BaseEstimator:
                     state_dict = load(as_bytes)
 
                 return state_dict
+
         else:
+
             def _get_state_dict(f_name):
                 map_location = get_map_location(self.device)
                 self.device = self._check_device(self.device, map_location)
@@ -3242,18 +3302,21 @@ class BaseEstimator:
         if checkpoint is not None:
             if not self.initialized_:
                 self.initialize()
-            if f_history is None and getattr(checkpoint, 'f_history', None) is not None:
+            if f_history is None and getattr(checkpoint, "f_history", None) is not None:
                 self.history = History.from_file(checkpoint.f_history_)
             kwargs_full.update(**checkpoint.get_formatted_files(self))
 
         # explicit arguments may override checkpoint arguments
         kwargs_full.update(**kwargs)
-        for key, val in [('f_params', f_params), ('f_optimizer', f_optimizer),
-                         ('f_history', f_history)]:
+        for key, val in [
+            ("f_params", f_params),
+            ("f_optimizer", f_optimizer),
+            ("f_history", f_history),
+        ]:
             if val:
                 kwargs_full[key] = val
 
-        kwargs_module, kwargs_other = _check_f_arguments('load_params', **kwargs_full)
+        kwargs_module, kwargs_other = _check_f_arguments("load_params", **kwargs_full)
 
         if not kwargs_module and not kwargs_other:
             if self.verbose:
@@ -3261,7 +3324,7 @@ class BaseEstimator:
             return
 
         # only valid key in kwargs_other is f_history
-        f_history = kwargs_other.get('f_history')
+        f_history = kwargs_other.get("f_history")
         if f_history is not None:
             self.history = History.from_file(f_history)
 
@@ -3373,7 +3436,7 @@ class BaseEstimator:
         """
         # Fetch optimizer parameters using a provided method to extract parameters
         kwargs = self.get_params_for(prefix)
-        
+
         # Initialize list to hold parameter groups
         pgroups = []
 
@@ -3381,24 +3444,28 @@ class BaseEstimator:
         params = list(named_parameters)
 
         # Extract and set up parameter groups if specified by the user
-        for pattern, group in kwargs.pop('param_groups', []):
+        for pattern, group in kwargs.pop("param_groups", []):
             # Filter parameters matching the pattern
-            matches = [i for i, (name, _) in enumerate(params) if fnmatch.fnmatch(name, pattern)]
+            matches = [
+                i
+                for i, (name, _) in enumerate(params)
+                if fnmatch.fnmatch(name, pattern)
+            ]
             # Create a parameter group for the matched parameters
             if matches:
                 pgroup_params = [params.pop(i)[1] for i in reversed(matches)]
-                pgroups.append({'params': pgroup_params, **group})
+                pgroups.append({"params": pgroup_params, **group})
 
         # Remaining parameters are grouped separately
         if params:
-            pgroups.append({'params': [param for _, param in params]})
+            pgroups.append({"params": [param for _, param in params]})
 
         # Tuple of argument is a list of parameter groups
         args = (pgroups,)
-        
+
         # Default learning rate added to kwargs if not provided
-        if 'lr' not in kwargs:
-            kwargs['lr'] = self.lr
+        if "lr" not in kwargs:
+            kwargs["lr"] = self.lr
 
         return args, kwargs
 
@@ -3444,7 +3511,7 @@ class BaseEstimator:
         """
         # Delegate the task to the internal method to fetch the parameters
         args, kwargs = self._get_params_for_optimizer(prefix, named_parameters)
-        
+
         # Return the parameters ready for optimizer initialization
         return args, kwargs
 
@@ -3452,7 +3519,7 @@ class BaseEstimator:
         """
         Retrieve names of hyperparameters.
 
-        This function retrieves the names of all hyperparameters belonging to the object, 
+        This function retrieves the names of all hyperparameters belonging to the object,
         excluding those that end with an underscore ('_'). Conventionally, hyperparameters
         ending with an underscore represent parameters that are derived during fitting.
 
@@ -3471,10 +3538,10 @@ class BaseEstimator:
 
         # Using list comprehension to filter out attributes
         # that are designated for fitted parameters (ending with '_')
-        param_names = [key for key in self.__dict__.keys() if not key.endswith('_')]
+        param_names = [key for key in self.__dict__.keys() if not key.endswith("_")]
 
         return param_names
-    
+
     def _get_params_callbacks(self, deep=True):
         """
         Extract parameters for callback attributes.
@@ -3502,34 +3569,34 @@ class BaseEstimator:
         """
         # Initialize an empty dictionary to hold parameter names and values
         params = {}
-        
+
         # If not doing a deep retrieval, return the empty params
         if not deep:
             return params
 
         # Access the 'callbacks_' attribute if it exists, otherwise use an empty list
-        callbacks_ = getattr(self, 'callbacks_', [])
-        
+        callbacks_ = getattr(self, "callbacks_", [])
+
         # Iterate over the callbacks, if any
         for key, val in chain(callbacks_, self._default_callbacks):
             # Construct the parameter name with a 'callbacks__' prefix
-            name = 'callbacks__' + key
-            
+            name = "callbacks__" + key
+
             # Store the callback object itself
             params[name] = val
-            
+
             # If the callback is deactivated (None), skip it
             if val is None:
                 continue
-            
+
             # Retrieve and store parameters for each callback using its `get_params` method
             for subkey, subval in val.get_params().items():
                 # Construct the full parameter name with both prefixes
-                subname = name + '__' + subkey
-                
+                subname = name + "__" + subkey
+
                 # Store each sub-parameter
                 params[subname] = subval
-        
+
         # Return the dictionary of parameters
         return params
 
@@ -3571,15 +3638,15 @@ class BaseEstimator:
         """
         # First, get the parameters as returned by the sklearn's base estimator
         params = SkBaseEstimator.get_params(self, deep=deep, **kwargs)
-        
+
         # Get the callback parameters which require special treatment
         params_cb = self._get_params_callbacks(deep=deep)
-        
+
         # Update the parameters dictionary with callback parameters
         params.update(params_cb)
 
         # Define attributes that should not be included in the returned parameters
-        to_exclude = {'_modules', '_criteria', '_optimizers'}
+        to_exclude = {"_modules", "_criteria", "_optimizers"}
 
         # Return the parameters excluding the ones specified in to_exclude
         return {key: val for key, val in params.items() if key not in to_exclude}
@@ -3621,14 +3688,14 @@ class BaseEstimator:
         for key in sorted(self._params_to_validate):
 
             # Skip attributes that are meant to be set by the class (ending with '_')
-            if key.endswith('_'):
+            if key.endswith("_"):
                 continue
 
             # Check if the key matches any of the expected prefixes
             for prefix in sorted(self.prefixes_, key=lambda s: (-len(s), s)):
                 if key == prefix:
                     break
-                if key.startswith(prefix) and not key.startswith(prefix + '__'):
+                if key.startswith(prefix) and not key.startswith(prefix + "__"):
                     # If the key is missing the '__', it's likely a typo
                     missing_dunder_kwargs.append((prefix, key))
                     break
@@ -3641,29 +3708,32 @@ class BaseEstimator:
 
         # Generate messages for unexpected kwargs
         if unexpected_kwargs:
-            tmpl = ("__init__() got unexpected argument(s) {}. "
-                    "Either you made a typo, or you added new arguments "
-                    "in a subclass; if that is the case, the subclass "
-                    "should deal with the new arguments explicitly.")
-            msgs.append(tmpl.format(', '.join(sorted(unexpected_kwargs))))
+            tmpl = (
+                "__init__() got unexpected argument(s) {}. "
+                "Either you made a typo, or you added new arguments "
+                "in a subclass; if that is the case, the subclass "
+                "should deal with the new arguments explicitly."
+            )
+            msgs.append(tmpl.format(", ".join(sorted(unexpected_kwargs))))
 
         # Generate messages for kwargs with missing double underscores
         for prefix, key in sorted(missing_dunder_kwargs, key=lambda tup: tup[1]):
             tmpl = "Got an unexpected argument {}, did you mean {}?"
-            suggestion = prefix + '__' + key[len(prefix):].lstrip('_')
+            suggestion = prefix + "__" + key[len(prefix) :].lstrip("_")
             msgs.append(tmpl.format(key, suggestion))
 
         # Additional checks for specific parameters can be included here
         # for example:
-        valid_vals_use_caching = ('auto', False, True)
+        valid_vals_use_caching = ("auto", False, True)
         if self.use_caching not in valid_vals_use_caching:
             msgs.append(
                 f"Incorrect value for 'use_caching' parameter ('{self.use_caching}'), "
-                f"expected one of: {', '.join(map(str, valid_vals_use_caching))}.")
+                f"expected one of: {', '.join(map(str, valid_vals_use_caching))}."
+            )
 
         # Raise ValueError if there are any messages
         if msgs:
-            raise ValueError('\n'.join(msgs))
+            raise ValueError("\n".join(msgs))
 
     def _check_deprecated_params(self, **kwargs):
         """
@@ -3671,7 +3741,7 @@ class BaseEstimator:
         Currently does nothing.
         """
         pass
-    
+
     def _check_n_features(self, X, reset):
         """
         Verify the number of features in X matches the expected number.
@@ -3734,7 +3804,7 @@ class BaseEstimator:
                 f"X has {n_features} features, but {self.__class__.__name__} "
                 f"is expecting {self.n_features_in_} features as input."
             )
-        
+
     def _check_feature_names(self, X, *, reset):
         """
         Validate or update the feature names recorded by the estimator.
@@ -3843,7 +3913,7 @@ class BaseEstimator:
                 )
 
             raise ValueError(message)
-        
+
     def _set_params_callback(self, **params):
         """
         Set parameters for callbacks.
@@ -3877,20 +3947,20 @@ class BaseEstimator:
         """
         # model after sklearn.utils._BaseCompostion._set_params
         # 1. All steps
-        if 'callbacks' in params:
-            setattr(self, 'callbacks', params.pop('callbacks'))
+        if "callbacks" in params:
+            setattr(self, "callbacks", params.pop("callbacks"))
 
         # 2. Step replacement
-        names, _ = zip(*getattr(self, 'callbacks_'))
+        names, _ = zip(*getattr(self, "callbacks_"))
         for key in params.copy():
             name = key[11:]  # drop 'callbacks__'
-            if '__' not in name and name in names:
+            if "__" not in name and name in names:
                 self._replace_callback(name, params.pop(key))
 
         # 3. Step parameters and other initilisation arguments
         for key in params.copy():
             name = key[11:]
-            part0, part1 = name.split('__')
+            part0, part1 = name.split("__")
             kwarg = {part1: params.pop(key)}
             callback = dict(self.callbacks_).get(part0)
             if callback is not None:
@@ -3898,7 +3968,8 @@ class BaseEstimator:
             else:
                 raise ValueError(
                     "Trying to set a parameter for callback {} "
-                    "which does not exist.".format(part0))
+                    "which does not exist.".format(part0)
+                )
 
         return self
 
@@ -3923,11 +3994,11 @@ class BaseEstimator:
         This function assumes the presence of an attribute `callbacks_`, which is a list
         of tuples. Each tuple contains the name of the callback as its first element.
         The method replaces the callback with the specified `name` with `new_val`.
-        
+
         The method is intended for internal use, performing in-place modification of
         the `callbacks_` list and does not return any value. The caller is responsible
         for ensuring the validity of the `name`.
-        
+
         """
 
         # assumes `name` is a valid callback name
@@ -3936,8 +4007,8 @@ class BaseEstimator:
             if cb_name == name:
                 callbacks_new[i] = (name, new_val)
                 break
-        setattr(self, 'callbacks_', callbacks_new)
-        
+        setattr(self, "callbacks_", callbacks_new)
+
     def _validate_data(
         self,
         X="no_validation",
@@ -3984,7 +4055,7 @@ class BaseEstimator:
         --------
         check_array : Validate an array, list, sparse matrix or similar.
         check_X_y : Validate `X` and `y`.
-        
+
         """
         self._check_feature_names(X, reset=reset)
 
@@ -4035,7 +4106,7 @@ class BaseEstimator:
             self._check_n_features(X, reset=reset)
 
         return out
-    
+
     def __getstate__(self):
         """
         Retrieve the object's state for serialization, handling special attributes.
@@ -4066,7 +4137,7 @@ class BaseEstimator:
         __setstate__ : Method to deserialize the object's state.
         pickle.dump : Serialize the object to a file.
         pickle.dumps : Serialize the object to a byte stream.
-        
+
         """
 
         # Make a copy of the current state
@@ -4090,9 +4161,9 @@ class BaseEstimator:
         with tempfile.SpooledTemporaryFile() as f:
             torch.save(cuda_attrs, f)
             f.seek(0)
-            
+
             # Add the serialized CUDA-dependent attributes back to the state
-            state['__cuda_dependent_attributes__'] = f.read()
+            state["__cuda_dependent_attributes__"] = f.read()
 
         return state
 
@@ -4130,17 +4201,17 @@ class BaseEstimator:
 
         # Get the appropriate device map location, which is useful
         # when restoring on a machine where CUDA is not available.
-        map_location = get_map_location(state['device'])
-        
+        map_location = get_map_location(state["device"])
+
         # Keyword arguments for PyTorch's loading mechanism
-        load_kwargs = {'map_location': map_location}
+        load_kwargs = {"map_location": map_location}
 
         # Check and update the device information in the state
-        state['device'] = self._check_device(state['device'], map_location)
+        state["device"] = self._check_device(state["device"], map_location)
 
         # Load CUDA-dependent attributes from the temporary SpooledTemporaryFile
         with tempfile.SpooledTemporaryFile() as f:
-            f.write(state['__cuda_dependent_attributes__'])
+            f.write(state["__cuda_dependent_attributes__"])
             f.seek(0)
             cuda_attrs = torch.load(f, **load_kwargs)
 
@@ -4148,17 +4219,17 @@ class BaseEstimator:
         state.update(cuda_attrs)
 
         # Remove the temporary CUDA-dependent attributes key from the state
-        state.pop('__cuda_dependent_attributes__')
+        state.pop("__cuda_dependent_attributes__")
 
         # Finally, update the object's __dict__ to restore its state
         self.__dict__.update(state)
 
     def _register_attribute(
-            self,
-            name,
-            attr,
-            prefixes=True,
-            cuda_dependent_attributes=True,
+        self,
+        name,
+        attr,
+        prefixes=True,
+        cuda_dependent_attributes=True,
     ):
         """
         Register an attribute for special handling.
@@ -4198,7 +4269,7 @@ class BaseEstimator:
         """
 
         # Remove trailing underscores if any, e.g., "module_" becomes "module"
-        name = name.rstrip('_')
+        name = name.rstrip("_")
 
         # Create a copy of prefixes_ list to avoid mutating the original list
         if prefixes:
@@ -4206,14 +4277,15 @@ class BaseEstimator:
 
         # Create a copy of cuda_dependent_attributes_ list to avoid mutating the original list
         if cuda_dependent_attributes:
-            self.cuda_dependent_attributes_ = (
-                self.cuda_dependent_attributes_[:] + [name + '_'])
+            self.cuda_dependent_attributes_ = self.cuda_dependent_attributes_[:] + [
+                name + "_"
+            ]
 
     def _unregister_attribute(
-            self,
-            name,
-            prefixes=True,
-            cuda_dependent_attributes=True,
+        self,
+        name,
+        prefixes=True,
+        cuda_dependent_attributes=True,
     ):
         """
         Remove an attribute from the object's tracking lists.
@@ -4250,7 +4322,7 @@ class BaseEstimator:
         """
 
         # Remove trailing underscores if any, e.g., "module_" becomes "module"
-        name = name.rstrip('_')
+        name = name.rstrip("_")
 
         # Create a copy of the prefixes_ list to avoid mutating the original list,
         # then remove the attribute name if present.
@@ -4261,7 +4333,8 @@ class BaseEstimator:
         # then remove the attribute name if present.
         if cuda_dependent_attributes:
             self.cuda_dependent_attributes_ = [
-                a for a in self.cuda_dependent_attributes_ if a != name + '_']
+                a for a in self.cuda_dependent_attributes_ if a != name + "_"
+            ]
 
     def _check_settable_attr(self, name, attr):
         """
@@ -4291,20 +4364,26 @@ class BaseEstimator:
         """
         # Check if attribute is a PyTorch Module and if it is set outside of an initialization context
         if (self.init_context_ is None) and isinstance(attr, torch.nn.Module):
-            msg = ("Trying to set torch component '{}' outside of an initialize method."
-                  " Consider defining it inside 'initialize_module'".format(name))
+            msg = (
+                "Trying to set torch component '{}' outside of an initialize method."
+                " Consider defining it inside 'initialize_module'".format(name)
+            )
             raise StockpyAttributeError(msg)
 
         # Check if attribute is a PyTorch Optimizer and if it is set outside of an initialization context
         if (self.init_context_ is None) and isinstance(attr, torch.optim.Optimizer):
-            msg = ("Trying to set torch component '{}' outside of an initialize method."
-                  " Consider defining it inside 'initialize_optimizer'".format(name))
+            msg = (
+                "Trying to set torch component '{}' outside of an initialize method."
+                " Consider defining it inside 'initialize_optimizer'".format(name)
+            )
             raise StockpyAttributeError(msg)
 
         # Check if the attribute name ends with an underscore
-        if not name.endswith('_'):
-            msg = ("Names of initialized modules or optimizers should end "
-                  "with an underscore (e.g. '{}_')".format(name))
+        if not name.endswith("_"):
+            msg = (
+                "Names of initialized modules or optimizers should end "
+                "with an underscore (e.g. '{}_')".format(name)
+            )
             raise StockpyAttributeError(msg)
 
     def __setattr__(self, name, attr):
@@ -4338,14 +4417,14 @@ class BaseEstimator:
         methods, respectively.
         """
         # Check if attribute is already known or is a special attribute
-        is_known = name in self.prefixes_ or name.rstrip('_') in self.prefixes_
-        
+        is_known = name in self.prefixes_ or name.rstrip("_") in self.prefixes_
+
         # Check if attribute is a special param (contains '__')
-        is_special_param = '__' in name
-        
+        is_special_param = "__" in name
+
         # Check if this is the first initialization of the object
-        first_init = not hasattr(self, 'initialized_')
-        
+        first_init = not hasattr(self, "initialized_")
+
         # Check if attribute is a PyTorch component (Module or Optimizer)
         is_torch_component = isinstance(attr, (torch.nn.Module, torch.optim.Optimizer))
 
@@ -4353,7 +4432,7 @@ class BaseEstimator:
         if not (is_known or is_special_param or first_init) and is_torch_component:
             # Validate if attribute can be set in the current context
             # self._check_settable_attr(name, attr)
-            
+
             # Register the attribute into internal tracking lists
             # self._register_attribute(name, attr)
             pass
@@ -4387,10 +4466,10 @@ class BaseEstimator:
         """
         # Call internal method to unregister attribute from internal tracking lists
         self._unregister_attribute(name)
-        
+
         # Perform the actual deletion of the attribute
         super().__delattr__(name)
-        
+
     def _check_device(self, requested_device, map_device):
         """
         Check and resolve the device for neural network operations.
@@ -4417,7 +4496,7 @@ class BaseEstimator:
 
         Notes
         -----
-        - This function is intended to ensure that operations are carried out on the correct computational device, especially 
+        - This function is intended to ensure that operations are carried out on the correct computational device, especially
         when dealing with GPU-enabled environments where device-specific actions are critical.
         - The comparison is made using the resolved PyTorch device objects to account for device types and indices (e.g., 'cuda:0').
 
@@ -4439,15 +4518,15 @@ class BaseEstimator:
         # Check if the types differ and warn if so, then return the mapped device
         if type_1 != type_2:
             warnings.warn(
-                f'Setting self.device = {map_device} since the requested device ({requested_device}) '
-                'is not available.',
-                DeviceWarning
+                f"Setting self.device = {map_device} since the requested device ({requested_device}) "
+                "is not available.",
+                DeviceWarning,
             )
             return map_device
-        
+
         # If the types match, return the requested device (could be 'cuda:0' vs 'cuda:1')
         return requested_device
-    
+
     def __repr__(self):
         """
         Compute the official string representation of the instance.
@@ -4459,13 +4538,13 @@ class BaseEstimator:
         -------
         str
             A string representation of the instance that varies depending on whether the instance
-            is initialized or not. For an uninitialized instance, attributes starting with 'module' 
-            are included. For an initialized instance, attributes starting with 'module_' are included, 
+            is initialized or not. For an uninitialized instance, attributes starting with 'module'
+            are included. For an initialized instance, attributes starting with 'module_' are included,
             but those starting with 'module__' (indicating internal use) are excluded.
 
         Notes
         -----
-        - The representation is designed to give quick insight into the instance's state and is 
+        - The representation is designed to give quick insight into the instance's state and is
         particularly useful for interactive work where instances are frequently printed and inspected.
         - This method may be overridden by subclasses to provide more detailed or specific representations
         based on additional attributes or states specific to the subclass.
@@ -4474,21 +4553,21 @@ class BaseEstimator:
         --------
         >>> repr(my_neural_network)
         'NeuralNetwork(module_conv1=Conv2d(...), module_conv2=Conv2d(...), initialized=True)'
-        
-        In the above Examples, `my_neural_network` is an instance that has been initialized, so the 
+
+        In the above Examples, `my_neural_network` is an instance that has been initialized, so the
         representation includes initialized module attributes with their corresponding values.
         """
         # Initial list of attribute keys to include and exclude in the representation
-        to_include = ['module']
+        to_include = ["module"]
         to_exclude = []
         # If the network is uninitialized, specify that in the representation
-        parts = [str(self.__class__) + '[uninitialized](']
-        
+        parts = [str(self.__class__) + "[uninitialized]("]
+
         if self.initialized_:
             # If initialized, update the list of keys to include and exclude
-            parts = [str(self.__class__) + '[initialized](']
-            to_include = ['module_']
-            to_exclude = ['module__']
+            parts = [str(self.__class__) + "[initialized]("]
+            to_include = ["module_"]
+            to_exclude = ["module__"]
 
         # Iterate through sorted dictionary items of the object
         for key, val in sorted(self.__dict__.items()):
@@ -4501,16 +4580,17 @@ class BaseEstimator:
 
             # Convert value to string and handle multi-line strings
             val = str(val)
-            if '\n' in val:
-                val = '\n  '.join(val.split('\n'))
-            
+            if "\n" in val:
+                val = "\n  ".join(val.split("\n"))
+
             # Append each key-value pair to the parts list
-            parts.append('  {}={},'.format(key, val))
+            parts.append("  {}={},".format(key, val))
 
         # Close the representation and join all parts
-        parts.append(')')
-        return '\n'.join(parts)
-    
+        parts.append(")")
+        return "\n".join(parts)
+
+
 class EncoderDecoderForecaster(BaseEstimator):
     """
     Abstract base class for encoder-decoder time-series forecasting models.
@@ -4534,20 +4614,11 @@ class EncoderDecoderForecaster(BaseEstimator):
         Arbitrary keyword arguments passed to the ``BaseEstimator`` constructor.
     """
 
-    def __init__(
-            self,
-            context_len=20,
-            pred_len=1,
-            *args,
-            **kwargs
-    ):
+    def __init__(self, context_len=20, pred_len=1, *args, **kwargs):
         self.context_len = context_len
         self.pred_len = pred_len
 
-        super(EncoderDecoderForecaster, self).__init__(
-            *args,
-            **kwargs
-        )
+        super(EncoderDecoderForecaster, self).__init__(*args, **kwargs)
 
     def check_data(self, X, y):
         """
@@ -4591,32 +4662,35 @@ class EncoderDecoderForecaster(BaseEstimator):
 
         # Check if y is None and if X is not a Dataset and the training iterator is DataLoader
         if (y is None) and (not is_dataset(X)) and (self.iterator_train is DataLoader):
-            raise ValueError("No y-values are given (y=None). You must "
-                            "implement your own DataLoader for training "
-                            "(and your validation) and supply it using the "
-                            "``iterator_train`` and ``iterator_valid`` "
-                            "parameters respectively.")
-                            
-        
+            raise ValueError(
+                "No y-values are given (y=None). You must "
+                "implement your own DataLoader for training "
+                "(and your validation) and supply it using the "
+                "``iterator_train`` and ``iterator_valid`` "
+                "parameters respectively."
+            )
+
         # If y is None, the user has their own mechanism for generating y-values.
         if y is None:
             return
 
-    def fit(self, 
-            X, 
-            y=None, 
-            optimizer=torch.optim.SGD,
-            elbo=TraceMeanField_ELBO,
-            callbacks=None,
-            lr=0.01,
-            epochs=10,
-            batch_size=32,
-            shuffle=False,
-            verbose=1,
-            model_params=None,
-            warm_start=False,
-            train_split=ValidSplit(5),
-            **fit_params):
+    def fit(
+        self,
+        X,
+        y=None,
+        optimizer=torch.optim.SGD,
+        elbo=TraceMeanField_ELBO,
+        callbacks=None,
+        lr=0.01,
+        epochs=10,
+        batch_size=32,
+        shuffle=False,
+        verbose=1,
+        model_params=None,
+        warm_start=False,
+        train_split=ValidSplit(5),
+        **fit_params,
+    ):
         """
         Fit the model to the training data.
 
@@ -4687,26 +4761,26 @@ class EncoderDecoderForecaster(BaseEstimator):
         -----
         You should override this method if your workflow demands a pre-fit or post-fit processing.
         """
-            
-        return super(EncoderDecoderForecaster, self).fit(X,
-                                          y, 
-                                          optimizer,
-                                          elbo,
-                                          callbacks,
-                                          lr,
-                                          epochs,
-                                          batch_size,
-                                          shuffle,
-                                          verbose,
-                                          model_params,
-                                          warm_start,
-                                          train_split,
-                                          **fit_params)
-    
+
+        return super(EncoderDecoderForecaster, self).fit(
+            X,
+            y,
+            optimizer,
+            elbo,
+            callbacks,
+            lr,
+            epochs,
+            batch_size,
+            shuffle,
+            verbose,
+            model_params,
+            warm_start,
+            train_split,
+            **fit_params,
+        )
+
     @abstractmethod
-    def predict(self,
-                X,
-                predict_nonlinearity='auto'):
+    def predict(self, X, predict_nonlinearity="auto"):
         """
         Forecast future time steps for the given input sequences.
 
@@ -4729,443 +4803,13 @@ class EncoderDecoderForecaster(BaseEstimator):
             Forecasted values of shape ``(n_samples, pred_len, n_features)``.
 
         """
-        if not isinstance(X, torch.utils.data.dataset.Subset) and hasattr(X, 'ndim') and X.ndim == 1:
+        if (
+            not isinstance(X, torch.utils.data.dataset.Subset)
+            and hasattr(X, "ndim")
+            and X.ndim == 1
+        ):
             X = X.reshape(1, -1)
 
         self.predict_nonlinearity = predict_nonlinearity
 
         return super().predict_proba(X)
-    
-# class NumericalGenerator(BaseEstimator):
-
-#     def __init__(
-#             self,
-#             *args,
-#             **kwargs
-#     ):
-#         super(NumericalGenerator, self).__init__(
-#             *args,
-#             **kwargs
-#         )
-
-#     def check_data(self, X, y):
-#         """
-#         Validate that the input data is appropriate for training the neural network.
-
-#         This function checks if both `X` and `y` are provided in an appropriate format
-#         for the model's training iterator. If `y` is not provided, and the input data `X`
-#         is not a dataset compatible with the training iterator, then a `ValueError` is raised.
-
-#         Parameters
-#         ----------
-#         X : various types
-#             Input data, compatible with stockpy.dataset.StockpyDataset. You should be able to pass:
-#             - numpy arrays
-#             - torch tensors
-#             - pandas DataFrame or Series
-#             - scipy sparse CSR matrices
-#             - a dictionary containing any of the above types
-#             - a list/tuple containing any of the above types
-#             - a Dataset
-
-#         y : array-like, optional
-#             Labels for input data `X`. It is optional if you implement your own DataLoader.
-#             Default is None.
-
-#         Raises
-#         ------
-#         ValueError
-#             If `y` is None and the input data `X` is neither a dataset nor a DataLoader.
-
-#         Returns
-#         -------
-#         None
-#             This function doesn't return anything; it only validates the input data.
-
-#         Examples
-#         --------
-#         >>> net = NeuralNetClassifier(MyModule)
-#         >>> X = np.random.rand(100, 20)
-#         >>> y = np.random.randint(0, 2, 100)
-#         >>> net.check_data(X, y)  # Should not raise any errors
-
-#         Notes
-#         -----
-#         If you're providing a custom DataLoader, ensure that `y` is set to `None`.
-
-#         """
-#         # Check if y is None and if X is not a Dataset and the training iterator is DataLoader
-#         if (y is None) and (not is_dataset(X)) and (self.iterator_train is DataLoader):
-#             raise ValueError("No y-values are given (y=None). You must "
-#                             "implement your own DataLoader for training "
-#                             "(and your validation) and supply it using the "
-#                             "``iterator_train`` and ``iterator_valid`` "
-#                             "parameters respectively.")
-                            
-        
-#         # If y is None, the user has their own mechanism for generating y-values.
-#         if y is None:
-#             return
-
-#     # pylint: disable=signature-differs
-#     def fit(self, 
-#             X, 
-#             y=None, 
-#             optimizer=torch.optim.SGD,
-#             lr=0.01,
-#             epochs=10,
-#             batch_size=32,
-#             shuffle=False,
-#             verbose=1,
-#             warm_start=False,
-#             model_params=False,
-#             train_split=ValidSplit(5),
-#             **fit_params):
-#         """
-#         Fit the model to the given data.
-
-#         This method is an override of the ``NeuralNet.fit`` method. In contrast
-#         to the parent method, the ``y`` parameter is non-optional to ensure that
-#         the user doesn't forget to include labels. However, if the labels ``y`` 
-#         are derived dynamically from the input data ``X``, then ``y`` can be set 
-#         to ``None``.
-
-#         Parameters
-#         ----------
-#         X : array-like or Dataset
-#             Training data. You should be able to pass:
-#             - numpy arrays
-#             - torch tensors
-#             - pandas DataFrame or Series
-#             - scipy sparse CSR matrices
-#             - a dictionary of the above types
-#             - a list/tuple of the above types
-#             - a Dataset
-            
-#         y : array-like, optional
-#             Target values. While this parameter is non-optional, you can set it 
-#             to ``None`` if labels are derived from ``X`` dynamically.
-            
-#         **fit_params : dict
-#             Additional fitting parameters that will be passed to the base
-#             ``NeuralNet.fit`` method.
-
-#         Returns
-#         -------
-#         self : object
-#             Returns self for method chaining.
-
-#         Examples
-#         --------
-#         >>> net = EncoderDecoderForecaster(MyModule)
-#         >>> X = np.random.rand(100, 20)
-#         >>> y = np.random.rand(100)
-#         >>> net.fit(X, y)  # Should fit the model to the data
-
-#         Notes
-#         -----
-#         If you encounter a pylint bug saying "useless-super-delegation,"
-#         you can safely ignore it as it is a known pylint issue.
-
-#         """
-#         # pylint: disable=useless-super-delegation
-#         # this is actually a pylint bug:
-#         # https://github.com/PyCQA/pylint/issues/1085
-            
-#         self.optimizer = optimizer
-#         self.lr = lr
-#         self.epochs = epochs
-#         self.batch_size = batch_size
-#         self.shuffle = shuffle
-#         self.verbose = verbose
-#         self.warm_start = warm_start
-#         self.train_split = train_split
-
-#         X, y = self._validate_data(
-#             X, y, accept_sparse=["csr", "csc", "coo"], multi_output=True
-#         )
-
-#         # Ensure y is 2D
-#         if y.ndim == 1:
-#             y = y.reshape((-1, 1))
-
-#         self.n_outputs_ = y.shape[1]
-        
-#         # Check if the model should be re-initialized. If warm_start is True and the
-#         # model is already initialized, skip the re-initialization.
-#         if not self.warm_start or not self.initialized_:
-#             self.initialize()
-
-#         # Perform the partial fit, which is the actual fitting process.
-#         self.partial_fit(X, y, **fit_params)
-        
-#         return self
-    
-#     def sample(self, X, num_samples):
-#         """
-#         Sample a sequence from the trained model given an initial input.
-        
-#         Parameters
-#         ----------
-#         model : nn.Module
-#             The trained sequence-to-sequence model.
-#         initial_input : torch.Tensor
-#             The initial input tensor, shaped [batch_size, 1, input_dim].
-#         num_samples : int
-#             The number of samples to generate.
-
-#         Returns
-#         -------
-#         samples : torch.Tensor
-#             The generated samples, shaped [batch_size, num_samples, input_dim].
-#         """
-        
-#         input = X
-#         all_samples = []
-
-#         # Get the dataset object from the input data
-#         dataset = self.get_dataset(X)
-        
-#         # Create an iterator for the dataset, optionally set to training mode
-#         iterator = self.get_iterator(dataset, training=False)
-
-#         for i, batch in enumerate(iterator):
-#             # Initialize hidden and cell states using the encoder
-#             encoder_outputs, hidden, cell = self.encoder(batch[0])
-            
-#             # Initialize the first input to the Decoder
-#             input = to_device(torch.zeros(batch[0].size(0), 1, self.decoder.output_dim), self.device)
-
-#             samples = []  # Initialize an empty list for samples for this batch
-
-#             # Autoregressive sampling
-#             for t in range(num_samples):
-#                 # Use the model's forward function to predict the next output
-#                 output, hidden, cell = self.decoder(input, hidden, cell)
-                
-#                 # Append the output to the list of samples
-#                 samples.append(output.squeeze(1))
-                
-#                 # Update the next input to be the output
-#                 input = output
-
-#             # Convert the list of samples to a tensor and append to all_samples
-#             samples = torch.stack(samples, dim=1)
-#             all_samples.append(samples)
-        
-#         # Concatenate all_samples to form a single tensor
-#         all_samples = torch.cat(all_samples, dim=0)
-
-#         return all_samples
-    
-#     def predict(self, 
-#                 X,
-#                 predict_nonlinearity='auto'):
-#         """Where applicable, return class labels for samples in X.
-
-#         If the module's forward method returns multiple outputs as a
-#         tuple, it is assumed that the first output contains the
-#         relevant information and the other values are ignored. If all
-#         values are relevant, consider using
-#         :func:`~stockpy.NeuralNet.forward` instead.
-
-#         Parameters
-#         ----------
-#         X : input data, compatible with stockpy.dataset.StockpyDataset
-#           By default, you should be able to pass:
-
-#             * numpy arrays
-#             * torch tensors
-#             * pandas DataFrame or Series
-#             * scipy sparse CSR matrices
-#             * a dictionary of the former three
-#             * a list/tuple of the former three
-#             * a Dataset
-
-#           If this doesn't work with your data, you have to pass a
-#           ``Dataset`` that can deal with the data.
-
-#         Returns
-#         -------
-#         y_pred : numpy ndarray
-
-#         """
-#         if X.ndim == 1:
-#             X = X.reshape(1, -1)
-
-#         # initialize non linearity
-#         self.predict_nonlinearity = predict_nonlinearity
-
-#         return super().predict_proba(X)
-    
-# class CategoricalGenerator(BaseEstimator, ClassifierMixin):
-
-#     def __init__(
-#             self,
-#             *args,
-#             **kwargs
-#     ):
-#         super(CategoricalGenerator, self).__init__(
-#             *args,
-#             **kwargs
-#         )
-
-#     def check_data(self, X, y):
-#         """
-#         Validate that the input data is appropriate for training the neural network.
-
-#         This function checks if both `X` and `y` are provided in an appropriate format
-#         for the model's training iterator. If `y` is not provided, and the input data `X`
-#         is not a dataset compatible with the training iterator, then a `ValueError` is raised.
-
-#         Parameters
-#         ----------
-#         X : various types
-#             Input data, compatible with stockpy.dataset.StockpyDataset. You should be able to pass:
-#             - numpy arrays
-#             - torch tensors
-#             - pandas DataFrame or Series
-#             - scipy sparse CSR matrices
-#             - a dictionary containing any of the above types
-#             - a list/tuple containing any of the above types
-#             - a Dataset
-
-#         y : array-like, optional
-#             Labels for input data `X`. It is optional if you implement your own DataLoader.
-#             Default is None.
-
-#         Raises
-#         ------
-#         ValueError
-#             If `y` is None and the input data `X` is neither a dataset nor a DataLoader.
-
-#         Returns
-#         -------
-#         None
-#             This function doesn't return anything; it only validates the input data.
-
-#         Examples
-#         --------
-#         >>> net = NeuralNetClassifier(MyModule)
-#         >>> X = np.random.rand(100, 20)
-#         >>> y = np.random.randint(0, 2, 100)
-#         >>> net.check_data(X, y)  # Should not raise any errors
-
-#         Notes
-#         -----
-#         If you're providing a custom DataLoader, ensure that `y` is set to `None`.
-
-#         """
-#         # Check if y is None and if X is not a Dataset and the training iterator is DataLoader
-#         if (y is None) and (not is_dataset(X)) and (self.iterator_train is DataLoader):
-#             raise ValueError("No y-values are given (y=None). You must "
-#                             "implement your own DataLoader for training "
-#                             "(and your validation) and supply it using the "
-#                             "``iterator_train`` and ``iterator_valid`` "
-#                             "parameters respectively.")
-                            
-        
-#         # If y is None, the user has their own mechanism for generating y-values.
-#         if y is None:
-#             return
-
-#     # pylint: disable=signature-differs
-#     def fit(self, 
-#             X, 
-#             y=None, 
-#             optimizer=torch.optim.SGD,
-#             lr=0.01,
-#             epochs=10,
-#             batch_size=32,
-#             shuffle=False,
-#             verbose=1,
-#             model_params=None,
-#             warm_start=False,
-#             train_split=ValidSplit(5),
-#             **fit_params):
-#         """
-#         Fit the model to the given data.
-
-#         This method is an override of the ``NeuralNet.fit`` method. In contrast
-#         to the parent method, the ``y`` parameter is non-optional to ensure that
-#         the user doesn't forget to include labels. However, if the labels ``y`` 
-#         are derived dynamically from the input data ``X``, then ``y`` can be set 
-#         to ``None``.
-
-#         Parameters
-#         ----------
-#         X : array-like or Dataset
-#             Training data. You should be able to pass:
-#             - numpy arrays
-#             - torch tensors
-#             - pandas DataFrame or Series
-#             - scipy sparse CSR matrices
-#             - a dictionary of the above types
-#             - a list/tuple of the above types
-#             - a Dataset
-            
-#         y : array-like, optional
-#             Target values. While this parameter is non-optional, you can set it 
-#             to ``None`` if labels are derived from ``X`` dynamically.
-            
-#         **fit_params : dict
-#             Additional fitting parameters that will be passed to the base
-#             ``NeuralNet.fit`` method.
-
-#         Returns
-#         -------
-#         self : object
-#             Returns self for method chaining.
-
-#         Examples
-#         --------
-#         >>> net = EncoderDecoderForecaster(MyModule)
-#         >>> X = np.random.rand(100, 20)
-#         >>> y = np.random.rand(100)
-#         >>> net.fit(X, y)  # Should fit the model to the data
-
-#         Notes
-#         -----
-#         If you encounter a pylint bug saying "useless-super-delegation,"
-#         you can safely ignore it as it is a known pylint issue.
-
-#         """
-#         # import pandas as pd
-
-#         #    data = pd.read_pickle('../test/data.pickle')
-#         #    X = data.drop(['scenario'], axis=1)
-#         #    y = data['scenario']
-
-#         #    y = y.replace({1: 0, 2: 1, 3: 2, 4: 3})
-#         # pylint: disable=useless-super-delegation
-#         # this is actually a pylint bug:
-#         # https://github.com/PyCQA/pylint/issues/1085
-            
-#         self.optimizer = optimizer
-#         self.lr = lr
-#         self.epochs = epochs
-#         self.batch_size = batch_size
-#         self.shuffle = shuffle
-#         self.verbose = verbose
-#         self.warm_start = warm_start
-#         self.train_split = train_split
-
-#         X, y = self._validate_data(
-#             X, y, accept_sparse=["csr", "csc", "coo"], multi_output=True
-#         )
-
-#         # Ensure y is 2D
-#         if y.ndim == 1:
-#             y = y.reshape((-1, 1))
-
-#         self.n_outputs_ = y.shape[1]
-        
-#         # Check if the model should be re-initialized. If warm_start is True and the
-#         # model is already initialized, skip the re-initialization.
-#         if not self.warm_start or not self.initialized_:
-#             self.initialize()
-
-#         # Perform the partial fit, which is the actual fitting process.
-#         self.partial_fit(X, y, **fit_params)
-        
-#         return self

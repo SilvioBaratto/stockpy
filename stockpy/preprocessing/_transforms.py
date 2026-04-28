@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-__all__ = ['StandardScalerTransform', 'DifferenceTransform']
+__all__ = ["StandardScalerTransform", "DifferenceTransform"]
 
 
 class StandardScalerTransform:
@@ -214,9 +214,7 @@ class DifferenceTransform:
         data = self._validate_input(data)
 
         if self.order <= 0:
-            raise ValueError(
-                f"order must be a positive integer, got {self.order}."
-            )
+            raise ValueError(f"order must be a positive integer, got {self.order}.")
         if self.order >= data.shape[0]:
             raise ValueError(
                 f"order ({self.order}) must be less than the number of rows "

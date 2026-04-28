@@ -1,5 +1,6 @@
 from sklearn.exceptions import NotFittedError
 
+
 class StockpyException(Exception):
     """
     Base exception for the Stockpy framework.

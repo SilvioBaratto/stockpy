@@ -1,20 +1,21 @@
 import sys
 
-
 import numpy as np
 import torch
-from torch.optim.lr_scheduler import _LRScheduler
-from torch.optim.lr_scheduler import CosineAnnealingLR
-from torch.optim.lr_scheduler import CyclicLR
-from torch.optim.lr_scheduler import ExponentialLR
-from torch.optim.lr_scheduler import LambdaLR
-from torch.optim.lr_scheduler import MultiStepLR
-from torch.optim.lr_scheduler import ReduceLROnPlateau
-from torch.optim.lr_scheduler import StepLR
-from torch.optim.optimizer import Optimizer
+from torch.optim.lr_scheduler import CosineAnnealingLR  # noqa: F401
+from torch.optim.lr_scheduler import CyclicLR  # noqa: F401
+from torch.optim.lr_scheduler import ExponentialLR  # noqa: F401
+from torch.optim.lr_scheduler import LambdaLR  # noqa: F401
+from torch.optim.lr_scheduler import MultiStepLR  # noqa: F401
+from torch.optim.lr_scheduler import StepLR  # noqa: F401
+from torch.optim.lr_scheduler import (
+    ReduceLROnPlateau,
+    _LRScheduler,
+)
+
 from stockpy.callbacks import Callback
 
-__all__ = ['LRScheduler', 'WarmRestartLR']
+__all__ = ["LRScheduler", "WarmRestartLR"]
 
 
 def _check_lr(name, optimizer, lr):
@@ -75,8 +76,10 @@ def _check_lr(name, optimizer, lr):
 
     # If a list or tuple of learning rates is provided, check if its length matches the param groups
     if len(lr) != n:
-        raise ValueError("{} lr values were passed for {} but there are "
-                         "{} param groups.".format(len(lr), name, n))
+        raise ValueError(
+            "{} lr values were passed for {} but there are "
+            "{} param groups.".format(len(lr), name, n)
+        )
     return np.array(lr)
 
 
@@ -128,12 +131,14 @@ class LRScheduler(Callback):
       the version of PyTorch you are using.
     """
 
-    def __init__(self,
-                 policy='WarmRestartLR',
-                 monitor='train_loss',
-                 event_name="event_lr",
-                 step_every='epoch',
-                 **kwargs):
+    def __init__(
+        self,
+        policy="WarmRestartLR",
+        monitor="train_loss",
+        event_name="event_lr",
+        step_every="epoch",
+        **kwargs,
+    ):
         self.policy = policy
         self.monitor = monitor
         self.event_name = event_name
@@ -181,14 +186,14 @@ class LRScheduler(Callback):
         """
 
         test = torch.ones(1, requires_grad=True)
-        opt = torch.optim.SGD([{'params': test, 'lr': initial_lr}])
+        opt = torch.optim.SGD([{"params": test, "lr": initial_lr}])
         policy_cls = self._get_policy_cls()
         sch = policy_cls(opt, **self.kwargs)
 
         lrs = []
         for _ in range(steps):
             opt.step()  # suppress warning about .step call order
-            lrs.append(opt.param_groups[0]['lr'])
+            lrs.append(opt.param_groups[0]["lr"])
             sch.step()
 
         return np.array(lrs)
@@ -303,9 +308,12 @@ class LRScheduler(Callback):
         {'gamma': 0.1, 'step_size': 5}
 
         """
-        excluded = ('policy', 'monitor', 'event_name', 'step_every')
-        kwargs = {key: val for key, val in vars(self).items()
-                  if not (key in excluded or key.endswith('_'))}
+        excluded = ("policy", "monitor", "event_name", "step_every")
+        kwargs = {
+            key: val
+            for key, val in vars(self).items()
+            if not (key in excluded or key.endswith("_"))
+        }
         return kwargs
 
     def on_train_begin(self, net, **kwargs):
@@ -342,12 +350,10 @@ class LRScheduler(Callback):
 
         if net.history:
             try:
-                self.batch_idx_ = sum(net.history[:, 'train_batch_count'])
+                self.batch_idx_ = sum(net.history[:, "train_batch_count"])
             except KeyError:
-                self.batch_idx_ = sum(len(b) for b in net.history[:, 'batches'])
-        self.lr_scheduler_ = self._get_scheduler(
-            net, self.policy_, **self.kwargs
-        )
+                self.batch_idx_ = sum(len(b) for b in net.history[:, "batches"])
+        self.lr_scheduler_ = self._get_scheduler(net, self.policy_, **self.kwargs)
 
     def _step(self, net, lr_scheduler, score=None):
         """
@@ -381,7 +387,7 @@ class LRScheduler(Callback):
         optionally take a `score` argument if it's a ReduceLROnPlateau scheduler.
 
         """
-        accelerator_maybe = getattr(net, 'accelerator', None)
+        accelerator_maybe = getattr(net, "accelerator", None)
         accelerator_step_skipped = (
             accelerator_maybe and accelerator_maybe.optimizer_step_was_skipped
         )
@@ -435,7 +441,7 @@ class LRScheduler(Callback):
 
         """
 
-        if self.step_every != 'epoch':
+        if self.step_every != "epoch":
             return
         if isinstance(self.lr_scheduler_, ReduceLROnPlateau):
             if callable(self.monitor):
@@ -453,9 +459,8 @@ class LRScheduler(Callback):
             self._step(net, self.lr_scheduler_, score=score)
             # ReduceLROnPlateau does not expose the current lr so it can't be recorded
         else:
-            if (
-                    (self.event_name is not None)
-                    and hasattr(self.lr_scheduler_, "get_last_lr")
+            if (self.event_name is not None) and hasattr(
+                self.lr_scheduler_, "get_last_lr"
             ):
                 net.history.record(self.event_name, self.lr_scheduler_.get_last_lr()[0])
             self._step(net, self.lr_scheduler_)
@@ -496,14 +501,12 @@ class LRScheduler(Callback):
 
         """
 
-        if not training or self.step_every != 'batch':
+        if not training or self.step_every != "batch":
             return
-        if (
-                (self.event_name is not None)
-                and hasattr(self.lr_scheduler_, "get_last_lr")
-        ):
+        if (self.event_name is not None) and hasattr(self.lr_scheduler_, "get_last_lr"):
             net.history.record_batch(
-                self.event_name, self.lr_scheduler_.get_last_lr()[0])
+                self.event_name, self.lr_scheduler_.get_last_lr()[0]
+            )
         self._step(net, self.lr_scheduler_)
         self.batch_idx_ += 1
 
@@ -554,12 +557,11 @@ class LRScheduler(Callback):
         class and not meant to be accessed directly by users.
 
         """
-        if (
-                (policy not in [ReduceLROnPlateau])
-                and ('last_epoch' not in scheduler_kwargs)
+        if (policy not in [ReduceLROnPlateau]) and (
+            "last_epoch" not in scheduler_kwargs
         ):
             last_epoch = len(net.history) - 1
-            scheduler_kwargs['last_epoch'] = last_epoch
+            scheduler_kwargs["last_epoch"] = last_epoch
 
         return policy(net.optimizer_, **scheduler_kwargs)
 
@@ -620,17 +622,17 @@ class WarmRestartLR(_LRScheduler):
 
     """
 
-
     def __init__(
-            self, optimizer,
-            min_lr=1e-6,
-            max_lr=0.05,
-            base_period=10,
-            period_mult=2,
-            last_epoch=-1
+        self,
+        optimizer,
+        min_lr=1e-6,
+        max_lr=0.05,
+        base_period=10,
+        period_mult=2,
+        last_epoch=-1,
     ):
-        self.min_lr = _check_lr('min_lr', optimizer, min_lr)
-        self.max_lr = _check_lr('max_lr', optimizer, max_lr)
+        self.min_lr = _check_lr("min_lr", optimizer, min_lr)
+        self.max_lr = _check_lr("max_lr", optimizer, max_lr)
         self.base_period = base_period
         self.period_mult = period_mult
         super(WarmRestartLR, self).__init__(optimizer, last_epoch)
@@ -669,8 +671,7 @@ class WarmRestartLR(_LRScheduler):
 
         """
 
-        return min_lr + 0.5 * (max_lr - min_lr) * (
-            1 + np.cos(epoch * np.pi / period))
+        return min_lr + 0.5 * (max_lr - min_lr) * (1 + np.cos(epoch * np.pi / period))
 
     def get_lr(self):
         """
@@ -698,10 +699,7 @@ class WarmRestartLR(_LRScheduler):
 
         # Calculate the current learning rate based on the adjusted epoch index.
         current_lrs = self._get_current_lr(
-            self.min_lr,
-            self.max_lr,
-            current_period,
-            epoch_idx
+            self.min_lr, self.max_lr, current_period, epoch_idx
         )
         # Return the list of learning rates to be applied to the parameter groups.
         return current_lrs.tolist()

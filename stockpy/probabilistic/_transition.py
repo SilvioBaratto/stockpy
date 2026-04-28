@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 
+
 class Transition(nn.Module):
     """
     Define Gaussian latent transition probabilities in sequential models.
@@ -78,9 +79,9 @@ class Transition(nn.Module):
 
     def forward(self, z_t_1: torch.Tensor, x_t: torch.Tensor):
         """
-        The forward pass for the `Transition` module computes the mean (`loc`) and scale 
-        for the Gaussian distribution governing the transition of latent states. This 
-        includes a gating mechanism to blend between the previous state and a proposed 
+        The forward pass for the `Transition` module computes the mean (`loc`) and scale
+        for the Gaussian distribution governing the transition of latent states. This
+        includes a gating mechanism to blend between the previous state and a proposed
         new state based on the input.
 
         Parameters

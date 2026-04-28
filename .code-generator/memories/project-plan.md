@@ -1,4 +1,8 @@
-- #14 [priority:high] feat: implement GRUForecaster with encoder-decoder and teacher-forcing — agent: python-pro
-- #15 [priority:high] feat: implement BiLSTMForecaster with bidirectional encoder and unidirectional decoder — agent: python-pro
-- #19 [priority:high] test: add comprehensive tests for GRUForecaster — agent: python-pro
-- #23 [priority:medium] feat: update stockpy public API exports for Cycle 2 forecasters — agent: python-pro
+- #24 [priority:high] feat: implement DMMForecaster with Pyro SVI encoder-decoder — agent: python-pro
+- #25 [priority:high] feat: implement TransformerForecaster with positional encoding and cross-attention — agent: python-pro
+- #26 [priority:high] test: add comprehensive tests for DMMForecaster — agent: python-pro
+- #27 [priority:high] test: add comprehensive tests for TransformerForecaster — agent: python-pro
+- #28 [priority:medium] chore: add full type annotations to all public APIs in forecasters and base — agent: python-pro
+- #29 [priority:medium] chore: update GitHub Actions CI for pytest coverage on Python 3.10–3.12 — agent: python-pro
+- #30 [priority:medium] feat: update public API exports for DMMForecaster and TransformerForecaster — agent: python-pro
+- #31 [priority:high] chore: run full test suite and fix linting for Cycle 3 completion — agent: python-pro

@@ -1,5 +1,4 @@
 import json
-import pickle
 
 from stockpy.utils import open_file_like
 
@@ -104,6 +103,7 @@ def _getitem_list_tuple(items, keys):
     """
 
     return _getitem_list_list(items, keys, tuple_=True)
+
 
 def _getitem_list_str(items, key):
     """
@@ -319,7 +319,8 @@ def _unpack_index(i):
     if len(i) > 4:
         raise KeyError(
             "Tried to index history with {} indices but only "
-            "4 indices are possible.".format(len(i)))
+            "4 indices are possible.".format(len(i))
+        )
 
     # fill trailing indices with None
     i_e, k_e, i_b, k_b = i + tuple([None] * (4 - len(i)))
@@ -383,28 +384,28 @@ class History(list):
         [{'batches': []}]
         """
 
-        self.append({'batches': []})
+        self.append({"batches": []})
 
     def new_batch(self):
         """
         Add a new batch to the last recorded epoch in the history.
 
-        This method is used to record the start of a new batch during the training of a model. It appends an empty dictionary 
-        to the 'batches' list of the last recorded epoch in the history. This dictionary will later be filled with the metrics 
+        This method is used to record the start of a new batch during the training of a model. It appends an empty dictionary
+        to the 'batches' list of the last recorded epoch in the history. This dictionary will later be filled with the metrics
         recorded during the batch.
 
         Raises
         ------
         IndexError
-            If there are no epochs recorded in the history. This is because batches are recorded within epochs, so there must 
+            If there are no epochs recorded in the history. This is because batches are recorded within epochs, so there must
             be at least one epoch recorded before a batch can be added.
 
         Notes
         -----
         This method modifies the history in-place, adding a new batch to the last recorded epoch.
         """
-        
-        self[-1]['batches'].append({})
+
+        self[-1]["batches"].append({})
 
     def record(self, attr, value):
         """
@@ -462,8 +463,8 @@ class History(list):
         >>> print(history)
         [{'batches': [{'batch_loss': 0.15}]}]
         """
-        
-        self[-1]['batches'][-1][attr] = value
+
+        self[-1]["batches"][-1][attr] = value
 
     def to_list(self):
         """
@@ -509,7 +510,7 @@ class History(list):
         [{'epoch': 1, 'train_loss': 0.2}, {'epoch': 2, 'train_loss': 0.15}]
         """
 
-        with open_file_like(f, 'r') as fp:
+        with open_file_like(f, "r") as fp:
             return cls(json.load(fp))
 
     def to_file(self, f):
@@ -529,7 +530,7 @@ class History(list):
         >>> history.to_file('history.json')  # Saves the history to 'history.json'.
         """
 
-        with open_file_like(f, 'w') as fp:
+        with open_file_like(f, "w") as fp:
             json.dump(self.to_list(), fp)
 
     def __getitem__(self, i):
@@ -539,7 +540,7 @@ class History(list):
         Parameters
         ----------
         i : int, slice, tuple
-            The index. Can be an integer for epochs, a slice for a range of epochs, or a tuple 
+            The index. Can be an integer for epochs, a slice for a range of epochs, or a tuple
             that specifies a detailed path in the history structure (up to four elements: epoch index,
             epoch-level key, batch index, and batch-level key).
 
@@ -587,10 +588,12 @@ class History(list):
         i_e, k_e, i_b, k_b = _unpack_index(i)
         keyerror_msg = "Key {!r} was not found in history."
 
-        if i_b is not None and k_e != 'batches':
-            raise KeyError("History indexing beyond the 2nd level is "
-                           "only possible if key 'batches' is used, "
-                           "found key {!r}.".format(k_e))
+        if i_b is not None and k_e != "batches":
+            raise KeyError(
+                "History indexing beyond the 2nd level is "
+                "only possible if key 'batches' is used, "
+                "found key {!r}.".format(k_e)
+            )
 
         items = self.to_list()
 
@@ -619,19 +622,19 @@ class History(list):
                 # filter out epochs with missing keys
                 items = list(filter(_not_none, items))
 
-            if not items and not (k_e == 'batches' and i_b is None):
+            if not items and not (k_e == "batches" and i_b is None):
                 # none of the epochs matched
                 raise KeyError(keyerror_msg.format(key))
 
             if (
-                    isinstance(i_b, slice)
-                    and k_b is not None
-                    and not any(batches for batches in items)
+                isinstance(i_b, slice)
+                and k_b is not None
+                and not any(batches for batches in items)
             ):
                 # none of the batches matched
                 raise KeyError(keyerror_msg.format(key))
 
         if isinstance(i_e, int):
-            items, = items
+            (items,) = items
 
         return items

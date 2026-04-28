@@ -1,25 +1,25 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
+
 from stockpy.base import EncoderDecoderForecaster
 from stockpy.utils import get_activation_function
 
-__all__ = ['LSTMRegressor']
+__all__ = ["LSTMRegressor"]
+
 
 class LSTM(nn.Module):
     """
-    LSTM is a recurrent neural network architecture that uses LSTM (Long Short-Term Memory) cells to 
-    process sequences of data. It's designed to remember long-range dependencies and is often used in 
+    LSTM is a recurrent neural network architecture that uses LSTM (Long Short-Term Memory) cells to
+    process sequences of data. It's designed to remember long-range dependencies and is often used in
     time-series prediction, natural language processing, and other sequence-related tasks.
 
     Parameters
     ----------
     rnn_size : int
-        The number of features in the hidden state h of the LSTM. It's also the output feature dimension 
+        The number of features in the hidden state h of the LSTM. It's also the output feature dimension
         after processing the input sequence.
     hidden_size : int or list of int
-        The size of each hidden layer in the fully connected layers after the LSTM layer. If it is an integer, 
+        The size of each hidden layer in the fully connected layers after the LSTM layer. If it is an integer,
         it is the size of a single hidden layer; if it is a list, each element is the size of a layer.
     num_layers : int
         The number of recurrent layers (i.e., number of LSTM layers stacked on each other).
@@ -47,22 +47,23 @@ class LSTM(nn.Module):
         Initializes the LSTM layer and fully connected layers of the neural network.
     """
 
-    def __init__(self,
-                 rnn_size = 32,
-                 hidden_size=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 batch_norm=False,
-                 layer_norm=False,
-                 **kwargs):
-        
+    def __init__(
+        self,
+        rnn_size=32,
+        hidden_size=32,
+        num_layers=1,
+        dropout=0.2,
+        activation="relu",
+        bias=True,
+        seq_len=20,
+        batch_norm=False,
+        layer_norm=False,
+        **kwargs,
+    ):
         """
         Constructor for the LSTM class.
 
-        Initializes a new instance of LSTM with the specified configuration for sequence processing tasks. 
+        Initializes a new instance of LSTM with the specified configuration for sequence processing tasks.
         It constructs an LSTM layer followed by a series of fully connected layers based on the given arguments.
         """
         super().__init__()
@@ -81,8 +82,8 @@ class LSTM(nn.Module):
         """
         Implements the initialization of the LSTM and fully connected layers.
 
-        Sets up the architecture of the neural network based on the configuration provided in the constructor. 
-        This includes initializing the LSTM layer with the defined `rnn_size` and `num_layers`, and the fully 
+        Sets up the architecture of the neural network based on the configuration provided in the constructor.
+        This includes initializing the LSTM layer with the defined `rnn_size` and `num_layers`, and the fully
         connected layers according to `hidden_size` and `activation` function.
 
         """
@@ -97,13 +98,15 @@ class LSTM(nn.Module):
             self.output_size = self.n_outputs_
             self.criterion_ = nn.MSELoss()
 
-        self.lstm = nn.LSTM(input_size=self.n_features_in_,
-                             hidden_size=self.rnn_size,
-                             num_layers=self.num_layers,
-                             bidirectional=False,
-                             batch_first=True,
-                             bias=self.bias)
-        
+        self.lstm = nn.LSTM(
+            input_size=self.n_features_in_,
+            hidden_size=self.rnn_size,
+            num_layers=self.num_layers,
+            bidirectional=False,
+            batch_first=True,
+            bias=self.bias,
+        )
+
         layers = []
 
         fc_input_size = self.rnn_size
@@ -122,13 +125,14 @@ class LSTM(nn.Module):
             fc_input_size = hidden_size
 
         # Appends the output layer to the neural network
-        layers.append(nn.Linear(fc_input_size, self.output_size)) 
+        layers.append(nn.Linear(fc_input_size, self.output_size))
 
         self.layers = nn.Sequential(*layers)
 
     @property
     def model_type(self):
         return "rnn"
+
 
 class LSTMRegressor(EncoderDecoderForecaster, LSTM):
     """
@@ -170,17 +174,19 @@ class LSTMRegressor(EncoderDecoderForecaster, LSTM):
         Defines the forward pass of the LSTM regressor.
     """
 
-    def __init__(self,
-                 rnn_size = 32,
-                 hidden_size=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 batch_norm=False,
-                 layer_norm=False,
-                 **kwargs):
+    def __init__(
+        self,
+        rnn_size=32,
+        hidden_size=32,
+        num_layers=1,
+        dropout=0.2,
+        activation="relu",
+        bias=True,
+        seq_len=20,
+        batch_norm=False,
+        layer_norm=False,
+        **kwargs,
+    ):
         """
         Constructs an LSTMRegressor instance with specified parameters for the LSTM
         and fully connected layers. It initializes base EncoderDecoderForecaster attributes and
@@ -188,18 +194,19 @@ class LSTMRegressor(EncoderDecoderForecaster, LSTM):
         """
 
         EncoderDecoderForecaster.__init__(self, **kwargs)
-        LSTM.__init__(self, 
-                     rnn_size=rnn_size,
-                     hidden_size=hidden_size, 
-                     num_layers=num_layers,
-                     dropout=dropout, 
-                     activation=activation, 
-                     seq_len=seq_len,
-                     bias=bias, 
-                     batch_norm=batch_norm,
-                     layer_norm=layer_norm,
-                     **kwargs
-                     )
+        LSTM.__init__(
+            self,
+            rnn_size=rnn_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout,
+            activation=activation,
+            seq_len=seq_len,
+            bias=bias,
+            batch_norm=batch_norm,
+            layer_norm=layer_norm,
+            **kwargs,
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -226,7 +233,7 @@ class LSTMRegressor(EncoderDecoderForecaster, LSTM):
             If the input tensor does not match the expected dimensions or if an operation
             within the forward pass fails.
         """
-        
+
         # Ensures LSTM initial states h_0 and c_0 are reset to zeros at each forward call
         h_0 = torch.zeros(self.num_layers, x.size(0), self.rnn_size, requires_grad=True)
         c_0 = torch.zeros(self.num_layers, x.size(0), self.rnn_size, requires_grad=True)
@@ -240,7 +247,7 @@ class LSTMRegressor(EncoderDecoderForecaster, LSTM):
         # Returns the final output for regression
         return out
 
-    def predict(self, X, predict_nonlinearity='auto'):
+    def predict(self, X, predict_nonlinearity="auto"):
         """
         Forecast future values for the given input sequences.
 

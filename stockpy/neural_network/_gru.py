@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from stockpy.base import EncoderDecoderForecaster
 from stockpy.utils import get_activation_function
 
-__all__ = ['GRURegressor']
+__all__ = ["GRURegressor"]
+
 
 class GRU(nn.Module):
     """
@@ -47,21 +47,23 @@ class GRU(nn.Module):
         Initializes the GRU and fully connected layers. Typically, this would include setting up the weights and biases for the layers.
     """
 
-    def __init__(self,
-                 rnn_size = 32,
-                 hidden_size=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 batch_norm=False,
-                 layer_norm=False,
-                 **kwargs):
+    def __init__(
+        self,
+        rnn_size=32,
+        hidden_size=32,
+        num_layers=1,
+        dropout=0.2,
+        activation="relu",
+        bias=True,
+        seq_len=20,
+        batch_norm=False,
+        layer_norm=False,
+        **kwargs,
+    ):
         """
         Constructor for the GRU class.
 
-        Initializes a new instance of GRU with the specified configuration for sequence processing tasks. 
+        Initializes a new instance of GRU with the specified configuration for sequence processing tasks.
         It constructs an GRU layer followed by a series of fully connected layers based on the given arguments.
         """
 
@@ -99,13 +101,15 @@ class GRU(nn.Module):
             self.output_size = self.n_outputs_
             self.criterion_ = nn.MSELoss()
 
-        self.gru = nn.GRU(input_size=self.n_features_in_,
-                             hidden_size=self.rnn_size,
-                             num_layers=self.num_layers,
-                             bidirectional=False,
-                             batch_first=True,
-                             bias=self.bias)
-        
+        self.gru = nn.GRU(
+            input_size=self.n_features_in_,
+            hidden_size=self.rnn_size,
+            num_layers=self.num_layers,
+            bidirectional=False,
+            batch_first=True,
+            bias=self.bias,
+        )
+
         layers = []
 
         fc_input_size = self.rnn_size
@@ -123,7 +127,7 @@ class GRU(nn.Module):
             fc_input_size = hidden_size
 
         # Appends the output layer to the neural network
-        layers.append(nn.Linear(fc_input_size, self.output_size)) 
+        layers.append(nn.Linear(fc_input_size, self.output_size))
 
         self.layers = nn.Sequential(*layers)
 
@@ -177,17 +181,19 @@ class GRURegressor(EncoderDecoderForecaster, GRU):
     The rest of the methods from `EncoderDecoderForecaster` and `GRU` are inherited.
     """
 
-    def __init__(self,
-                 rnn_size = 32,
-                 hidden_size=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 batch_norm=False,
-                 layer_norm=False,
-                 **kwargs):
+    def __init__(
+        self,
+        rnn_size=32,
+        hidden_size=32,
+        num_layers=1,
+        dropout=0.2,
+        activation="relu",
+        bias=True,
+        seq_len=20,
+        batch_norm=False,
+        layer_norm=False,
+        **kwargs,
+    ):
         """
         Initializes the `GRURegressor` instance with the specified configurations.
 
@@ -197,37 +203,38 @@ class GRURegressor(EncoderDecoderForecaster, GRU):
         """
 
         EncoderDecoderForecaster.__init__(self, **kwargs)
-        GRU.__init__(self, 
-                     rnn_size=rnn_size,
-                     hidden_size=hidden_size, 
-                     num_layers=num_layers,
-                     dropout=dropout, 
-                     activation=activation, 
-                     seq_len=seq_len,
-                     bias=bias, 
-                     batch_norm=batch_norm,
-                     layer_norm=layer_norm,
-                     **kwargs
-                     )
+        GRU.__init__(
+            self,
+            rnn_size=rnn_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
+            dropout=dropout,
+            activation=activation,
+            seq_len=seq_len,
+            bias=bias,
+            batch_norm=batch_norm,
+            layer_norm=layer_norm,
+            **kwargs,
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass through the GRURegressor model.
 
-        The method processes the input sequence `x` through the GRU layers and then 
+        The method processes the input sequence `x` through the GRU layers and then
         through the fully connected layers to produce the regression output.
 
         Parameters
         ----------
         x : torch.Tensor
-            The input tensor containing the sequence of data. It should have dimensions 
+            The input tensor containing the sequence of data. It should have dimensions
             (batch_size, seq_len, n_features).
 
         Returns
         -------
         torch.Tensor
-            The output tensor after processing the input through the GRU and linear layers. 
-            For regression, this will typically have dimensions (batch_size, output_size), 
+            The output tensor after processing the input through the GRU and linear layers.
+            For regression, this will typically have dimensions (batch_size, output_size),
             where `output_size` corresponds to the predicted values for each sequence in the batch.
 
         Raises
@@ -235,19 +242,19 @@ class GRURegressor(EncoderDecoderForecaster, GRU):
         RuntimeError
             If the input tensor `x` does not have the correct shape or type.
         """
-        
+
         # Initialize the hidden state for the GRU
         h_0 = torch.zeros(self.num_layers, x.size(0), self.rnn_size, requires_grad=True)
-        
+
         # Pass the input through the GRU layer
         out, _ = self.gru(x, h_0)
-        
+
         # Pass the final hidden state through the fully connected layers
         out = self.layers(out[:, -1, :])
 
         return out
 
-    def predict(self, X, predict_nonlinearity='auto'):
+    def predict(self, X, predict_nonlinearity="auto"):
         """
         Forecast future values for the given input sequences.
 

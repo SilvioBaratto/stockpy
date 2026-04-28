@@ -1,13 +1,14 @@
 import torch
 import torch.nn as nn
 
+
 class EmitterRegressor(nn.Module):
     """
-    The `EmitterRegressor` module parameterizes the Gaussian observation likelihood 
-    `p(y_t | z_t, x_t)`, essentially modeling the conditional probability of the 
+    The `EmitterRegressor` module parameterizes the Gaussian observation likelihood
+    `p(y_t | z_t, x_t)`, essentially modeling the conditional probability of the
     observed data `y_t` given the latent state `z_t` and possibly an additional input `x_t`.
 
-    This module generates parameters for a Gaussian distribution, predicting the mean 
+    This module generates parameters for a Gaussian distribution, predicting the mean
     and standard deviation for the observation at time `t`.
 
     Attributes
@@ -50,13 +51,17 @@ class EmitterRegressor(nn.Module):
         # Initialize linear layers for predicting the mean (mu).
         self.lin_z_to_hidden_mu = nn.Linear(z_dim, emission_dim)
         self.lin_x_to_hidden_mu = nn.Linear(input_dim, emission_dim)
-        self.lin_hidden_to_hidden_mu = nn.Linear(emission_dim * 2, emission_dim)  # Concatenated z and x.
+        self.lin_hidden_to_hidden_mu = nn.Linear(
+            emission_dim * 2, emission_dim
+        )  # Concatenated z and x.
         self.lin_hidden_to_output_mu = nn.Linear(emission_dim, output_dim)
 
         # Initialize linear layers for predicting the standard deviation (sigma).
         self.lin_z_to_hidden_sigma = nn.Linear(z_dim, emission_dim)
         self.lin_x_to_hidden_sigma = nn.Linear(input_dim, emission_dim)
-        self.lin_hidden_to_hidden_sigma = nn.Linear(emission_dim * 2, emission_dim)  # Concatenated z and x.
+        self.lin_hidden_to_hidden_sigma = nn.Linear(
+            emission_dim * 2, emission_dim
+        )  # Concatenated z and x.
         self.lin_hidden_to_output_sigma = nn.Linear(emission_dim, output_dim)
 
         # Initialize non-linearities.
@@ -69,7 +74,7 @@ class EmitterRegressor(nn.Module):
 
         Processes `z_t` and `x_t` through distinct pathways, each with a linear layer
         and ReLU activation. The results are concatenated and passed through additional
-        layers to predict the mean (`mu`) and softplus-transformed standard deviation 
+        layers to predict the mean (`mu`) and softplus-transformed standard deviation
         (`sigma`) for the Gaussian distribution of the observation `y_t`.
 
         Parameters
@@ -82,7 +87,7 @@ class EmitterRegressor(nn.Module):
         Returns
         -------
         Tuple[torch.Tensor, torch.Tensor]
-            A tuple of two tensors representing the predicted mean (`mu`) and standard 
+            A tuple of two tensors representing the predicted mean (`mu`) and standard
             deviation (`sigma`) for the Gaussian distribution of `y_t`.
         """
 
@@ -102,4 +107,3 @@ class EmitterRegressor(nn.Module):
         sigma = self.softplus(sigma_pre)  # Ensure that sigma is positive
 
         return mu, sigma
-    

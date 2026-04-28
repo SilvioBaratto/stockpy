@@ -1,8 +1,7 @@
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 import pyro
 import pyro.distributions as dist
+import torch
+import torch.nn as nn
 from pyro.nn import PyroModule
 
 from stockpy.base import EncoderDecoderForecaster
@@ -11,7 +10,8 @@ from ._combiner import Combiner
 from ._emitter import EmitterRegressor
 from ._transition import Transition
 
-__all__ = ['DMMRegressor']
+__all__ = ["DMMRegressor"]
+
 
 class DMM(PyroModule):
     """
@@ -85,19 +85,21 @@ class DMM(PyroModule):
     Operates as a regressor using the emitter_rgr module.
     """
 
-    def __init__(self,
-                 z_dim=32,
-                 emission_dim=32,
-                 transition_dim=32,
-                 rnn_dim=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 variance=0.1,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 **kwargs):
-        
+    def __init__(
+        self,
+        z_dim=32,
+        emission_dim=32,
+        transition_dim=32,
+        rnn_dim=32,
+        num_layers=1,
+        dropout=0.2,
+        variance=0.1,
+        activation="relu",
+        bias=True,
+        seq_len=20,
+        **kwargs,
+    ):
+
         super().__init__()
 
         self.z_dim = z_dim
@@ -123,25 +125,25 @@ class DMM(PyroModule):
 
         self.output_size = self.n_outputs_
 
-        self.emitter_rgr = EmitterRegressor(self.n_features_in_,
-                                        self.z_dim,
-                                        self.emission_dim,
-                                        self.output_size)
+        self.emitter_rgr = EmitterRegressor(
+            self.n_features_in_, self.z_dim, self.emission_dim, self.output_size
+        )
 
-        self.transition = Transition(self.z_dim,
-                                     self.n_features_in_,
-                                     self.transition_dim)
-        
+        self.transition = Transition(
+            self.z_dim, self.n_features_in_, self.transition_dim
+        )
+
         self.combiner = Combiner(self.z_dim, self.rnn_dim)
-        
-        self.rnn = nn.GRU(input_size=self.n_features_in_,
-                            hidden_size=self.rnn_dim,
-                            batch_first=True,
-                            bidirectional=True,
-                            num_layers=self.num_layers,
-                            bias=self.bias,
-                            )
-        
+
+        self.rnn = nn.GRU(
+            input_size=self.n_features_in_,
+            hidden_size=self.rnn_dim,
+            batch_first=True,
+            bidirectional=True,
+            num_layers=self.num_layers,
+            bias=self.bias,
+        )
+
         # define a (trainable) parameters z_0 and z_q_0 that help define
         # the probability distributions p(z_1) and q(z_1)
         # (since for t = 1 there are no previous latents to condition on)
@@ -153,7 +155,8 @@ class DMM(PyroModule):
     @property
     def model_type(self):
         return "rnn"
-    
+
+
 class DMMRegressor(EncoderDecoderForecaster, DMM):
     """
     Specialized DMM for regression tasks using deep generative modeling.
@@ -192,21 +195,23 @@ class DMMRegressor(EncoderDecoderForecaster, DMM):
     Adjusts DMM output dimensions for regression task requirements.
     """
 
-    def __init__(self,
-                 z_dim=32,
-                 emission_dim=32,
-                 transition_dim=32,
-                 rnn_dim=32,
-                 num_layers=1,
-                 dropout=0.2,
-                 variance=0.1,
-                 activation='relu',
-                 bias=True,
-                 seq_len=20,
-                 **kwargs):
+    def __init__(
+        self,
+        z_dim=32,
+        emission_dim=32,
+        transition_dim=32,
+        rnn_dim=32,
+        num_layers=1,
+        dropout=0.2,
+        variance=0.1,
+        activation="relu",
+        bias=True,
+        seq_len=20,
+        **kwargs,
+    ):
         """
         Constructor method for the DMMRegressor class.
-        
+
         This method initializes a new instance of DMMRegressor with the specified
         parameters or their default values. It first initializes the EncoderDecoderForecaster base class
         and then the DMM class with the provided arguments.
@@ -220,18 +225,20 @@ class DMMRegressor(EncoderDecoderForecaster, DMM):
         """
 
         EncoderDecoderForecaster.__init__(self, **kwargs)
-        DMM.__init__(self,
-                     z_dim=z_dim,
-                     emission_dim=emission_dim,
-                     transition_dim=transition_dim,
-                     rnn_dim=rnn_dim,
-                     num_layers=num_layers,
-                     dropout=dropout,
-                     variance=variance,
-                     activation=activation,
-                     bias=bias,
-                     seq_len=seq_len,
-                     **kwargs)
+        DMM.__init__(
+            self,
+            z_dim=z_dim,
+            emission_dim=emission_dim,
+            transition_dim=transition_dim,
+            rnn_dim=rnn_dim,
+            num_layers=num_layers,
+            dropout=dropout,
+            variance=variance,
+            activation=activation,
+            bias=bias,
+            seq_len=seq_len,
+            **kwargs,
+        )
 
     def model(self, x, y, annealing_factor=1.0):
         """
@@ -264,7 +271,7 @@ class DMMRegressor(EncoderDecoderForecaster, DMM):
         # allowing for vectorized operations across the batch dimension.
         with pyro.plate("z_minibatch", len(x)):
             # Loop over each time step in the sequence. Pyro's markov context manager tells Pyro
-            # that the current time step only depends on the previous one, which enables 
+            # that the current time step only depends on the previous one, which enables
             # optimizations for markov models.
             for t in pyro.markov(range(1, T_max + 1)):
 
@@ -279,7 +286,9 @@ class DMMRegressor(EncoderDecoderForecaster, DMM):
                     # Sample the latent variable `z_t` for time step `t` from the normal distribution
                     # parameterized by `z_loc` and `z_scale`. `.to_event(1)` indicates that this
                     # distribution is over a vector-valued random variable.
-                    z_t = pyro.sample("z_%d" % t, dist.Normal(z_loc, z_scale).to_event(1))
+                    z_t = pyro.sample(
+                        "z_%d" % t, dist.Normal(z_loc, z_scale).to_event(1)
+                    )
 
                 # Pass the sampled latent state `z_t` and the observed data to the emission module
                 # to get the parameters `mu` and `sigma` of the observed distribution.
@@ -288,12 +297,11 @@ class DMMRegressor(EncoderDecoderForecaster, DMM):
                 # Sample the observation `y` at time `t` from the normal distribution parameterized
                 # by the output of the emission module. The `obs=y[:, t - 1, :]` argument indicates
                 # that this sample corresponds to the actual observed data.
-                pyro.sample("obs_y_%d" % t, dist.Normal(mu, sigma).to_event(1), 
-                            obs=y)
+                pyro.sample("obs_y_%d" % t, dist.Normal(mu, sigma).to_event(1), obs=y)
 
                 # Update `z_prev` to the current `z_t` to be used in the next time step.
                 z_prev = z_t
-            
+
     def guide(self, x, y=None, annealing_factor=1.0):
         """
         Defines the variational guide for the deep Markov model (DMM) regressor.
@@ -310,22 +318,24 @@ class DMMRegressor(EncoderDecoderForecaster, DMM):
             Factor to anneal the KL-divergence term in the loss during training (default is 1.0).
 
         """
-        
+
         # Determine the sequence length from the input features `x`.
         T_max = x.size(1)
         # Register this module with Pyro, which is necessary for optimization.
         pyro.module("dmm", self)
-        
+
         # Prepare the initial hidden state for the RNN, ensuring it's compatible with the input's batch size.
-        h_0_contig = self.h_0.expand(self.num_layers * 2, x.size(0), self.rnn.hidden_size).contiguous()
-        
+        h_0_contig = self.h_0.expand(
+            self.num_layers * 2, x.size(0), self.rnn.hidden_size
+        ).contiguous()
+
         # Process the sequence `x` through the RNN to obtain the output for each time step.
         rnn_output, _ = self.rnn(x, h_0_contig)
-        
+
         # Initialize the previous latent state `z_prev` with `z_q_0`, which is a trainable parameter
         # that represents the initial state of the latent variable.
         z_prev = self.z_q_0.expand(x.size(0), self.z_dim)
-        
+
         # Start a Pyro plate for batching, similar to the model function.
         with pyro.plate("z_minibatch", len(x)):
             # Loop over each time step in the sequence in reverse order.
@@ -374,7 +384,7 @@ class DMMRegressor(EncoderDecoderForecaster, DMM):
         """
         # Initialize a list to hold the predictions at each time step.
         preds = []
-                
+
         # Record the operations of the guide function on the input `x` to later access the latent variables.
         guide_trace = pyro.poutine.trace(self.guide).get_trace(x)
 
@@ -390,17 +400,17 @@ class DMMRegressor(EncoderDecoderForecaster, DMM):
             # Use the emitter (which is typically a neural network module) to get the mean prediction at time `t`.
             # The underscore '_' is used to discard the second return value (typically the standard deviation).
             mean_t, _ = self.emitter_rgr(z_t, x[:, t - 1, :])
-            
+
             # Append the mean prediction for the current time step to the list of predictions.
             preds.append(mean_t)
-                
+
         # Combine the predictions from all time steps into a single tensor.
         preds = torch.stack(preds)
 
         # Return the predictions for the last time step for each element in the batch.
         return preds[-1, :, :]
 
-    def predict(self, X, predict_nonlinearity='auto'):
+    def predict(self, X, predict_nonlinearity="auto"):
         """
         Forecast future values for the given input sequences.
 

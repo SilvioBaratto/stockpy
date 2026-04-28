@@ -6,7 +6,7 @@ from stockpy.base import EncoderDecoderForecaster
 from stockpy.preprocessing import unpack_data
 from stockpy.utils import get_activation_function
 
-__all__ = ['TCNForecaster']
+__all__ = ["TCNForecaster"]
 
 
 class CausalConv1d(nn.Module):
@@ -52,11 +52,15 @@ class TemporalBlock(nn.Module):
         bias=True,
     ):
         super().__init__()
-        self.conv1 = CausalConv1d(in_channels, out_channels, kernel_size, dilation, bias)
+        self.conv1 = CausalConv1d(
+            in_channels, out_channels, kernel_size, dilation, bias
+        )
         self.relu1 = nn.ReLU()
         self.dropout1 = nn.Dropout(dropout)
 
-        self.conv2 = CausalConv1d(out_channels, out_channels, kernel_size, dilation, bias)
+        self.conv2 = CausalConv1d(
+            out_channels, out_channels, kernel_size, dilation, bias
+        )
         self.relu2 = nn.ReLU()
         self.dropout2 = nn.Dropout(dropout)
 
@@ -113,7 +117,7 @@ class TCNEncoder(nn.Module):
         layers = []
         for i in range(num_layers):
             in_ch = n_features if i == 0 else num_filters
-            dilation = 2 ** i
+            dilation = 2**i
             layers.append(
                 TemporalBlock(
                     in_channels=in_ch,
@@ -172,7 +176,7 @@ class TCNModel(nn.Module):
         num_layers=1,
         hidden_size=32,
         dropout=0.0,
-        activation='relu',
+        activation="relu",
         bias=True,
     ):
         super().__init__()
@@ -303,7 +307,7 @@ class TCNForecaster(EncoderDecoderForecaster):
         num_layers=1,
         hidden_size=32,
         dropout=0.2,
-        activation='relu',
+        activation="relu",
         bias=True,
         context_len=20,
         pred_len=1,
@@ -322,12 +326,13 @@ class TCNForecaster(EncoderDecoderForecaster):
             pred_len=pred_len,
             **kwargs,
         )
-        self._modules = ['module']
+        self._modules = ["module"]
 
     def __sklearn_tags__(self):
-        from sklearn.utils._tags import Tags, TargetTags, InputTags
+        from sklearn.utils._tags import InputTags, Tags, TargetTags
+
         return Tags(
-            estimator_type='regressor',
+            estimator_type="regressor",
             target_tags=TargetTags(required=True, multi_output=True),
             input_tags=InputTags(two_d_array=True),
         )
@@ -380,7 +385,7 @@ class TCNForecaster(EncoderDecoderForecaster):
             y_pred = self.infer(Xi, y=yi, **fit_params)
             loss = self.get_loss(y_pred, yi, X=Xi, training=True)
             loss.backward()
-            return {'loss': loss, 'y_pred': y_pred}
+            return {"loss": loss, "y_pred": y_pred}
         return super().train_step_single(batch, **fit_params)
 
     def state_dict(self):
@@ -393,4 +398,4 @@ class TCNForecaster(EncoderDecoderForecaster):
 
     @property
     def model_type(self):
-        return 'cnn'
+        return "cnn"

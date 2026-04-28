@@ -1,13 +1,13 @@
-
 import warnings
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+
 from stockpy.base import EncoderDecoderForecaster
 from stockpy.utils import get_activation_function
 
-__all__ = ['CNNRegressor']
+__all__ = ["CNNRegressor"]
+
 
 class CNN(nn.Module):
     """
@@ -51,19 +51,21 @@ class CNN(nn.Module):
         and a final dense layer for output.
     """
 
-    def __init__(self,
-                 hidden_size=32,
-                 num_filters=32,
-                 kernel_size=3,
-                 pool_size=2,
-                 dropout=0.2,
-                 activation='relu',
-                 num_layers=1,
-                 num_channels=1,
-                 bias=True,
-                 batch_norm=False,
-                 layer_norm=False,
-                 **kwargs):
+    def __init__(
+        self,
+        hidden_size=32,
+        num_filters=32,
+        kernel_size=3,
+        pool_size=2,
+        dropout=0.2,
+        activation="relu",
+        num_layers=1,
+        num_channels=1,
+        bias=True,
+        batch_norm=False,
+        layer_norm=False,
+        **kwargs,
+    ):
         """
         Constructs the CNN with the specified parameters. This includes setting up
         the convolutional layers, pooling layers, and fully connected layers based on the
@@ -123,13 +125,23 @@ class CNN(nn.Module):
         flattened_size = (self.input_size - self.kernel_size + 1) // self.pool_size
 
         # Additional convolutional layers
-        for i in range(1, self.num_layers):  # Adjusted to start from 1 since we already have the initial conv layer
-            new_flattened_size = (flattened_size - self.kernel_size + 1) // self.pool_size
+        for i in range(
+            1, self.num_layers
+        ):  # Adjusted to start from 1 since we already have the initial conv layer
+            new_flattened_size = (
+                flattened_size - self.kernel_size + 1
+            ) // self.pool_size
             if new_flattened_size <= 0:
-                warnings.warn("Cannot add more layers; doing so would result in negative dimension size.")
+                warnings.warn(
+                    "Cannot add more layers; doing so would result in negative dimension size."
+                )
                 break
 
-            layers.append(nn.Conv1d(input_size, self.num_filters, self.kernel_size, bias=self.bias))
+            layers.append(
+                nn.Conv1d(
+                    input_size, self.num_filters, self.kernel_size, bias=self.bias
+                )
+            )
             if self.batch_norm:
                 layers.append(nn.BatchNorm1d(self.num_filters))
             if self.layer_norm:
@@ -204,20 +216,22 @@ class CNNRegressor(EncoderDecoderForecaster, CNN):
     The rest of the methods from `EncoderDecoderForecaster` and `CNN` are inherited.
     """
 
-    def __init__(self,
-                 hidden_size=32,
-                 num_filters=32,
-                 kernel_size=3,
-                 pool_size=2,
-                 dropout=0.2,
-                 activation='relu',
-                 num_layers=1,
-                 num_channels=1,
-                 dim=1,
-                 bias=True,
-                 batch_norm=False,
-                 layer_norm=False,
-                 **kwargs):
+    def __init__(
+        self,
+        hidden_size=32,
+        num_filters=32,
+        kernel_size=3,
+        pool_size=2,
+        dropout=0.2,
+        activation="relu",
+        num_layers=1,
+        num_channels=1,
+        dim=1,
+        bias=True,
+        batch_norm=False,
+        layer_norm=False,
+        **kwargs,
+    ):
         """
         Initializes the CNNRegressor with the specified parameters for the convolutional neural network.
         The parameters include settings for the convolutional and dense layers, as well as the overall
@@ -225,22 +239,23 @@ class CNNRegressor(EncoderDecoderForecaster, CNN):
         """
 
         EncoderDecoderForecaster.__init__(self, **kwargs)
-        CNN.__init__(self, 
-                     hidden_size=hidden_size, 
-                     num_filters=num_filters,
-                     kernel_size=kernel_size,
-                     pool_size=pool_size,
-                     dropout=dropout, 
-                     activation=activation, 
-                     num_layers=num_layers,
-                     num_channels=num_channels,
-                     dim=dim,
-                     bias=bias, 
-                     batch_norm=batch_norm,
-                     layer_norm=layer_norm,
-                     **kwargs
-                     )
-            
+        CNN.__init__(
+            self,
+            hidden_size=hidden_size,
+            num_filters=num_filters,
+            kernel_size=kernel_size,
+            pool_size=pool_size,
+            dropout=dropout,
+            activation=activation,
+            num_layers=num_layers,
+            num_channels=num_channels,
+            dim=dim,
+            bias=bias,
+            batch_norm=batch_norm,
+            layer_norm=layer_norm,
+            **kwargs,
+        )
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Performs the forward pass of the CNNRegressor with the input tensor `x`.
@@ -267,12 +282,12 @@ class CNNRegressor(EncoderDecoderForecaster, CNN):
         # Ensures the model has been fitted before making predictions
         if self.layers is None:
             raise RuntimeError("You must call fit before calling predict")
-                
+
         x = self.layers(x)
 
         return x
 
-    def predict(self, X, predict_nonlinearity='auto'):
+    def predict(self, X, predict_nonlinearity="auto"):
         """
         Forecast future values for the given input sequences.
 

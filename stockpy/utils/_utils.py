@@ -1,74 +1,70 @@
+import pathlib
+import warnings
 from collections.abc import Mapping, Sequence
 from contextlib import contextmanager
 from enum import Enum
 from functools import partial
-import io
 from itertools import tee
-import pathlib
-import warnings
 
 import numpy as np
+import torch
 from scipy import sparse
-import sklearn
 from sklearn.exceptions import NotFittedError
 from sklearn.utils import _safe_indexing as safe_indexing
 from sklearn.utils.validation import check_is_fitted as sk_check_is_fitted
-import torch
 from torch import nn
-
-from pyro.nn import PyroModule
 from torch.nn.utils.rnn import PackedSequence
 from torch.utils.data.dataset import Subset
 
-from ..exceptions import DeviceWarning
-from ..exceptions import NotInitializedError
+from ..exceptions import DeviceWarning, NotInitializedError
 
 try:
-    import torch_geometric
+    import torch_geometric  # noqa: F401
+
     TORCH_GEOMETRIC_INSTALLED = True
 except ImportError:
     TORCH_GEOMETRIC_INSTALLED = False
 
 # import all the classes and function into a __all__ list
 __all__ = [
-    'Ansi',
-    'is_torch_data_type',
-    'is_dataset',
-    'is_geometric_data_type',
-    'to_tensor',
-    '_is_slicedataset',
-    'to_numpy',
-    'to_device', 
-    'get_dim',
-    'is_pandas_ndframe',
-    'flatten', 
-    '_indexing_none', 
-    '_indexing_dict', 
-    '_indexing_list_tuple_of_data',
-    '_indexing_ndframe',
-    '_indexing_other',
-    'check_indexing',
-    '_normalize_numpy_indices',
-    'multi_indexing',
-    'duplicate_items',
-    'params_for', 
-    'data_from_dataset', 
-    'is_stockpy_dataset', 
-    'noop', 
-    'open_file_like', 
-    'train_loss_score', 
-    'valid_loss_score', 
-    'FirstStepAccumulator', 
-    '_make_split', 
-    'freeze_parameter', 
-    'unfreeze_parameter', 
-    'get_map_location', 
-    'check_is_fitted', 
-    '_identity',
-    '_infer_predict_nonlinearity', 
-    'TeeGenerator', 
-    '_check_f_arguments', 
-    'get_activation_function', 
+    "Ansi",
+    "is_torch_data_type",
+    "is_dataset",
+    "is_geometric_data_type",
+    "to_tensor",
+    "_is_slicedataset",
+    "to_numpy",
+    "to_device",
+    "get_dim",
+    "is_pandas_ndframe",
+    "flatten",
+    "_indexing_none",
+    "_indexing_dict",
+    "_indexing_list_tuple_of_data",
+    "_indexing_ndframe",
+    "_indexing_other",
+    "check_indexing",
+    "_normalize_numpy_indices",
+    "multi_indexing",
+    "duplicate_items",
+    "params_for",
+    "data_from_dataset",
+    "is_stockpy_dataset",
+    "noop",
+    "open_file_like",
+    "train_loss_score",
+    "valid_loss_score",
+    "FirstStepAccumulator",
+    "_make_split",
+    "freeze_parameter",
+    "unfreeze_parameter",
+    "get_map_location",
+    "check_is_fitted",
+    "_identity",
+    "_infer_predict_nonlinearity",
+    "TeeGenerator",
+    "_check_f_arguments",
+    "get_activation_function",
 ]
 
 
@@ -91,12 +87,14 @@ class Ansi(Enum):
     ENDC : str
         ANSI code to reset text color to default.
     """
-    BLUE = '\033[94m'
-    CYAN = '\033[36m'
-    GREEN = '\033[32m'
-    MAGENTA = '\033[35m'
-    RED = '\033[31m'
-    ENDC = '\033[0m'
+
+    BLUE = "\033[94m"
+    CYAN = "\033[36m"
+    GREEN = "\033[32m"
+    MAGENTA = "\033[35m"
+    RED = "\033[31m"
+    ENDC = "\033[0m"
+
 
 def is_torch_data_type(x):
     """
@@ -119,6 +117,7 @@ def is_torch_data_type(x):
     # pylint: disable=protected-access
     return isinstance(x, (torch.Tensor, PackedSequence))
 
+
 def is_dataset(x):
     """
     Check if an object is a PyTorch dataset.
@@ -134,6 +133,7 @@ def is_dataset(x):
         True if `x` is an instance of torch.utils.data.Dataset, False otherwise.
     """
     return isinstance(x, torch.utils.data.Dataset)
+
 
 def is_geometric_data_type(x):
     """
@@ -154,7 +154,9 @@ def is_geometric_data_type(x):
 
     """
     from torch_geometric.data import Data
+
     return isinstance(x, Data)
+
 
 def to_tensor(X, device, accept_sparse=False):
     """
@@ -200,9 +202,9 @@ def to_tensor(X, device, accept_sparse=False):
         return to_device(X, device)
     if TORCH_GEOMETRIC_INSTALLED and is_geometric_data_type(X):
         return to_device(X, device)
-    if hasattr(X, 'convert_to_tensors'):
+    if hasattr(X, "convert_to_tensors"):
         # huggingface transformers BatchEncoding
-        return X.convert_to_tensors('pt')
+        return X.convert_to_tensors("pt")
     if isinstance(X, Mapping):
         return {key: to_tensor_(val) for key, val in X.items()}
     if isinstance(X, (list, tuple)):
@@ -216,7 +218,9 @@ def to_tensor(X, device, accept_sparse=False):
     if sparse.issparse(X):
         if accept_sparse:
             return torch.sparse_coo_tensor(X.nonzero(), X.data, size=X.shape).to(device)
-        raise TypeError("Sparse matrices are not supported. Set accept_sparse=True to allow sparse matrices.")
+        raise TypeError(
+            "Sparse matrices are not supported. Set accept_sparse=True to allow sparse matrices."
+        )
 
     raise TypeError("Cannot convert this data type to a torch tensor.")
 
@@ -263,7 +267,7 @@ def _is_slicedataset(X):
     This function does not check the validity of the attributes themselves or
     their types; it only checks for their existence.
     """
-    return hasattr(X, 'dataset') and hasattr(X, 'idx') and hasattr(X, 'indices')
+    return hasattr(X, "dataset") and hasattr(X, "idx") and hasattr(X, "indices")
 
 
 def to_numpy(X):
@@ -332,14 +336,13 @@ def to_numpy(X):
     if X.is_cuda:
         X = X.cpu()
 
-    if hasattr(X, 'is_mps') and X.is_mps:
+    if hasattr(X, "is_mps") and X.is_mps:
         X = X.cpu()
 
     if X.requires_grad:
         X = X.detach()
 
     return X.numpy()
-
 
 
 def to_device(X, device):
@@ -391,7 +394,7 @@ def to_device(X, device):
         return type(X)({key: to_device(val, device) for key, val in X.items()})
 
     # PackedSequence class inherits from a namedtuple
-    if isinstance(X, (tuple, list)) and (type(X) != PackedSequence):
+    if isinstance(X, (tuple, list)) and (type(X) is not PackedSequence):
         return type(X)(to_device(x, device) for x in X)
 
     if isinstance(X, torch.distributions.distribution.Distribution):
@@ -472,7 +475,7 @@ def is_pandas_ndframe(x):
     >>> is_pandas_ndframe([1, 2, 3])
     False
     """
-    return hasattr(x, 'iloc')
+    return hasattr(x, "iloc")
 
 
 def flatten(arr):
@@ -507,6 +510,7 @@ def flatten(arr):
             yield from flatten(item)
         else:
             yield item
+
 
 def _indexing_none(data, i):
     """
@@ -577,8 +581,7 @@ def _indexing_list_tuple_of_data(data, i, indexings=None):
 
     if not indexings:
         return [multi_indexing(x, i) for x in data]
-    return [multi_indexing(x, i, indexing)
-            for x, indexing in zip(data, indexings)]
+    return [multi_indexing(x, i, indexing) for x, indexing in zip(data, indexings)]
 
 
 def _indexing_ndframe(data, i):
@@ -602,7 +605,7 @@ def _indexing_ndframe(data, i):
         if `data` was dictionary-like.
     """
 
-    if hasattr(data, 'iloc'):
+    if hasattr(data, "iloc"):
         return data.iloc[i]
     return _indexing_dict(data, i)
 
@@ -716,7 +719,7 @@ def _normalize_numpy_indices(i):
     ----------
     i : numpy.ndarray
         The numpy array index to be normalized. Can be an array of booleans or integers.
-        
+
     Returns
     -------
     list or tuple
@@ -750,12 +753,13 @@ def _normalize_numpy_indices(i):
     # Return the normalized index
     return i
 
+
 def multi_indexing(data, i, indexing=None):
     """
     Perform indexing on various data structures with support for different index types.
 
-    This function is capable of indexing standard Python data structures as well as 
-    numpy arrays, pandas frames, and torch tensors. It can automatically determine the 
+    This function is capable of indexing standard Python data structures as well as
+    numpy arrays, pandas frames, and torch tensors. It can automatically determine the
     correct indexing method or use a provided one.
 
     Parameters
@@ -764,12 +768,12 @@ def multi_indexing(data, i, indexing=None):
         The data structure to be indexed. This could be a list, tuple, dictionary,
         numpy array, pandas DataFrame, or any other object that supports indexing.
     i : int, slice, or numpy.ndarray
-        The index or indices to apply. This could be a single position for simple 
-        indexing, a slice object for range indexing, or a numpy array for advanced 
+        The index or indices to apply. This could be a single position for simple
+        indexing, a slice object for range indexing, or a numpy array for advanced
         indexing scenarios.
     indexing : callable, optional
-        An optional function that performs indexing on `data`. If provided, this 
-        function will be used directly. If None, an appropriate indexing function will 
+        An optional function that performs indexing on `data`. If provided, this
+        function will be used directly. If None, an appropriate indexing function will
         be determined based on the type of `data`.
 
     Returns
@@ -802,20 +806,21 @@ def multi_indexing(data, i, indexing=None):
     # appropriate indexing function to be used.
     return check_indexing(data)(data, i)
 
+
 def duplicate_items(*collections):
     """
     Identify duplicate items across multiple collections.
 
     This function takes an arbitrary number of collections and identifies items
     that are present in more than one of the collections. It works with any type
-    of iterable collections like lists, sets, tuples, and dictionaries. For 
+    of iterable collections like lists, sets, tuples, and dictionaries. For
     dictionaries, only the keys are considered.
 
     Parameters
     ----------
     *collections : iterable
-        An arbitrary number of collections where each collection is an iterable. 
-        This could be lists, sets, tuples, or dictionaries. If dictionaries are 
+        An arbitrary number of collections where each collection is an iterable.
+        This could be lists, sets, tuples, or dictionaries. If dictionaries are
         provided, their keys are used for comparison.
 
     Returns
@@ -828,13 +833,13 @@ def duplicate_items(*collections):
     --------
     >>> duplicate_items([1, 2], [3])
     set()
-        
+
     >>> duplicate_items({1: 'a', 2: 'b'}, {2: 'c', 3: 'd'})
     {2}
-        
+
     >>> duplicate_items(['a', 'b', 'a'])
     {'a'}
-        
+
     >>> duplicate_items([1, 2], {3: 'hi', 4: 'ha'}, (2, 3))
     {2, 3}
     """
@@ -894,14 +899,14 @@ def params_for(prefix, kwargs):
     # If the prefix is empty, return the entire kwargs as no filtering is required
     if not prefix:
         return kwargs
-    
+
     # Ensure the prefix ends with double underscores for proper filtering
-    if not prefix.endswith('__'):
-        prefix += '__'
-    
+    if not prefix.endswith("__"):
+        prefix += "__"
+
     # Filter and return only those parameters whose keys start with the prefix
     return {
-        key[len(prefix):]: val  # Remove the prefix part of the key
+        key[len(prefix) :]: val  # Remove the prefix part of the key
         for key, val in kwargs.items()  # Iterate over all key, value pairs in kwargs
         if key.startswith(prefix)  # Select only those that start with the prefix
     }
@@ -949,7 +954,7 @@ def data_from_dataset(dataset, X_indexing=None, y_indexing=None):
     >>> net = EncoderDecoderForecaster(...)
     >>> ds = Dataset(X, y)
     >>> X, y = data_from_dataset(ds)
-        
+
     >>> subset_indices = [0, 1, 2]
     >>> sub_ds = Subset(ds, subset_indices)
     >>> X_sub, y_sub = data_from_dataset(sub_ds)
@@ -966,10 +971,11 @@ def data_from_dataset(dataset, X_indexing=None, y_indexing=None):
 
     if isinstance(dataset, Subset):
         X, y = data_from_dataset(
-            dataset.dataset, X_indexing=X_indexing, y_indexing=y_indexing)
+            dataset.dataset, X_indexing=X_indexing, y_indexing=y_indexing
+        )
         X = multi_indexing(X, dataset.indices, indexing=X_indexing)
         y = multi_indexing(y, dataset.indices, indexing=y_indexing)
-    elif hasattr(dataset, 'X') and hasattr(dataset, 'y'):
+    elif hasattr(dataset, "X") and hasattr(dataset, "y"):
         X, y = dataset.X, dataset.y
     elif isinstance(dataset, torch.utils.data.dataset.TensorDataset):
         if len(items := dataset.tensors) == 2:
@@ -1012,7 +1018,9 @@ def is_stockpy_dataset(ds):
     True
 
     """
-    from stockpy.preprocessing import StockpyDataset  # Assuming StockpyDataset is defined here
+    from stockpy.preprocessing import (  # Assuming StockpyDataset is defined here
+        StockpyDataset,
+    )
 
     # Recursive check for instances of StockpyDataset, even within Subsets
     if isinstance(ds, Subset):
@@ -1021,8 +1029,9 @@ def is_stockpy_dataset(ds):
     # Direct instance check
     return isinstance(ds, StockpyDataset)
 
+
 def noop(*args, **kwargs):
-    pass  
+    pass
 
 
 @contextmanager
@@ -1123,7 +1132,7 @@ def train_loss_score(net, X=None, y=None):
     during the fitting process. Accessing this function without previously fitting the
     net will result in IndexError.
     """
-    return net.history[-1, 'batches', -1, 'train_loss']
+    return net.history[-1, "batches", -1, "train_loss"]
 
 
 def valid_loss_score(net, X=None, y=None):
@@ -1160,16 +1169,15 @@ def valid_loss_score(net, X=None, y=None):
     during the fitting process. Accessing this function without previously fitting the
     net will result in IndexError.
     """
-    return net.history[-1, 'batches', -1, 'valid_loss']
-
+    return net.history[-1, "batches", -1, "valid_loss"]
 
 
 class FirstStepAccumulator:
     """
     Store and retrieve the train step data.
 
-    This class is designed to accumulate the training step data. It stores the first train step value and consistently 
-    returns this first value upon request. This can be particularly useful when using optimization algorithms that 
+    This class is designed to accumulate the training step data. It stores the first train step value and consistently
+    returns this first value upon request. This can be particularly useful when using optimization algorithms that
     involve multiple train steps per iteration, and you are only interested in the first step of each iteration.
 
     Parameters
@@ -1197,8 +1205,8 @@ class FirstStepAccumulator:
 
     Notes
     -----
-    This accumulator is used by default in `nn.Module or PyroModule` for optimizers that call the train step once. If using 
-    an optimizer that calls the train step multiple times (e.g., LBFGS), and you wish to use a different accumulating 
+    This accumulator is used by default in `nn.Module or PyroModule` for optimizers that call the train step once. If using
+    an optimizer that calls the train step multiple times (e.g., LBFGS), and you wish to use a different accumulating
     strategy (like accumulating the last step), you would need to implement a custom accumulator.
     """
 
@@ -1212,7 +1220,7 @@ class FirstStepAccumulator:
         """
         Stores the first step value.
 
-        This method will only store the step if no previous step has been stored. If a step is already present, 
+        This method will only store the step if no previous step has been stored. If a step is already present,
         it does nothing.
 
         Parameters
@@ -1324,7 +1332,7 @@ def unfreeze_parameter(param):
     param.requires_grad = True
 
 
-def get_map_location(target_device, fallback_device='cpu'):
+def get_map_location(target_device, fallback_device="cpu"):
     """
     Determine the appropriate device location for mapping loaded data, such as model weights.
 
@@ -1366,12 +1374,14 @@ def get_map_location(target_device, fallback_device='cpu'):
 
     # The user wants to use CUDA but there is no CUDA device
     # available, thus fall back to CPU.
-    if map_location.type == 'cuda' and not torch.cuda.is_available():
+    if map_location.type == "cuda" and not torch.cuda.is_available():
         warnings.warn(
-            'Requested to load data to CUDA but no CUDA devices '
+            "Requested to load data to CUDA but no CUDA devices "
             'are available. Loading on device "{}" instead.'.format(
                 fallback_device,
-            ), DeviceWarning)
+            ),
+            DeviceWarning,
+        )
         map_location = torch.device(fallback_device)
     return map_location
 
@@ -1416,11 +1426,13 @@ def check_is_fitted(estimator, attributes=None, msg=None, all_or_any=all):
         sk_check_is_fitted(estimator, attributes, msg=msg, all_or_any=all_or_any)
     except NotFittedError as exc:
         if msg is None:
-            msg = ("This %(name)s instance is not initialized yet. Call "
-                   "'initialize' or 'fit' with appropriate arguments "
-                   "before using this method.")
+            msg = (
+                "This %(name)s instance is not initialized yet. Call "
+                "'initialize' or 'fit' with appropriate arguments "
+                "before using this method."
+            )
 
-        raise NotInitializedError(msg % {'name': type(estimator).__name__}) from exc
+        raise NotInitializedError(msg % {"name": type(estimator).__name__}) from exc
 
 
 def _identity(x):
@@ -1439,6 +1451,7 @@ def _identity(x):
 
     """
     return x
+
 
 def _infer_predict_nonlinearity(net):
     """
@@ -1460,6 +1473,7 @@ def _infer_predict_nonlinearity(net):
 
     """
     return _identity
+
 
 class TeeGenerator:
     """
@@ -1488,11 +1502,12 @@ class TeeGenerator:
 
     Notes
     -----
-    Iterators returned by `tee` do not have the ability to save their position for later use. 
-    Once an item has been consumed by a `tee`-generated iterator, it is gone unless stored elsewhere. 
+    Iterators returned by `tee` do not have the ability to save their position for later use.
+    Once an item has been consumed by a `tee`-generated iterator, it is gone unless stored elsewhere.
     In addition, as the original generator is advanced, `tee` stores the data until all derived iterators
     have consumed it, which may lead to increased memory usage.
     """
+
     def __init__(self, gen):
         self.gen = gen
 
@@ -1555,18 +1570,23 @@ def _check_f_arguments(caller_name, **kwargs):
     The function will normalize 'f_params' to 'module_' internally, as 'f_params' and 'f_module' refer to the same set of parameters.
     """
 
-    if kwargs.get('f_params') and kwargs.get('f_module'):
-        raise TypeError("{} called with both f_params and f_module, please choose one"
-                        .format(caller_name))
+    if kwargs.get("f_params") and kwargs.get("f_module"):
+        raise TypeError(
+            "{} called with both f_params and f_module, please choose one".format(
+                caller_name
+            )
+        )
 
     kwargs_module = {}
     kwargs_other = {}
-    keys_other = {'f_history', 'f_pickle'}
+    keys_other = {"f_history", "f_pickle"}
     for key, val in kwargs.items():
-        if not key.startswith('f_'):
+        if not key.startswith("f_"):
             raise TypeError(
-                "{name} got an unexpected argument '{key}', did you mean 'f_{key}'?"
-                .format(name=caller_name, key=key))
+                "{name} got an unexpected argument '{key}', did you mean 'f_{key}'?".format(
+                    name=caller_name, key=key
+                )
+            )
 
         if val is None:
             continue
@@ -1575,10 +1595,11 @@ def _check_f_arguments(caller_name, **kwargs):
         else:
             # strip 'f_' prefix and attach '_', and normalize 'params' to 'module'
             # e.g. 'f_optimizer' becomes 'optimizer_', 'f_params' becomes 'module_'
-            key = 'module_' if key == 'f_params' else key[2:] + '_'
+            key = "module_" if key == "f_params" else key[2:] + "_"
             kwargs_module[key] = val
-            
+
     return kwargs_module, kwargs_other
+
 
 def get_activation_function(name):
     """
@@ -1617,12 +1638,12 @@ def get_activation_function(name):
     """
 
     activation_functions = {
-        'relu': nn.ReLU(),
-        'tanh': nn.Tanh(),
-        'sigmoid': nn.Sigmoid(),
-        'softmax': nn.Softmax(dim=1),
-        'leaky_relu': nn.LeakyReLU(),
-        'gelu': nn.GELU(),
+        "relu": nn.ReLU(),
+        "tanh": nn.Tanh(),
+        "sigmoid": nn.Sigmoid(),
+        "softmax": nn.Softmax(dim=1),
+        "leaky_relu": nn.LeakyReLU(),
+        "gelu": nn.GELU(),
     }
-    
+
     return activation_functions.get(name, nn.ReLU())

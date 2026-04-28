@@ -1,20 +1,17 @@
-""" Callbacks related to training progress. """
+"""Callbacks related to training progress."""
 
 import os
 import pickle
 import warnings
-from fnmatch import fnmatch
 from copy import deepcopy
 
 import numpy as np
+
 from stockpy.callbacks import Callback
 from stockpy.exceptions import StockpyException
-from stockpy.utils import _check_f_arguments
-from stockpy.utils import noop
-from stockpy.utils import open_file_like
+from stockpy.utils import _check_f_arguments, noop, open_file_like
 
-
-__all__ = ['Checkpoint', 'EarlyStopping']
+__all__ = ["Checkpoint", "EarlyStopping"]
 
 
 class Checkpoint(Callback):
@@ -77,17 +74,18 @@ class Checkpoint(Callback):
     >>> net = MyNet(callbacks=[cb])
     >>> net.fit(X, y)
     """
+
     def __init__(
-            self,
-            monitor='valid_loss_best',
-            f_pickle=None,
-            fn_prefix='',
-            dirname='',
-            event_name='event_cp',
-            sink=noop,
-            load_best=False,
-            use_safetensors=False,
-            **kwargs
+        self,
+        monitor="valid_loss_best",
+        f_pickle=None,
+        fn_prefix="",
+        dirname="",
+        event_name="event_cp",
+        sink=noop,
+        load_best=False,
+        use_safetensors=False,
+        **kwargs,
     ):
         self.monitor = monitor
         self.f_pickle = f_pickle
@@ -137,14 +135,16 @@ class Checkpoint(Callback):
         """
 
         for key in kwargs:
-            if not key.startswith('f_'):
+            if not key.startswith("f_"):
                 raise TypeError(
                     "{cls_name} got an unexpected argument '{key}', did you mean "
-                    "'f_{key}'?".format(cls_name=self.__class__.__name__, key=key))
-        if self.use_safetensors and getattr(self, 'f_optimizer', None) is not None:
+                    "'f_{key}'?".format(cls_name=self.__class__.__name__, key=key)
+                )
+        if self.use_safetensors and getattr(self, "f_optimizer", None) is not None:
             raise ValueError(
                 "Cannot save optimizer state when using safetensors, "
-                "please set f_optimizer=None or don't use safetensors.")
+                "please set f_optimizer=None or don't use safetensors."
+            )
 
     def initialize(self):
         """
@@ -209,7 +209,7 @@ class Checkpoint(Callback):
         -----
         - This method is automatically called by the training loop and is not intended to be
           called manually.
-        
+
         - Loading of the best checkpoint is only performed if `load_best` is `True`, which
           is helpful in conjunction with callbacks like early stopping.
 
@@ -224,10 +224,10 @@ class Checkpoint(Callback):
         """
         Determine if a checkpoint should be saved at the end of an epoch.
 
-        This method checks the monitor parameter at the end of each epoch to decide if 
-        the state of the network should be checkpointed. If the monitor parameter is 
-        present in the history and suffixed with '_best', a warning is issued to check if 
-        this was intentional. It records the checkpoint event and saves the model if 
+        This method checks the monitor parameter at the end of each epoch to decide if
+        the state of the network should be checkpointed. If the monitor parameter is
+        present in the history and suffixed with '_best', a warning is issued to check if
+        this was intentional. It records the checkpoint event and saves the model if
         the conditions are met.
 
         Parameters
@@ -240,7 +240,7 @@ class Checkpoint(Callback):
         Raises
         ------
         StockpyException
-            If the monitoring parameter is not found in the history, and it is expected 
+            If the monitoring parameter is not found in the history, and it is expected
             to be there (e.g., when using validation scores for checkpointing).
 
         Examples
@@ -254,10 +254,10 @@ class Checkpoint(Callback):
 
         Notes
         -----
-        - This method is called automatically at the end of each epoch and is not meant 
+        - This method is called automatically at the end of each epoch and is not meant
           for manual invocation.
 
-        - The decision to checkpoint can be based on a pre-defined history key, a 
+        - The decision to checkpoint can be based on a pre-defined history key, a
           custom callable, or every epoch if the monitor is set to `None`.
 
         """
@@ -266,7 +266,9 @@ class Checkpoint(Callback):
             warnings.warn(
                 "Checkpoint monitor parameter is set to '{0}' and the history "
                 "contains '{0}_best'. Perhaps you meant to set the parameter "
-                "to '{0}_best'".format(self.monitor), UserWarning)
+                "to '{0}_best'".format(self.monitor),
+                UserWarning,
+            )
 
         if self.monitor is None:
             do_checkpoint = True
@@ -278,7 +280,8 @@ class Checkpoint(Callback):
             except KeyError as e:
                 msg = (
                     f"{e.args[0]} Make sure you have validation data if you use "
-                    "validation scores for checkpointing.")
+                    "validation scores for checkpointing."
+                )
                 raise StockpyException(msg)
 
         if self.event_name is not None:
@@ -286,23 +289,24 @@ class Checkpoint(Callback):
 
         if do_checkpoint:
             self.save_model(net)
-            self._sink("A checkpoint was triggered in epoch {}.".format(
-                len(net.history) + 1
-            ), net.verbose)
+            self._sink(
+                "A checkpoint was triggered in epoch {}.".format(len(net.history) + 1),
+                net.verbose,
+            )
 
     def _f_kwargs(self):
         """
         Collect file-related attributes from the instance.
 
-        This method retrieves all attributes of the instance whose names start with ``f_`` 
-        and returns them as a dictionary, with the exception of 'f_history_'. This 
-        dictionary is likely used to dynamically handle file operations for checkpointing 
+        This method retrieves all attributes of the instance whose names start with ``f_``
+        and returns them as a dictionary, with the exception of 'f_history_'. This
+        dictionary is likely used to dynamically handle file operations for checkpointing
         different components of the training process.
 
         Returns
         -------
         dict
-            A dictionary where keys are attribute names that begin with ``f_``, and values 
+            A dictionary where keys are attribute names that begin with ``f_``, and values
             are their corresponding values from the instance.
 
         Examples
@@ -313,22 +317,25 @@ class Checkpoint(Callback):
 
         Notes
         -----
-        - This method is intended for internal use to abstract the collection of file 
+        - This method is intended for internal use to abstract the collection of file
         paths and is not part of the public API of the callback.
-        - The method explicitly excludes the 'f_history_' attribute, which may have 
+        - The method explicitly excludes the 'f_history_' attribute, which may have
         separate handling logic.
         """
 
-        return {key: getattr(self, key) for key in dir(self)
-                if key.startswith('f_') and (key != 'f_history_')}
+        return {
+            key: getattr(self, key)
+            for key in dir(self)
+            if key.startswith("f_") and (key != "f_history_")
+        }
 
     def save_model(self, net):
         """
         Save the model to files.
 
-        This method saves various components of the model based on the current 
-        state of the `Checkpoint` instance. It can handle saving model parameters, 
-        optimizer state, criterion state, training history, custom modules, and the 
+        This method saves various components of the model based on the current
+        state of the `Checkpoint` instance. It can handle saving model parameters,
+        optimizer state, criterion state, training history, custom modules, and the
         entire model object depending on the attributes set in the `Checkpoint` instance.
 
         The method determines which components to save based on the presence of
@@ -354,11 +361,11 @@ class Checkpoint(Callback):
         Notes
         -----
         - The actual file paths are determined using the `_format_target` method
-          and support dynamic naming based on the current training state, such as 
+          and support dynamic naming based on the current training state, such as
           epoch number.
-        - If a file path attribute is set to `None`, the corresponding component 
+        - If a file path attribute is set to `None`, the corresponding component
           will not be saved.
-        - The history is saved in a JSON format, and the entire model object is 
+        - The history is saved in a JSON format, and the entire model object is
           pickled.
         - This method is a part of the `Checkpoint` callback's internal logic and
           is not intended to be invoked directly by users.
@@ -366,7 +373,8 @@ class Checkpoint(Callback):
         """
 
         kwargs_module, kwargs_other = _check_f_arguments(
-            self.__class__.__name__, **self._f_kwargs())
+            self.__class__.__name__, **self._f_kwargs()
+        )
 
         for key, val in kwargs_module.items():
             if val is None:
@@ -374,17 +382,17 @@ class Checkpoint(Callback):
 
             f = self._format_target(net, val, -1)
             key = key[:-1]  # remove trailing '_'
-            self._save_params(f, net, 'f_' + key, key + " state")
+            self._save_params(f, net, "f_" + key, key + " state")
 
-        f_history = kwargs_other.get('f_history')
+        f_history = kwargs_other.get("f_history")
         if f_history is not None:
             f = self.f_history_
             self._save_params(f, net, "f_history", "history")
 
-        f_pickle = kwargs_other.get('f_pickle')
+        f_pickle = kwargs_other.get("f_pickle")
         if f_pickle:
             f_pickle = self._format_target(net, f_pickle, -1)
-            with open_file_like(f_pickle, 'wb') as f:
+            with open_file_like(f_pickle, "wb") as f:
                 pickle.dump(net, f)
 
     @property
@@ -393,8 +401,8 @@ class Checkpoint(Callback):
         Constructs the full path for the training history file.
 
         This property appends the directory name and filename prefix to the base
-        training history filename provided by the user (`self.f_history`). If 
-        `self.f_history` is `None`, it simply returns `None`, indicating that the 
+        training history filename provided by the user (`self.f_history`). If
+        `self.f_history` is `None`, it simply returns `None`, indicating that the
         history will not be saved to a file.
 
         Returns
@@ -411,20 +419,19 @@ class Checkpoint(Callback):
 
         Notes
         -----
-        - This property is used internally to determine where to save the training 
+        - This property is used internally to determine where to save the training
           history when the `save_model` method is called.
-        - The directory and prefix are set when the `Checkpoint` instance is 
-          initialized. If they are not set, the training history filename will 
+        - The directory and prefix are set when the `Checkpoint` instance is
+          initialized. If they are not set, the training history filename will
           just be `self.f_history`.
-        - If the checkpoint has not been initialized (i.e., `self.dirname` is not 
-          set), calling this property will still return the correct path assuming 
+        - If the checkpoint has not been initialized (i.e., `self.dirname` is not
+          set), calling this property will still return the correct path assuming
           `self.f_history` is not `None`.
 
         """
         if self.f_history is None:
             return None
-        return os.path.join(
-            self.dirname, self.fn_prefix + self.f_history)
+        return os.path.join(self.dirname, self.fn_prefix + self.f_history)
 
     def get_formatted_files(self, net):
         """
@@ -461,8 +468,8 @@ class Checkpoint(Callback):
 
         Notes
         -----
-        - The method uses `self._format_target` to create the file paths, which 
-          applies any formatting rules such as including the epoch number or other 
+        - The method uses `self._format_target` to create the file paths, which
+          applies any formatting rules such as including the epoch number or other
           placeholders.
 
         - The returned dictionary only includes entries for file types that have
@@ -479,8 +486,10 @@ class Checkpoint(Callback):
                     idx = len(net.history) - i - 1
                     break
 
-        return {key: self._format_target(net, val, idx) for key, val
-                in self._f_kwargs().items()}
+        return {
+            key: self._format_target(net, val, idx)
+            for key, val in self._f_kwargs().items()
+        }
 
     def _save_params(self, f, net, f_name, log_name):
         """
@@ -524,11 +533,14 @@ class Checkpoint(Callback):
         which is an attribute of the Checkpoint instance.
         """
         try:
-            net.save_params(**{f_name: f, 'use_safetensors': self.use_safetensors})
+            net.save_params(**{f_name: f, "use_safetensors": self.use_safetensors})
         except Exception as e:  # pylint: disable=broad-except
             self._sink(
                 "Unable to save {} to {}, {}: {}".format(
-                    log_name, f, type(e).__name__, e), net.verbose)
+                    log_name, f, type(e).__name__, e
+                ),
+                net.verbose,
+            )
 
     def _format_target(self, net, f, idx):
         """
@@ -578,7 +590,7 @@ class Checkpoint(Callback):
             f = self.fn_prefix + f.format(
                 net=net,
                 last_epoch=net.history[idx],
-                last_batch=net.history[idx, 'batches', -1],
+                last_batch=net.history[idx, "batches", -1],
             )
             return os.path.join(self.dirname, f)
         return f
@@ -628,8 +640,7 @@ class Checkpoint(Callback):
             return f and not isinstance(f, str)
 
         if any(_is_truthy_and_not_str(val) for val in self._f_kwargs().values()):
-            raise StockpyException(
-                'dirname can only be used when f_* are strings')
+            raise StockpyException("dirname can only be used when f_* are strings")
 
     def _sink(self, text, verbose):
         #  We do not want to be affected by verbosity if sink is not print
@@ -693,14 +704,14 @@ class EarlyStopping(Callback):
     """
 
     def __init__(
-            self,
-            monitor='valid_loss',
-            patience=5,
-            threshold=1e-4,
-            threshold_mode='rel',
-            lower_is_better=True,
-            sink=print,
-            load_best=False,
+        self,
+        monitor="valid_loss",
+        patience=5,
+        threshold=1e-4,
+        threshold_mode="rel",
+        lower_is_better=True,
+        sink=print,
+        load_best=False,
     ):
         self.monitor = monitor
         self.lower_is_better = lower_is_better
@@ -741,10 +752,10 @@ class EarlyStopping(Callback):
         >>> serialized = pickle.dumps(early_stopping)  # `best_model_weights_` not included
         >>> deserialized = pickle.loads(serialized)    # Restores without `best_model_weights_`
         """
-        
+
         # Avoids to save the module_ weights twice when pickling
         state = self.__dict__.copy()
-        state['best_model_weights_'] = None
+        state["best_model_weights_"] = None
         return state
 
     def on_train_begin(self, net, **kwargs):
@@ -788,9 +799,8 @@ class EarlyStopping(Callback):
         >>> neural_net.fit(X, y)  # `on_train_begin` is called internally
         """
 
-        if self.threshold_mode not in ['rel', 'abs']:
-            raise ValueError("Invalid threshold mode: '{}'"
-                             .format(self.threshold_mode))
+        if self.threshold_mode not in ["rel", "abs"]:
+            raise ValueError("Invalid threshold mode: '{}'".format(self.threshold_mode))
         self.misses_ = 0
         self.dynamic_threshold_ = np.inf if self.lower_is_better else -np.inf
         self.best_model_weights_ = None
@@ -818,7 +828,7 @@ class EarlyStopping(Callback):
         -----
         This method is automatically called by stockpy at the end of each epoch during the training process.
 
-        If `load_best` is True and the score has improved, the current state of the network's parameters 
+        If `load_best` is True and the score has improved, the current state of the network's parameters
         is saved so it can potentially be restored later.
 
         Examples
@@ -833,7 +843,7 @@ class EarlyStopping(Callback):
         ... except KeyboardInterrupt:
         ...     print("Early stopping triggered")
         """
-        
+
         current_score = net.history[-1, self.monitor]
         if not self._is_score_improved(current_score):
             self.misses_ += 1
@@ -845,9 +855,11 @@ class EarlyStopping(Callback):
                 self.best_model_weights_ = deepcopy(net.state_dict())
         if self.misses_ == self.patience:
             if net.verbose:
-                self._sink("Stopping since {} has not improved in the last "
-                           "{} epochs.".format(self.monitor, self.patience),
-                           verbose=net.verbose)
+                self._sink(
+                    "Stopping since {} has not improved in the last "
+                    "{} epochs.".format(self.monitor, self.patience),
+                    verbose=net.verbose,
+                )
             raise KeyboardInterrupt
 
     def on_train_end(self, net, **kwargs):
@@ -865,7 +877,7 @@ class EarlyStopping(Callback):
 
         Notes
         -----
-        This method is automatically called by stockpy at the end of the training process. 
+        This method is automatically called by stockpy at the end of the training process.
         It is not intended to be called manually.
 
         Examples
@@ -879,13 +891,15 @@ class EarlyStopping(Callback):
         """
 
         if (
-            self.load_best and (self.best_epoch_ != net.history[-1, "epoch"])
+            self.load_best
+            and (self.best_epoch_ != net.history[-1, "epoch"])
             and (self.best_model_weights_ is not None)
         ):
             net.load_state_dict(self.best_model_weights_)
-            self._sink("Restoring best model from epoch {}.".format(
-                self.best_epoch_
-            ), verbose=net.verbose)
+            self._sink(
+                "Restoring best model from epoch {}.".format(self.best_epoch_),
+                verbose=net.verbose,
+            )
 
     def _is_score_improved(self, score):
         """
@@ -952,7 +966,7 @@ class EarlyStopping(Callback):
         0.099
         """
 
-        if self.threshold_mode == 'rel':
+        if self.threshold_mode == "rel":
             abs_threshold_change = self.threshold * score
         else:
             abs_threshold_change = self.threshold
