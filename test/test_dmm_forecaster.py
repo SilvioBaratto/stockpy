@@ -1,10 +1,8 @@
 import numpy as np
-import pytest
 import torch
 
 from stockpy.forecasters import DMMForecaster
 from stockpy.base import EncoderDecoderForecaster
-from stockpy.preprocessing import TimeSeriesDataset
 
 
 class TestDMMForecaster:

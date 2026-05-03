@@ -412,7 +412,6 @@ class TestTransformerForecaster:
         model2.fit(
             synthetic_series, synthetic_series, epochs=0, verbose=0, train_split=None
         )
-        model2.device = None
         model2.load_params(f_params=f_params, use_safetensors=True)
 
         assert _state_dicts_equal(

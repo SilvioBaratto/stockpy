@@ -1,103 +1,84 @@
 {
   "mode": "single",
   "started_at": "2026-05-03T06:52:50Z",
-  "updated_at": "2026-05-03T07:46:17Z",
+  "updated_at": "2026-05-03T08:40:20Z",
   "current_cycle": null,
   "cycles": [],
   "phase": 6,
   "issues": [
     {
-      "number": 2,
-      "status": "closed",
-      "agent": "python-pro",
-      "labels": [],
-      "reviewed": true,
-      "comments": "",
-      "title": "unable to fit"
-    },
-    {
-      "number": 32,
+      "number": 38,
       "status": "closed",
       "agent": "python-pro",
       "labels": [
+        "bug",
         "priority:high",
         "phase:implement",
         "agent:python-pro",
-        "area:forecasters"
+        "area:base"
       ],
       "reviewed": true,
       "comments": "",
-      "title": "feat: relocate DMM sub-components and delete legacy modules"
+      "title": "fix: coerce self.device to str when calling safetensors safe_open"
     },
     {
-      "number": 33,
+      "number": 39,
       "status": "closed",
       "agent": "python-pro",
       "labels": [
+        "bug",
         "priority:high",
         "phase:implement",
         "agent:python-pro",
-        "area:forecasters"
+        "area:preprocessing"
       ],
       "reviewed": true,
       "comments": "",
-      "title": "feat: implement TransformerForecaster encoder-decoder"
+      "title": "fix: skip ValidSplit length check when fit(X, y=X) on windowed dataset"
     },
     {
-      "number": 34,
+      "number": 40,
       "status": "closed",
       "agent": "python-pro",
       "labels": [
-        "priority:high",
-        "area:tests",
-        "phase:implement",
-        "agent:python-pro"
-      ],
-      "reviewed": true,
-      "comments": "",
-      "title": "test: add test_transformer_forecaster.py covering encoder-decoder contract"
-    },
-    {
-      "number": 35,
-      "status": "closed",
-      "agent": "python-pro",
-      "labels": [
+        "bug",
         "priority:medium",
         "phase:implement",
         "agent:python-pro",
-        "area:forecasters"
+        "area:preprocessing"
       ],
       "reviewed": true,
       "comments": "",
-      "title": "refactor: add type annotations to all forecaster modules"
+      "title": "fix: StandardScalerTransform must return same array library as input (numpy in -> numpy out)"
     },
     {
-      "number": 36,
+      "number": 41,
       "status": "closed",
       "agent": "python-pro",
       "labels": [
-        "priority:medium",
+        "bug",
+        "priority:low",
         "phase:implement",
         "agent:python-pro",
-        "area:ci"
+        "area:base"
       ],
       "reviewed": true,
       "comments": "",
-      "title": "ci: update python-package.yml to Python 3.10/3.11/3.12 with pytest-cov"
+      "title": "fix: validate len(X) >= context_len + pred_len upfront in EncoderDecoderForecaster.fit"
     },
     {
-      "number": 37,
+      "number": 42,
       "status": "closed",
       "agent": "python-pro",
       "labels": [
-        "priority:medium",
+        "priority:low",
         "phase:implement",
         "agent:python-pro",
         "area:packaging"
       ],
       "reviewed": true,
       "comments": "",
-      "title": "build: remove setup.py and finalize pyproject.toml package discovery"
+      "title": "chore: remove stale build/ and stockpy_learn.egg-info/ artifacts; verify clean wheel"
     }
   ],
   "session_id": null,
@@ -106,94 +87,81 @@
   "last_error": null,
   "effort_hints": [
     {
-      "scope_keyword": "transformer",
-      "effort": "high"
-    },
-    {
-      "scope_keyword": "attention",
-      "effort": "high"
-    },
-    {
-      "scope_keyword": "sklearn",
-      "effort": "medium"
-    },
-    {
-      "scope_keyword": "cleanup",
-      "effort": "medium"
-    },
-    {
-      "scope_keyword": "delete",
+      "scope_keyword": "safetensors",
       "effort": "low"
     },
     {
-      "scope_keyword": "github actions",
+      "scope_keyword": "train_split",
       "effort": "medium"
     },
     {
-      "scope_keyword": "ci",
-      "effort": "medium"
+      "scope_keyword": "scaler",
+      "effort": "low"
     },
     {
-      "scope_keyword": "type annotations",
-      "effort": "medium"
+      "scope_keyword": "validation",
+      "effort": "low"
     },
     {
-      "scope_keyword": "test_transformer_forecaster",
-      "effort": "medium"
-    },
-    {
-      "scope_keyword": "pyproject",
+      "scope_keyword": "packaging",
       "effort": "low"
     }
   ],
-  "requirements_hash": "ccc05237c25ead77c2500dab9339f2dc695ffd2fdf990220c54150b2905471b9",
+  "requirements_hash": "2bc602cdbe2e96ce3646628fae347b600f85bfc43b38533281aeb27400e0f950",
   "base_commit": "02e2100338adbdf1be64453491d00e84c67be361",
   "token_usage": {
     "phase0": {
-      "input": 8,
-      "output": 2292,
-      "cache_read": 212651,
-      "cache_write": 39357,
-      "num_turns": 4
+      "input": 6,
+      "output": 427,
+      "cache_read": 62487,
+      "cache_write": 65641,
+      "num_turns": 2
     },
     "phase1": {
-      "input": 40,
-      "output": 24069,
-      "cache_read": 2459317,
-      "cache_write": 194948,
-      "num_turns": 40
+      "input": 27,
+      "output": 15045,
+      "cache_read": 1434785,
+      "cache_write": 148354,
+      "num_turns": 28
     },
     "phase2": {
-      "input": 2908,
-      "output": 7634,
-      "cache_read": 252338,
-      "cache_write": 71058,
-      "num_turns": 15
+      "input": 11,
+      "output": 5345,
+      "cache_read": 410502,
+      "cache_write": 77142,
+      "num_turns": 17
     },
     "phase3_4": {
-      "input": 7231,
-      "output": 118808,
-      "cache_read": 43004432,
-      "cache_write": 317253,
-      "num_turns": 237
+      "input": 3145,
+      "output": 39291,
+      "cache_read": 12547809,
+      "cache_write": 217326,
+      "num_turns": 129
     },
     "phase5": {
-      "input": 12,
-      "output": 6236,
-      "cache_read": 2817711,
-      "cache_write": 13790,
-      "num_turns": 23
+      "input": 7,
+      "output": 2053,
+      "cache_read": 616113,
+      "cache_write": 14439,
+      "num_turns": 11
     },
     "phase6": {
+      "input": 7,
+      "output": 572,
+      "cache_read": 190012,
+      "cache_write": 16651,
+      "num_turns": 7
+    },
+    "phase7": {
       "input": 5,
-      "output": 364,
-      "cache_read": 99981,
-      "cache_write": 33904,
-      "num_turns": 4
+      "output": 138,
+      "cache_read": 0,
+      "cache_write": 59634,
+      "num_turns": 1
     }
   },
   "session_mode": "shared",
-  "client_alive_at": "2026-05-03T06:55:10+00:00",
+  "client_alive_at": "2026-05-03T08:16:40+00:00",
   "phase2_batch_id": null,
   "repo": {
     "host": "github.com",

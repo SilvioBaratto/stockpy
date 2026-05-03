@@ -83,24 +83,27 @@ class StandardScalerTransform:
 
         Parameters
         ----------
-        data : array-like, shape (n_samples, n_features)
+        data : array-like or torch.Tensor, shape (n_samples, n_features)
             Data to standardize.
 
         Returns
         -------
-        torch.Tensor
-            Standardized data as a float32 tensor.
+        np.ndarray or torch.Tensor
+            Standardized data. The return type mirrors the input: a
+            ``torch.Tensor`` is returned when ``data`` is a tensor,
+            otherwise a float32 numpy array.
         """
         self._check_is_fitted()
-        data = np.asarray(data)
-        if data.ndim != 2:
+        is_tensor = isinstance(data, torch.Tensor)
+        array = data.detach().cpu().numpy() if is_tensor else np.asarray(data)
+        if array.ndim != 2:
             raise ValueError(
                 "Input must be 2-dimensional with shape (n_samples, n_features). "
-                f"Got shape with {data.ndim} dimension(s)."
+                f"Got shape with {array.ndim} dimension(s)."
             )
 
-        scaled = (data - self.mean_) / self.std_
-        return torch.from_numpy(scaled).float()
+        scaled = ((array - self.mean_) / self.std_).astype(np.float32)
+        return torch.from_numpy(scaled) if is_tensor else scaled
 
     def inverse_transform(self, data):
         """
@@ -113,17 +116,15 @@ class StandardScalerTransform:
 
         Returns
         -------
-        torch.Tensor
-            Original-scale data as a float32 tensor.
+        np.ndarray or torch.Tensor
+            Original-scale data. The return type mirrors the input.
         """
         self._check_is_fitted()
-        if isinstance(data, torch.Tensor):
-            data = data.numpy()
-        else:
-            data = np.asarray(data)
+        is_tensor = isinstance(data, torch.Tensor)
+        array = data.detach().cpu().numpy() if is_tensor else np.asarray(data)
 
-        original = data * self.std_ + self.mean_
-        return torch.from_numpy(original).float()
+        original = (array * self.std_ + self.mean_).astype(np.float32)
+        return torch.from_numpy(original) if is_tensor else original
 
     def fit_transform(self, data):
         """
@@ -131,13 +132,13 @@ class StandardScalerTransform:
 
         Parameters
         ----------
-        data : array-like, shape (n_samples, n_features)
+        data : array-like or torch.Tensor, shape (n_samples, n_features)
             Training data.
 
         Returns
         -------
-        torch.Tensor
-            Standardized data as a float32 tensor.
+        np.ndarray or torch.Tensor
+            Standardized data; return type mirrors the input.
         """
         return self.fit(data).transform(data)
 

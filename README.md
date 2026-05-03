@@ -11,216 +11,229 @@
 ## Table of Contents
 * [Description](#description)
 * [Documentation](https://stockpy.readthedocs.io/)
-* [Installation](#installation)
+* [Installation](#dependencies-and-installation)
 * [Usage](#usage)
-* [Examples](#examples)
 * [Data Downloader](#data-downloader)
 * [License](#license)
-* [Contributing](#contributing)
+* [Contributing](#how-to-contribute)
 * [TODOs](#todos)
 
 ## Description
-**stockpy** is a versatile Python Machine Learning library initially designed for stock market data analysis and predictions. It has now evolved to handle a wider range of datasets, supporting tasks such as regression and classification. It currently supports the following algorithms, each with regression and classification implementations:
+**stockpy** (`0.4.0`) is a Python library for **time-series forecasting using encoder-decoder neural architectures**. Each model consumes a context window of past observations of length `context_len` and produces a prediction window of `pred_len` future steps with shape `(n_samples, pred_len, n_features)`. The library is built on PyTorch, with Pyro-PPL powering the probabilistic forecasters via stochastic variational inference.
 
-- Bayesian Neural Networks (BNN)
-- Long Short Term Memory (LSTM)
-- Bidirectional Long Short Term Memory (BiLSTM)
-- Gated Recurrent Unit (GRU)
-- Bidirectional Gated Recurrent Unit (BiGRU)
-- Multilayer Perceptron (MLP)
-- Neural Network Hidden Markov Models (NNHMM) 
-- Deep Markov Model (DMM) 
+> **Breaking changes vs. 0.3.x**: classification (`*Classifier`), flat regression (`MLPRegressor`, `BNNRegressor`, `BCNNRegressor`), and the `stockpy.neural_network` / `stockpy.probabilistic` namespaces have all been removed. All models now live under `stockpy.forecasters` and inherit from `EncoderDecoderForecaster`.
+
+Available forecasters:
+
+| Model                  | Architecture                                                       |
+|------------------------|--------------------------------------------------------------------|
+| `LSTMForecaster`       | LSTM encoder + LSTM decoder with teacher forcing                   |
+| `GRUForecaster`        | GRU encoder + GRU decoder with teacher forcing                     |
+| `BiLSTMForecaster`     | Bidirectional LSTM encoder + unidirectional LSTM decoder           |
+| `BiGRUForecaster`      | Bidirectional GRU encoder + unidirectional GRU decoder             |
+| `TCNForecaster`        | Temporal Convolutional Network (causal dilated) encoder + GRU dec. |
+| `TransformerForecaster`| Encoder-decoder Transformer with multi-head self/cross attention   |
+| `DMMForecaster`        | Deep Markov Model (Pyro SVI) — probabilistic encoder-decoder       |
 
 ## Usage
-To use **stockpy**, start by importing the relevant models from the `stockpy.neural_network` and `stockpy.probabilistic` modules. The library can be used with various types of input data, such as CSV files, pandas dataframes, numpy arrays and torch arrays.
+Import the forecaster you want from `stockpy.forecasters`. Inputs must be 2-D arrays shaped `(time_steps, n_features)`; the library handles the sliding-window split into `context_len` / `pred_len` pairs internally via `TimeSeriesDataset`.
 
-Here's an example to demonstrate the usage of stockpy for regression. In this example, we read a CSV file containing stock market data for Apple (AAPL), split the data into training and testing sets, fit an LSTM model to the training data, and use the model to make predictions on the test data:
+### Deterministic forecasting (LSTM)
 
-```Python
-from stockpy.neural_network import CNNRegressor
+```python
+import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+import torch
 from sklearn.preprocessing import StandardScaler
 
+from stockpy.forecasters import LSTMForecaster
+
 # Load the dataset
-df = pd.read_csv('stock/AAPL.csv', parse_dates=True, index_col='Date').dropna(how="any")
+df = pd.read_csv("stock/AAPL.csv", parse_dates=True, index_col="Date").dropna(how="any")
+features = df[["Open", "High", "Low", "Close", "Volume"]].values.astype(np.float32)
 
-# Define features and target
-X = df[['Open', 'High', 'Low', 'Volume']]
-y = df['Close']
+# Chronological split
+n_train = int(len(features) * 0.8)
+X_train, X_test = features[:n_train], features[n_train:]
 
-# Split the dataset
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, shuffle=False)
+# Scale on the training window
+scaler = StandardScaler().fit(X_train)
+X_train = scaler.transform(X_train).astype(np.float32)
+X_test = scaler.transform(X_test).astype(np.float32)
 
-# Scale the data
-scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
+# Fit an encoder-decoder LSTM: 30 past steps -> 5 future steps
+model = LSTMForecaster(
+    context_len=30,
+    pred_len=5,
+    rnn_size=64,
+    hidden_size=64,
+    num_layers=2,
+    dropout=0.1,
+)
+model.fit(
+    X_train,
+    y=None,                        # auto-regressive: target derived from X
+    epochs=50,
+    batch_size=32,
+    lr=1e-3,
+    optimizer=torch.optim.Adam,
+)
 
-# Convert the data to torch tensors
-X_train = torch.tensor(X_train, dtype=torch.float)
-X_test = torch.tensor(X_test, dtype=torch.float)
-y_train = torch.tensor(y_train.values, dtype=torch.float)
-
-# Fit the model
-predictor = CNNRegressor(hidden_size=32)
-
-predictor.fit(X_train, 
-              y_train, 
-              batch_size=32, 
-              lr=0.01, 
-              optimizer=torch.optim.Adam, 
-              epochs=50)
+# predict() returns shape (n_windows, pred_len, n_features)
+forecasts = model.predict(X_test)
+print(forecasts.shape)
 ```
 
-Here's an example to demonstrate the usage of stockpy for classification. In this example, we read a pickle file containing labeled data, split the data into training and testing sets, fit an LSTM model to the training data, and use the model to make classification on the test data:
+### Probabilistic forecasting (DMM)
 
-```Python
-from stockpy.neural_network import LSTMClassifier
-from sklearn.datasets import make_classification
-from sklearn.model_selection import train_test_split
+```python
+from stockpy.forecasters import DMMForecaster
 
-X, y = make_classification(n_samples=10000, 
-                           n_features=20, 
-                           n_informative=15, 
-                           n_redundant=5, 
-                           n_classes=5, 
-                           random_state=0)
-
-
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.05, shuffle=False)
-
-# Scale the data and convert to torch tensors
-from sklearn.preprocessing import MinMaxScaler
-scaler = MinMaxScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
-
-X_train = X_train.astype(np.float32)
-X_test = X_test.astype(np.float32)
-y_train = y_train.astype(np.int64)
-
-predictor = LSTMClassifier()
-
-predictor.fit(X_train, 
-              y_train, 
-              batch_size=32, 
-              lr=0.01, 
-              optimizer=torch.optim.Adam, 
-              epochs=50)
+model = DMMForecaster(
+    context_len=30,
+    pred_len=5,
+    z_dim=16,
+    emission_dim=32,
+    transition_dim=32,
+    rnn_dim=32,
+)
+model.fit(X_train, epochs=30, batch_size=32, lr=1e-3, optimizer=torch.optim.Adam)
+samples = model.predict(X_test)   # (n_windows, pred_len, n_features)
 ```
 
-The above code can be applied to all models in the library, just make sure to import from the correct location, either `stockpy.neural_network` or `stockpy.probabilistic`.
+The same pattern applies to every forecaster — change the import and the model-specific hyperparameters; `context_len` / `pred_len` / `fit` / `predict` are uniform across the API.
 
+### Saving and loading
+
+Model weights are persisted with **safetensors**, not `torch.save`:
+
+```python
+model.save_params(f_params="lstm.safetensors")
+loaded = LSTMForecaster(context_len=30, pred_len=5).initialize()
+loaded.load_params(f_params="lstm.safetensors")
+```
 
 ## Dependencies and installation
-**stockpy** requires the modules `numpy, torch, pyro-ppl`. The code is tested for _Python 3_. It can be installed using `pip` or directly from the source cod.
+**stockpy** requires Python ≥ 3.10 and the packages listed in `pyproject.toml` (PyTorch, Pyro-PPL, NumPy, pandas, scikit-learn, safetensors, tqdm, matplotlib, tabulate, yfinance). It can be installed via `pip` or directly from source.
 
 ### Installing via pip
 
-To install the package:
 ```bash
-> pip install stockpy-learn
+pip install stockpy-learn
 ```
-To uninstall the package:
+
+To uninstall:
+
 ```bash
-> pip uninstall stockpy-learn
+pip uninstall stockpy-learn
 ```
+
 ### Installing from source
 
-You can clone this repository on your local machines using:
-
 ```bash
-> git clone https://github.com/SilvioBaratto/stockpy
+git clone https://github.com/SilvioBaratto/stockpy
+cd stockpy
+pip install -e .
+# or, for a much faster install via uv:
+uv pip install -r requirements.txt
 ```
 
-To install the package:
+### Development install
 
 ```bash
-> cd stockpy
-> pip install .
+pip install -e ".[dev]"      # adds pytest, pytest-cov, black, ruff, pycodestyle
+pytest test/                 # run the test suite
+black stockpy/               # format
+pycodestyle stockpy/         # lint
 ```
 
 ## Data downloader
-The data downloader is a command-line application located named `data.py`, which can be used to download and update stock market data. The downloader has been tested and verified using Ubuntu 22.04 LTS.
+`data_downloader.py` is a command-line utility for fetching and updating per-ticker OHLCV CSVs directly from Yahoo Finance via the [`yfinance`](https://github.com/ranaroussi/yfinance) library. Output schema is auto-adjusted (`Open, High, Low, Close, Volume`, splits/dividends already applied via `auto_adjust=True`). Tested on Ubuntu 22.04 LTS.
 
-| Parameter       | Explanation
-|-----------------|-------------------------------------|
-| `--download`| Download all the S&P 500 stocks. If no start and end dates are specified, the default range is between "2017-01-01" and today's date.                |
-| `--stock`| Download a specific stock specified by the user. If no start and end dates are specified, the default range is between "2017-01-01" and today's date.                |
-| `--update`| Update all the stocks present in the folder containing the files. It is possible to update the files to any range of dates. If a stock wasn't listed before a specific date, it will be downloaded from the day it enters the public market. |
-|`--update.stock`| Update a specific stock specified by the user. It is possible to update the files to any range of dates by specifying the start and end dates. |
-|`--start`| Specify the start date for downloading or updating data. |
-|`--end`| Specify the end date for downloading or updating data. |
-|`--delete`| Delete all files present in the files folder. | 
-|`--delete-stock`| Delete a specific stock present in the files folder. | 
-|`--folder`| Choose the folder where to read or download all the files. |
-### Usage example
-Below are some examples of how to use the downloader:
-```Python
-# Download all the data between "2017-01-01" and "2018-01-01"
-python3 data.py --download --start="2017-01-01" --end="2018-01-01"
+### Behaviour highlights
 
-# Download data for Apple (AAPL) from "2017-01-01" to today's date
-python3 data.py --stock="AAPL" --end="today"
+- **Symbol normalization** — Yahoo Finance uses `-` in tickers, the Wikipedia S&P 500 table uses `.`. Inputs like `BRK.B` are auto-converted to `BRK-B` and saved as `BRK-B.csv`. Whitespace and `=` are stripped.
+- **Lazy S&P universe fetch** — the Wikipedia constituent list is only downloaded when actually needed (`--download`, `--range`, or empty target folder). Single-stock and update flows skip the scrape.
+- **Incremental updates** — `--update` / `--update-stock` resume from the last date in the existing CSV (`last_index + 1 day`) and append, dedup, and sort. No-ops cleanly when already up-to-date.
+- **Batch downloads** — `--download` and `--stock-list` use a single `yf.download(..., group_by="ticker")` call with threading, then split per symbol.
+- **Persistence** — CSVs use `Date` as the index column, written via `os.path.join` so paths work on any OS. Folder is created with `os.makedirs(..., exist_ok=True)`.
 
-# Update all the data between "2014-01-01" and "2020-01-01"
-python3 data.py --update --start="2014-01-01" --end="2020-01-01"
+### CLI flags
 
-# Update a specific stock from "2014-01-01" until the last day present in the stock file
-python3 data.py --update-stock --stock="AAPL" --start="2014-01-01"
+| Parameter         | Explanation                                                                                                                                                                                                                  |
+|-------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `--download`      | Download every S&P 500 stock as separate CSVs. Default date range: `2017-01-01` to today.                                                                                                                                    |
+| `--stock`         | Download one specific ticker (e.g. `AAPL`, `BRK.B`). Default range: `2017-01-01` to today.                                                                                                                                   |
+| `--stock-list`    | Comma-separated list of tickers to download in a single batch call (e.g. `AAPL,MSFT,GOOG`).                                                                                                                                  |
+| `--range N`       | When used with `--download`, restrict to the first `N` symbols of the S&P 500 list (handy for smoke tests).                                                                                                                  |
+| `--update`        | Incrementally update every CSV in `--folder`. Resumes from the last date in each file unless `--start` is given.                                                                                                             |
+| `--update-stock`  | Incrementally update a single ticker (pass the symbol as the value, e.g. `--update-stock=AAPL`).                                                                                                                             |
+| `--start`         | Start date (`YYYY-MM-DD`). Optional for updates (defaults to `last_index + 1 day`).                                                                                                                                          |
+| `--end`           | End date (`YYYY-MM-DD`). Defaults to today; the literal string `today` is also accepted.                                                                                                                                     |
+| `--delete`        | Delete every file in `--folder` and exit.                                                                                                                                                                                    |
+| `--delete-stock`  | Delete one specific ticker's CSV from `--folder`.                                                                                                                                                                            |
+| `--folder`        | Source / destination folder (default `stock/`). Created automatically if missing.                                                                                                                                            |
 
-# Download all the data between "2017-01-01" and today's date, 
-# choosing the folder where to download the files
-python3 data.py --download --folder="../../example"
+### Usage examples
+
+```bash
+# Download every S&P 500 stock between 2017-01-01 and 2018-01-01
+python3 data_downloader.py --download --start=2017-01-01 --end=2018-01-01
+
+# Download Apple (AAPL) from 2017-01-01 to today, into ./stock/
+python3 data_downloader.py --stock=AAPL --end=today --folder=stock/
+
+# Download a small batch in one call
+python3 data_downloader.py --stock-list=AAPL,MSFT,GOOG --start=2024-01-01 --folder=stock/
+
+# Smoke test: first 5 S&P symbols only
+python3 data_downloader.py --download --range=5 --start=2024-01-01 --end=2024-02-01
+
+# Symbols with dots are normalized: BRK.B -> stock/BRK-B.csv
+python3 data_downloader.py --stock=BRK.B --start=2024-01-01
+
+# Incrementally update every CSV in the folder (resume from each file's last date)
+python3 data_downloader.py --update --folder=stock/
+
+# Incrementally update one ticker; second run is a no-op when up-to-date
+python3 data_downloader.py --update-stock=AAPL --folder=stock/
+
+# Delete one ticker, or wipe the folder
+python3 data_downloader.py --delete-stock=AAPL --folder=stock/
+python3 data_downloader.py --delete --folder=stock/
 ```
 
+> **Note:** the data downloader is a standalone CLI tool — it is not imported by any `stockpy` model code. The forecasters in `stockpy.forecasters` accept any 2-D NumPy array shaped `(time_steps, n_features)`, regardless of source.
+
 ## TODOs
-Below is a list of planned enhancements and features that are in the pipeline for **stockpy**. Contributions and suggestions are always welcome!
+Planned enhancements. Contributions and suggestions are welcome.
 
-- [ ] Implement a dedicated `test` directory with comprehensive unit tests to ensure reliability and facilitate continuous integration.
-- [ ] Expand the documentation to include more detailed tutorials and code explanations, aiding users in effectively utilizing **stockpy**.
-- [ ] Enrich the algorithmic suite by adding additional models for regression and classification, catering to a broader range of data science needs.
-- [ ] Integrate generative models into the library to provide advanced capabilities for data synthesis and pattern discovery.
-- [ ] Develop and incorporate sophisticated prediction models that can handle complex forecasting tasks with higher accuracy.
+- [x] Comprehensive `test/` suite covering every forecaster.
+- [ ] Expand documentation with end-to-end forecasting tutorials and API reference.
+- [ ] Add more encoder-decoder architectures (Informer, N-BEATS, PatchTST).
+- [ ] Probabilistic uncertainty intervals via Monte Carlo sampling on `DMMForecaster`.
+- [ ] Multi-series / panel-data training support.
 
-*Note: A checked box (✅) indicates that the task has been completed.*
+*Note: ✅ / a checked box indicates the task has been completed.*
 
 ## Authors and acknowledgements
-**stockpy** is currently developed and mantained by **Silvio Baratto**. You can contact me at:
+**stockpy** is currently developed and maintained by **Silvio Baratto**. Contact:
 - silvio.baratto22 at gmail.com
 
 ## Reporting a bug
-The best way to report a bug is using the
-[Issues](https://github.com/fAndreuzzi/BisPy/issues) section. Please, be clear,
-and give detailed examples on how to reproduce the bug (the best option would
-be the graph which triggered the error you are reporting).
+The best way to report a bug is via the [Issues](https://github.com/SilvioBaratto/stockpy/issues) section. Please be clear and include a minimal reproducible example (input shape, model hyperparameters, full traceback).
 
 ## How to contribute
 
-We are more than happy to receive contributions on tests, documentation and
-new features. Our [Issues](https://github.com/fAndreuzzi/BisPy/issues)
-section is always full of things to do.
+Contributions on tests, documentation, and new features are welcome. The [Issues](https://github.com/SilvioBaratto/stockpy/issues) tracker lists open work.
 
-Here are the guidelines to submit a patch:
+Guidelines for submitting a patch:
 
-1. Start by opening a new [issue](https://github.com/fAndreuzzi/BisPy/issues)
-   describing the bug you want to fix, or the feature you want to introduce.
-   This lets us keep track of what is being done at the moment, and possibly
-   avoid writing different solutions for the same problem.
-
-2. Fork the project, and setup a **new** branch to work in (_fix-issue-22_, for
-   instance). If you do not separate your work in different branches you may
-   have a bad time when trying to push a pull request to fix a particular
-   issue.
-
-3. Run [black](https://github.com/psf/black) before pushing
-   your code for review.
-
-4. Provide menaningful **commit messages** to help us keeping a good _git_
-   history.
-
-5. Finally you can submbit your _pull request_!
+1. Open a new [issue](https://github.com/SilvioBaratto/stockpy/issues) describing the bug or feature, so we can avoid duplicate work.
+2. Fork the project and create a dedicated branch (e.g. `fix-issue-22`).
+3. Run [black](https://github.com/psf/black) (88-char lines) before pushing.
+4. Provide meaningful commit messages.
+5. Submit your pull request.
 
 ## License
 

@@ -4,12 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Direction
 
-stockpy is being restructured (target version `0.4.0`) from a general ML library into a **time-series forecasting library using encoder-decoder architectures only**. The requirements for this restructure are in `.code-generator/requirements.md`. Key constraints:
+stockpy `0.4.0` is a **time-series forecasting library using encoder-decoder architectures only**. The full restructuring spec lives in `.code-generator/requirements.md`. Hard constraints:
 
-- **No classification** — all `*Classifier` classes and `ClassifierMixin` are being deleted.
-- **No flat regression** — models without temporal structure (MLP, BNN, BCNN) are being deleted.
-- **Encoder-decoder only** — every model must accept `context_len` (past) and `pred_len` (future) and produce shape `(n_samples, pred_len, n_features)` from `predict()`.
-- **No sklearn dependency** on `ClassifierMixin`/`RegressorMixin` — the base class will be a standalone `EncoderDecoderForecaster` ABC.
+- **No classification** — `*Classifier` classes and `ClassifierMixin` removed.
+- **No flat regression** — feedforward models without temporal structure (MLP, BNN, BCNN) removed.
+- **Encoder-decoder only** — every forecaster accepts `context_len` (past) and `pred_len` (future) and `predict()` returns shape `(n_samples, pred_len, n_features)`.
+- **No sklearn `ClassifierMixin`/`RegressorMixin`** — base is the standalone `EncoderDecoderForecaster` ABC.
+
+The README still describes the legacy 0.3.x API (`stockpy.neural_network`, `*Classifier`, `*Regressor`). Treat it as outdated until updated; trust `.code-generator/requirements.md` and the `stockpy/` source.
 
 ## Commands
 
@@ -17,79 +19,82 @@ stockpy is being restructured (target version `0.4.0`) from a general ML library
 ```bash
 conda activate stockpy
 pip install -e .
-# or with uv (installed, much faster):
+# or with uv (much faster):
 uv pip install -r requirements.txt
 ```
 
-**Run tests:**
+**Tests:**
 ```bash
-pytest test/
-# single test file:
-pytest test/open_ml.py -v
-# with coverage:
+pytest test/                                 # full suite (note: `test/`, not `tests/`)
+pytest test/test_lstm_forecaster.py -v       # single file
+pytest test/test_lstm_forecaster.py::test_fit_predict_shape -v   # single test
 coverage run -m pytest && coverage report
 ```
 
-**Lint:**
+**Lint / format:**
 ```bash
 pycodestyle stockpy/
-black --check stockpy/      # formatter is Black, 88-char lines
-```
-
-**Format:**
-```bash
+black --check stockpy/      # Black, 88-char lines (configured in pyproject.toml)
 black stockpy/
 ```
 
-**Build docs:**
+**Docs:**
 ```bash
 cd docs && make html
 ```
 
 ## Architecture
 
-### Current package layout (`stockpy/stockpy/`)
+### Current package layout (`stockpy/`)
 
 ```
-base.py                  # Central training engine — Regressor and Classifier base classes
-                         # Manages fit/predict loop, DataLoaders, callbacks, SVI (Pyro)
-neural_network/          # Pure PyTorch models: MLP, LSTM, BiLSTM, GRU, BiGRU, CNN
-                         # Each file has a *Classifier and *Regressor variant
-probabilistic/           # Pyro-PPL models: BNN, BCNN, DMM, NNHMM, GHMM
-                         # Uses stochastic variational inference (SVI) via guide/model pattern
-preprocessing/           # StockDatasetFFNN / RNN / CNN — wraps numpy/pandas into PyTorch Datasets
-callbacks/               # Hook system: EarlyStopping, Checkpoint, LRScheduler, EpochScoring, PrintLog
-utils/_utils.py          # Device management, tensor↔numpy conversions, parameter filtering
-history.py               # History dict-of-lists for per-epoch metric tracking
+base.py                  # BaseEstimator (training engine) + EncoderDecoderForecaster ABC
+forecasters/             # All concrete models — encoder-decoder only
+  _lstm.py _gru.py _bilstm.py _bigru.py _tcn.py _transformer.py
+  _dmm.py _dmm_components.py    # DMMForecaster (Pyro SVI) + Combiner/Emitter/Transition
+preprocessing/
+  _base.py               # ValidSplit, unpack_data, StockpyDataset
+  _dataset.py            # TimeSeriesDataset (dual context_len + pred_len sliding windows)
+  _transforms.py         # StandardScalerTransform, DifferenceTransform
+  _synthetic.py          # synthetic series generators (test fixtures)
+callbacks/               # EarlyStopping, Checkpoint, LRScheduler, EpochScoring, PrintLog, EpochTimer
+utils/_utils.py          # device mgmt, tensor↔numpy, parameter filtering, check_is_fitted
+history.py               # per-epoch metric tracking (dict-of-lists)
 exceptions.py            # StockpyException hierarchy
 ```
 
+The legacy `stockpy/neural_network/` and `stockpy/probabilistic/` packages no longer exist. All models are unified under `forecasters/` and exported from `stockpy.forecasters` via `__init__.py`:
+`LSTMForecaster, GRUForecaster, BiLSTMForecaster, BiGRUForecaster, TCNForecaster, DMMForecaster, TransformerForecaster`.
+
 ### How the training loop works (`base.py`)
 
-`base.py` is the core of the library. `Regressor`/`Classifier` inherit from `SkBaseEstimator` and implement `.fit()` / `.predict()`. Key flow:
+`base.py` is the core. Two classes:
 
-1. `.fit(X, y)` → `initialize()` → builds model, optimizer, criterion, dataset, callbacks
-2. `fit_loop()` → `run_each_epoch()` → `train_step()` / `validation_step()`
-3. Probabilistic models use **Pyro SVI** (`TraceMeanField_ELBO`) instead of a standard loss; `base.py` branches on `self._is_probabilistic`.
-4. Callbacks are notified at `on_train_begin`, `on_epoch_begin/end`, `on_batch_begin/end`, `on_grad_computed`.
-5. Model state is saved/loaded via **safetensors** (not torch.save).
+1. **`BaseEstimator`** (line ~239) — sklearn-compatible base. Owns `initialize()`, `fit_loop()`, `run_single_epoch()`, `train_step()`, `validation_step()`, optimizer/criterion plumbing, callbacks, history, safetensors save/load (`save_params` / `load_params`).
+2. **`EncoderDecoderForecaster`** (line ~4594) — abstract subclass that adds `context_len` / `pred_len` and the forecasting `fit()` / `predict()` contract. Concrete forecasters in `forecasters/` subclass this.
 
-### Callback system
+Flow: `.fit(X, y)` → `initialize()` (builds module, optimizer, criterion, dataset, callbacks) → `fit_loop()` → `run_single_epoch()` → `train_step()` / `validation_step()`.
 
-Callbacks in `callbacks/` receive a reference to the `net` (the Regressor/Classifier) and call `net.history` to read metrics. They are plain classes with hook methods — not PyTorch hooks. `_scoring.py` is the most complex: `EpochScoring` re-runs inference on the validation set and stores the metric in `history`.
+Probabilistic models (`DMMForecaster`) branch on `self._is_probabilistic` and use **Pyro SVI** with `TraceMeanField_ELBO` instead of a standard PyTorch loss. The Pyro `model` (generative) and `guide` (inference network) double as decoder and encoder.
 
-### Probabilistic models (Pyro)
+Model state is persisted via **safetensors**, never `torch.save`.
 
-`DMM`, `NNHMM`, `GHMM` in `probabilistic/` define a Pyro `model` (generative) and `guide` (inference/encoder). The `_combiner.py`, `_emitter.py`, `_transition.py` files are sub-components used by `DMM`. These are the models closest to a true encoder-decoder structure and are the primary candidates for the `DMMForecaster` in the restructure.
+### Callbacks
 
-### Dataset classes
+Plain Python classes in `callbacks/` with hook methods (`on_train_begin`, `on_epoch_begin/end`, `on_batch_begin/end`, `on_grad_computed`) — not PyTorch hooks. Each receives a reference to the `net` and reads/writes `net.history`. `EpochScoring` in `_scoring.py` is the most complex: re-runs inference on the validation set and stores the metric.
 
-`preprocessing/_dataset.py` wraps input data into PyTorch `Dataset` objects. `StockDatasetRNN` adds a sliding-window `seq_len` dimension — this is the pattern `TimeSeriesDataset` will replace with `context_len` + `pred_len` dual windows.
+### Datasets
+
+`TimeSeriesDataset` (in `preprocessing/_dataset.py`) replaces the old `StockDatasetRNN/CNN/FFNN`. It produces dual sliding windows of length `context_len` (encoder input) and `pred_len` (decoder target) over a single contiguous series.
 
 ## Coding Conventions
 
 - Formatter: **Black** (88 chars). Linter: **pycodestyle**.
-- Public model parameters are set in `__init__` and follow the sklearn pattern: stored as-is with the same name as the argument (no mangling), so `get_params()` works automatically.
-- Private helpers use a leading underscore prefix (`_fit_loop`, `_train_step`).
+- Public model parameters set in `__init__`, stored as-is under the same name (sklearn pattern, so `get_params()` works automatically — no mangling).
+- Private helpers use a leading underscore (`_fit_loop`, `_train_step`).
 - NumPy-style docstrings on all public methods.
-- Model sub-modules (encoder, decoder sub-networks) live inside the same `_model.py` file as private classes, not in separate files.
+- Encoder/decoder sub-modules live as private classes inside the same `_<model>.py` file as their forecaster, not in separate files. Exception: `DMMForecaster` keeps `_dmm_components.py` because `Combiner`/`Emitter`/`Transition` are reused by Pyro `model`/`guide`.
+
+## Code Generation State
+
+The `.code-generator/` directory contains the active restructure plan (`requirements.md`), generation logs (`logs/`), and run state (`state.json` / `memories/`). Treat it as authoritative for in-flight breaking changes. Don't edit generated state files by hand unless explicitly requested.

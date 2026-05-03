@@ -66,3 +66,32 @@ class TestValidSplitTooFewSamples:
 
         train, valid = ValidSplit(cv=2)(dataset)
         assert len(train) + len(valid) == 4
+
+
+class TestValidSplitAutoregressiveFit:
+    """Regression coverage for issue #39: ``fit(X, y=X)`` with default
+    ``train_split=ValidSplit(5)`` must work despite the windowed dataset
+    producing fewer rows than the raw series."""
+
+    def test_default_train_split_with_autoregressive_y(self):
+        from stockpy.forecasters import LSTMForecaster
+
+        X = _series(120, n_features=3)
+        model = LSTMForecaster(
+            context_len=10,
+            pred_len=5,
+            rnn_size=8,
+            hidden_size=8,
+            num_layers=1,
+        )
+
+        model.fit(X, y=X, epochs=1, verbose=0)
+
+        assert len(model.history) >= 1
+
+    def test_length_mismatch_still_raises_for_unrelated_y(self):
+        dataset = TimeSeriesDataset(_series(40), context_len=10, pred_len=5)
+        unrelated_y = _series(7)
+
+        with pytest.raises(ValueError, match=r"different lengths"):
+            ValidSplit(cv=2)(dataset, y=unrelated_y)

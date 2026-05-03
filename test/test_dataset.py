@@ -219,3 +219,62 @@ class TestTimeSeriesDataset:
         assert y_target.shape == (5, 3)
         assert isinstance(x_context, torch.Tensor)
         assert isinstance(y_target, torch.Tensor)
+
+
+class TestShortSeriesUpfrontValidation:
+    """Issue #41: short-series guard must fire at ``fit`` entry, before any
+    training machinery is built."""
+
+    def test_fit_raises_before_training_on_short_series(self):
+        from stockpy.forecasters import LSTMForecaster
+
+        X = np.zeros((10, 3), dtype=np.float32)
+        model = LSTMForecaster(
+            context_len=30, pred_len=5, rnn_size=8, hidden_size=8, num_layers=1
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=r"context_len.*pred_len|pred_len.*context_len",
+        ):
+            model.fit(X, y=X, epochs=1, verbose=0, train_split=None)
+
+        assert getattr(model, "initialized_", False) is False
+        history = getattr(model, "history", None)
+        assert history is None or len(history) == 0
+
+    def test_error_message_reports_actual_length(self):
+        from stockpy.forecasters import LSTMForecaster
+
+        X = np.zeros((7, 2), dtype=np.float32)
+        model = LSTMForecaster(
+            context_len=10, pred_len=4, rnn_size=4, hidden_size=4, num_layers=1
+        )
+
+        with pytest.raises(ValueError, match=r"\b7\b"):
+            model.fit(X, y=X, epochs=1, verbose=0, train_split=None)
+
+    def test_dataset_constructor_guard_still_fires(self):
+        X = np.zeros((5, 2), dtype=np.float32)
+        with pytest.raises(ValueError, match=r"context_len.*pred_len|too short"):
+            TimeSeriesDataset(X, context_len=10, pred_len=3)
+
+    def test_guard_skipped_when_X_has_no_len(self):
+        from stockpy.forecasters import LSTMForecaster
+
+        class _NoLenDataset(torch.utils.data.IterableDataset):
+            def __iter__(self):
+                yield torch.zeros(10, 3), torch.zeros(5, 3)
+
+        model = LSTMForecaster(
+            context_len=10, pred_len=5, rnn_size=4, hidden_size=4, num_layers=1
+        )
+        try:
+            model.fit(_NoLenDataset(), epochs=0, verbose=0, train_split=None)
+        except ValueError as exc:
+            msg = str(exc)
+            assert not (
+                "context_len" in msg and "pred_len" in msg and "Series length" in msg
+            )
+        except Exception:
+            pass

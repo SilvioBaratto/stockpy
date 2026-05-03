@@ -1,0 +1,3 @@
+*.safetensors
+*.pt
+.ipynb_checkpoints/

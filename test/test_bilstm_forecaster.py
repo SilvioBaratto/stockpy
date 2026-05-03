@@ -1,11 +1,9 @@
 import numpy as np
-import pytest
 import torch
 import torch.nn as nn
 
 from stockpy.forecasters import BiLSTMForecaster
 from stockpy.base import EncoderDecoderForecaster
-from stockpy.preprocessing import TimeSeriesDataset
 
 
 class TestBiLSTMForecaster:

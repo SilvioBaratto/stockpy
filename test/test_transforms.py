@@ -19,14 +19,42 @@ class TestStandardScalerTransform:
         np.testing.assert_array_almost_equal(scaler.mean_, expected_mean)
         np.testing.assert_array_almost_equal(scaler.std_, expected_std)
 
-    def test_transform_returns_torch_tensor(self):
+    def test_standard_scaler_returns_numpy_for_numpy_input(self):
         data = np.arange(12).reshape(4, 3).astype(np.float32)
         scaler = StandardScalerTransform()
         scaler.fit(data)
         transformed = scaler.transform(data)
 
+        assert isinstance(transformed, np.ndarray)
+        assert transformed.dtype == np.float32
+
+    def test_standard_scaler_returns_tensor_for_tensor_input(self):
+        data = torch.arange(12, dtype=torch.float32).reshape(4, 3)
+        scaler = StandardScalerTransform()
+        scaler.fit(data.numpy())
+        transformed = scaler.transform(data)
+
         assert isinstance(transformed, torch.Tensor)
         assert transformed.dtype == torch.float32
+
+    def test_inverse_transform_returns_numpy_for_numpy_input(self):
+        data = np.arange(12).reshape(4, 3).astype(np.float32)
+        scaler = StandardScalerTransform()
+        scaler.fit(data)
+        scaled = scaler.transform(data)
+        recovered = scaler.inverse_transform(scaled)
+
+        assert isinstance(recovered, np.ndarray)
+        np.testing.assert_array_almost_equal(recovered, data, decimal=5)
+
+    def test_inverse_transform_returns_tensor_for_tensor_input(self):
+        data = np.arange(12).reshape(4, 3).astype(np.float32)
+        scaler = StandardScalerTransform()
+        scaler.fit(data)
+        scaled = torch.from_numpy(scaler.transform(data)).float()
+        recovered = scaler.inverse_transform(scaled)
+
+        assert isinstance(recovered, torch.Tensor)
 
     def test_transform_produces_correct_z_scores(self):
         data = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
@@ -35,7 +63,7 @@ class TestStandardScalerTransform:
         transformed = scaler.transform(data)
 
         expected = (data - data.mean(axis=0)) / data.std(axis=0, ddof=0)
-        np.testing.assert_array_almost_equal(transformed.numpy(), expected, decimal=5)
+        np.testing.assert_array_almost_equal(transformed, expected, decimal=5)
 
     def test_transform_on_unseen_data(self):
         train = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
@@ -46,7 +74,7 @@ class TestStandardScalerTransform:
         transformed = scaler.transform(test)
 
         expected = (test - train.mean(axis=0)) / train.std(axis=0, ddof=0)
-        np.testing.assert_array_almost_equal(transformed.numpy(), expected, decimal=5)
+        np.testing.assert_array_almost_equal(transformed, expected, decimal=5)
 
     def test_inverse_transform_recovers_original(self):
         data = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
@@ -55,16 +83,16 @@ class TestStandardScalerTransform:
         transformed = scaler.transform(data)
         recovered = scaler.inverse_transform(transformed)
 
-        np.testing.assert_array_almost_equal(recovered.numpy(), data, decimal=5)
+        np.testing.assert_array_almost_equal(recovered, data, decimal=5)
 
     def test_fit_transform_combined(self):
         data = np.array([[1, 2], [3, 4], [5, 6]], dtype=np.float32)
         scaler = StandardScalerTransform()
         transformed = scaler.fit_transform(data)
 
-        assert isinstance(transformed, torch.Tensor)
+        assert isinstance(transformed, np.ndarray)
         expected = (data - data.mean(axis=0)) / data.std(axis=0, ddof=0)
-        np.testing.assert_array_almost_equal(transformed.numpy(), expected, decimal=5)
+        np.testing.assert_array_almost_equal(transformed, expected, decimal=5)
 
     def test_constant_feature_raises(self):
         data = np.array([[1, 2], [1, 4], [1, 6]], dtype=np.float32)

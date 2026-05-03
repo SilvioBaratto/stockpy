@@ -1,7 +1,5 @@
-- #2 [priority:unknown] unable to fit — agent: python-pro
-- #32 [priority:high] feat: relocate DMM sub-components and delete legacy modules — agent: python-pro
-- #33 [priority:high] feat: implement TransformerForecaster encoder-decoder — agent: python-pro
-- #34 [priority:high] test: add test_transformer_forecaster.py covering encoder-decoder contract — agent: python-pro
-- #35 [priority:medium] refactor: add type annotations to all forecaster modules — agent: python-pro
-- #36 [priority:medium] ci: update python-package.yml to Python 3.10/3.11/3.12 with pytest-cov — agent: python-pro
-- #37 [priority:medium] build: remove setup.py and finalize pyproject.toml package discovery — agent: python-pro
+- #38 [priority:high] fix: coerce self.device to str when calling safetensors safe_open — agent: python-pro
+- #39 [priority:high] fix: skip ValidSplit length check when fit(X, y=X) on windowed dataset — agent: python-pro
+- #40 [priority:medium] fix: StandardScalerTransform must return same array library as input (numpy in -> numpy out) — agent: python-pro
+- #41 [priority:low] fix: validate len(X) >= context_len + pred_len upfront in EncoderDecoderForecaster.fit — agent: python-pro
+- #42 [priority:low] chore: remove stale build/ and stockpy_learn.egg-info/ artifacts; verify clean wheel — agent: python-pro

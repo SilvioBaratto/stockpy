@@ -1,11 +1,9 @@
 import numpy as np
-import pytest
 import torch
 import torch.nn as nn
 
 from stockpy.forecasters import TCNForecaster
 from stockpy.base import EncoderDecoderForecaster
-from stockpy.preprocessing import TimeSeriesDataset
 
 
 class TestTCNForecaster:
@@ -236,7 +234,6 @@ class TestTCNForecaster:
             context_len=10, pred_len=5, num_filters=8, hidden_size=8, num_layers=1
         )
         model2.fit(X, y, epochs=0, verbose=0, train_split=None)
-        model2.device = None
         model2.load_params(f_params=f_params, use_safetensors=True)
 
         preds_after = model2.predict(ds)

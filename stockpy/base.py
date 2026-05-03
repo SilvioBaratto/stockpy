@@ -3281,7 +3281,7 @@ class BaseEstimator:
 
                 if isinstance(f_name, (str, os.PathLike)):
                     state_dict = {}
-                    with safe_open(f_name, framework="pt", device=self.device) as f:
+                    with safe_open(f_name, framework="pt", device=str(self.device)) as f:
                         for key in f.keys():
                             state_dict[key] = f.get_tensor(key)
                 else:
@@ -4762,22 +4762,58 @@ class EncoderDecoderForecaster(BaseEstimator):
         You should override this method if your workflow demands a pre-fit or post-fit processing.
         """
 
-        return super(EncoderDecoderForecaster, self).fit(
-            X,
-            y,
-            optimizer,
-            elbo,
-            callbacks,
-            lr,
-            epochs,
-            batch_size,
-            shuffle,
-            verbose,
-            model_params,
-            warm_start,
-            train_split,
-            **fit_params,
-        )
+        self._check_series_length(X)
+
+        # Autoregressive shorthand: ``fit(X, y=X)`` means "predict the same
+        # series". sklearn's ``_validate_data`` still needs ``y`` (the
+        # forecaster's ``requires_y`` tag is True), so keep it here and
+        # collapse the alias inside ``get_split_datasets`` instead, where
+        # ``TimeSeriesDataset``'s autoregressive branch and ``ValidSplit``
+        # both expect ``y=None``.
+        self._autoregressive_y = y is X
+
+        try:
+            return super(EncoderDecoderForecaster, self).fit(
+                X,
+                y,
+                optimizer,
+                elbo,
+                callbacks,
+                lr,
+                epochs,
+                batch_size,
+                shuffle,
+                verbose,
+                model_params,
+                warm_start,
+                train_split,
+                **fit_params,
+            )
+        finally:
+            self._autoregressive_y = False
+
+    def get_split_datasets(self, X, y=None, **fit_params):
+        if getattr(self, "_autoregressive_y", False):
+            y = None
+        return super().get_split_datasets(X, y, **fit_params)
+
+    def _check_series_length(self, X):
+        """Raise upfront when the series is too short for the chosen windows.
+
+        The guard is duck-typed: inputs without ``__len__`` (e.g. an
+        ``IterableDataset``) are skipped and validated downstream by
+        ``TimeSeriesDataset`` instead.
+        """
+        if not hasattr(X, "__len__"):
+            return
+        series_len = len(X)
+        min_required = self.context_len + self.pred_len
+        if series_len < min_required:
+            raise ValueError(
+                f"Series length ({series_len}) is too short for "
+                f"context_len ({self.context_len}) + pred_len "
+                f"({self.pred_len}). Minimum required: {min_required}."
+            )
 
     @abstractmethod
     def predict(self, X, predict_nonlinearity="auto"):

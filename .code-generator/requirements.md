@@ -1,98 +1,137 @@
-# stockpy
+# stockpy 0.4.0 — Identified Bugs
 
-## Description
-A Python library for time-series forecasting using encoder-decoder neural architectures. Designed for financial and sequential data, it provides probabilistic and deterministic encoder-decoder models that predict future sequences from past observations — not classifying or regressing on flat features.
+Bugs surfaced while building `examples/quickstart.ipynb` against the bundled `stock/AAPL.csv` (1569 OHLCV rows, `LSTMForecaster(context_len=30, pred_len=5)`).
 
-## Tech Stack
-- **Language**: Python 3.11+
-- **Framework**: PyTorch (neural networks), Pyro-PPL (probabilistic encoder-decoders)
-- **Database**: none
-- **Deploy**: local / pip install
-- **Tests**: pytest, pytest-cov
+---
 
-## Features
+## Bug 1 — `safetensors` load fails because `self.device` is a `torch.device` object
 
-### Core Restructuring (Breaking Changes)
-1. **Remove all classification models** — delete every `*Classifier` class across `neural_network/` and `probabilistic/`. Remove sklearn `ClassifierMixin` inheritance, classification-specific loss functions (`CrossEntropyLoss`, etc.), and classification metrics (`accuracy_score`, `f1_score`) from `base.py`, `callbacks/_scoring.py`, and all model files.
-2. **Remove all flat-regression models** — delete `MLPRegressor`, `BNNRegressor`, `BCNNRegressor` and any model whose forward pass does not operate on a temporal sequence. Pure feedforward (MLP, BNN, BCNN) models have no place here.
-3. **Rename `Regressor` base to `Forecaster`** — the remaining task is sequence-to-sequence future prediction, not regression on a fixed-size input. Update `base.py`, all model names, `__init__.py` exports, and documentation strings accordingly.
+**Severity:** High (blocks the documented save/load path)
 
-### Encoder-Decoder Architecture (New Core)
-4. **Implement a canonical `EncoderDecoderForecaster` base class** in `base.py` (or a new `forecaster.py`) that:
-   - Accepts a `context_len` (encoder window, past observations) and `pred_len` (decoder window, future steps to predict).
-   - Runs the encoder over the context window, passes the final hidden state to the decoder, and autoregressively (or in one shot) produces `pred_len` future values.
-   - Keeps the existing callback system (EarlyStopping, Checkpoint, LRScheduler, PrintLog) fully functional.
-5. **Refactor LSTM → `LSTMForecaster`** using the `EncoderDecoderForecaster` base: separate `LSTMEncoder` and `LSTMDecoder` sub-modules, teacher-forcing support during training.
-6. **Refactor GRU → `GRUForecaster`** with the same encoder-decoder split and teacher-forcing.
-7. **Refactor BiLSTM → `BiLSTMForecaster`** — bidirectional encoder, unidirectional decoder.
-8. **Refactor BiGRU → `BiGRUForecaster`** — bidirectional encoder, unidirectional decoder.
-9. **Refactor CNN → `TCNForecaster`** — replace the plain CNN with a Temporal Convolutional Network (TCN) encoder (causal dilated convolutions) paired with a GRU decoder.
-10. **Refactor DMM → `DMMForecaster`** — keep the Deep Markov Model but reframe it as a pure forecasting model: the inference network is the encoder, the generative network is the decoder. Remove classifier variant, remove NNHMM and GHMM (they add no distinct encoder-decoder value over DMM).
-11. **Add `TransformerForecaster`** — encoder-decoder Transformer with positional encoding, multi-head self-attention in the encoder, cross-attention in the decoder, suitable for multi-step ahead forecasting.
+**Location:** `stockpy/base.py:3284`
 
-### Library Structure
-12. **Reorganise the package layout** to match a proper Python library:
-    ```
-    stockpy/
-    ├── __init__.py                  # public API surface
-    ├── forecasters/
-    │   ├── __init__.py
-    │   ├── _base.py                 # EncoderDecoderForecaster ABC
-    │   ├── _lstm.py                 # LSTMForecaster
-    │   ├── _gru.py                  # GRUForecaster
-    │   ├── _bilstm.py               # BiLSTMForecaster
-    │   ├── _bigru.py                # BiGRUForecaster
-    │   ├── _tcn.py                  # TCNForecaster
-    │   ├── _transformer.py          # TransformerForecaster
-    │   └── _dmm.py                  # DMMForecaster (probabilistic)
-    ├── preprocessing/
-    │   ├── __init__.py
-    │   ├── _dataset.py              # TimeSeriesDataset (context_len + pred_len windows)
-    │   └── _transforms.py           # Normalisation, differencing helpers
-    ├── callbacks/                   # keep existing — no changes needed
-    ├── utils/
-    │   ├── __init__.py
-    │   └── _utils.py
-    ├── exceptions.py
-    └── history.py
-    tests/
-    ├── conftest.py                  # shared fixtures (synthetic sine-wave data)
-    ├── test_lstm_forecaster.py
-    ├── test_gru_forecaster.py
-    ├── test_bilstm_forecaster.py
-    ├── test_bigru_forecaster.py
-    ├── test_tcn_forecaster.py
-    ├── test_transformer_forecaster.py
-    ├── test_dmm_forecaster.py
-    ├── test_dataset.py
-    └── test_callbacks.py
-    ```
-13. **`TimeSeriesDataset`** replaces `StockDatasetRNN/CNN/FFNN` with a single class parameterised by `context_len` and `pred_len`; returns `(x_context, y_target)` tensors.
-14. **`pyproject.toml`-first packaging** — migrate from `setup.py` to `pyproject.toml` with `[project]` table, proper optional dependency groups (`[dev]`, `[docs]`), and entry-points if needed.
+```python
+with safe_open(f_name, framework="pt", device=self.device) as f:
+```
 
-### Testing & Maintainability
-15. **pytest suite with fixtures** — `conftest.py` generates a synthetic multivariate sine-wave time series so no network or file I/O is needed in unit tests.
-16. **One test file per forecaster** — each file tests: model instantiation, `fit()` on synthetic data (5 epochs), `predict()` output shape `(batch, pred_len, features)`, callback hooks (EarlyStopping triggers), and model save/load round-trip.
-17. **`test_dataset.py`** — tests `TimeSeriesDataset` slicing, edge-case sequence lengths, and DataLoader compatibility.
-18. **`test_callbacks.py`** — tests EarlyStopping, Checkpoint, LRScheduler, PrintLog in isolation with a mock forecaster.
-19. **CI: GitHub Actions** — update `.github/workflows/python-package.yml` to run `pytest --cov=stockpy --cov-report=xml` on Python 3.10, 3.11, 3.12 and upload to Coveralls.
-20. **Type annotations** — add `from __future__ import annotations` and full parameter/return type hints to all public methods in `_base.py` and every forecaster.
+**Root cause:** `self.device` is set in `BaseEstimator.__init__` (`base.py:297`) as `torch.device("cuda" if ... else "cpu")` — i.e. a `torch.device` object. `safetensors.safe_open` accepts a `str` (`"cpu"`, `"cuda:0"`, ...) or an `int`, not a `torch.device`. The repr `device(type='cpu')` does not match safetensors' device parser.
 
-## Non-functional Requirements
-- No sklearn `ClassifierMixin` or `RegressorMixin` anywhere — the library is not a sklearn estimator library.
-- All models must support `context_len` and `pred_len` as first-class constructor parameters.
-- `predict()` must always return a numpy array of shape `(n_samples, pred_len, n_features)`.
-- No test should require internet access or real stock data files.
-- Callback system must remain framework-agnostic (works with any `EncoderDecoderForecaster` subclass).
-- Code style: Black (88 chars), isort, ruff for linting.
+**Repro:**
 
-## Project Structure
-See feature 12 above for the target folder layout.
+```python
+m = LSTMForecaster(context_len=30, pred_len=5)
+m.fit(X, y=X, epochs=0, train_split=None, verbose=0)
+m.save_params(f_params="ckpt.safetensors", use_safetensors=True)
 
-## Additional Notes
-- **Delete**: `stockpy/neural_network/_mlp.py`, `stockpy/probabilistic/_bnn.py`, `stockpy/probabilistic/_bcnn.py`, `stockpy/probabilistic/_nhmm.py`, `stockpy/probabilistic/_ghmm.py`, all `*Classifier` classes everywhere.
-- **Rename**: `stockpy/neural_network/` → `stockpy/forecasters/`; `base.py` `Regressor` → `EncoderDecoderForecaster`.
-- **Keep**: `callbacks/`, `utils/`, `exceptions.py`, `history.py` — these are reusable and architecture-agnostic.
-- **Pyro** remains a dependency only for `DMMForecaster`; all other models are pure PyTorch.
-- The `stock/` sample CSV files (AAPL, TSLA, etc.) can stay as example data for notebooks but must not be required by any test.
-- Version bump to `0.4.0` to signal the breaking change.
+m2 = LSTMForecaster(context_len=30, pred_len=5)
+m2.fit(X, y=X, epochs=0, train_split=None, verbose=0)
+m2.load_params(f_params="ckpt.safetensors", use_safetensors=True)
+```
+
+**Observed:**
+
+```
+SafetensorError: device cpu is invalid
+```
+
+**Workaround in user code:** `m2.device = str(m2.device)` before `load_params`.
+
+**Suggested fix:** in `_get_state_dict` at `base.py:3284` (and the analogous save-path device handling), coerce with `str(self.device)` or `self.device.type if isinstance(self.device, torch.device) else self.device`.
+
+**Test gap:** `test/test_lstm_forecaster.py::test_save_load_roundtrip` uses `save_params`/`load_params` with the **default** torch save (no `use_safetensors=True`), so the bug is not exercised. Add a `use_safetensors=True` variant to that test to catch regressions.
+
+---
+
+## Bug 2 — Default `train_split=ValidSplit(5)` is incompatible with windowed datasets
+
+**Severity:** High (blocks the canonical `fit(X, y=X)` invocation)
+
+**Locations:**
+- Default set at `stockpy/base.py:4691` — `train_split=ValidSplit(5)` in `EncoderDecoderForecaster.fit`.
+- Length check at `stockpy/preprocessing/_base.py:637`.
+
+**Root cause:** `TimeSeriesDataset` derives windows of length `(series_len - context_len - pred_len) // stride + 1`, which is strictly less than `len(y)` when the user passes `y=X` (the natural auto-regressive call). `ValidSplit.__call__` then compares `get_len(dataset) != get_len(y)` and raises:
+
+```
+ValueError: Cannot perform a CV split if dataset and y have different lengths.
+```
+
+**Repro:**
+
+```python
+m = LSTMForecaster(context_len=30, pred_len=5)
+m.fit(X_train, y=X_train, epochs=15, batch_size=32, lr=1e-3,
+      optimizer=torch.optim.Adam)   # default train_split fires the error
+```
+
+**Workaround in user code:** pass `train_split=None` (used in the example notebook and in `test/test_lstm_forecaster.py`).
+
+**Suggested fix:** `EncoderDecoderForecaster.fit` should either
+- compare lengths against the **windowed dataset** rather than the raw `y`, or
+- detect the auto-regressive case (`y is X` / `y is None`) and skip the length comparison, or
+- ship `train_split=None` as the default and document `ValidSplit` as opt-in.
+
+**Related memory:** observation #842 already noted the small-dataset failure mode of `ValidSplit(5)`.
+
+---
+
+## Bug 3 — `StandardScalerTransform` silently changes the array library (numpy → torch)
+
+**Severity:** Medium (UX / type-stability surprise)
+
+**Locations:** `stockpy/preprocessing/_transforms.py:103, 126, 142`
+
+```python
+return torch.from_numpy(scaled).float()      # transform
+return torch.from_numpy(original).float()    # inverse_transform
+return self.fit(data).transform(data)        # fit_transform inherits the cast
+```
+
+**Root cause:** All three methods accept `array-like` (numpy/list/DataFrame) but always return `torch.Tensor`. Downstream numpy-only code (`array.astype(...)`, `np.reshape`, indexing helpers) fails with `AttributeError: 'Tensor' object has no attribute 'astype'`.
+
+**Repro:**
+
+```python
+scaler = StandardScalerTransform()
+X_scaled = scaler.fit_transform(X_train_raw).astype(np.float32)
+# AttributeError: 'Tensor' object has no attribute 'astype'
+```
+
+**Workaround in user code:** explicit `.numpy()` after every call.
+
+**Suggested fix:** return the same array library as the input (mirror sklearn's `StandardScaler`). Convert to tensor only at the model boundary in `to_tensor` (`utils/_utils.py`).
+
+---
+
+## Bug 4 — `TimeSeriesDataset` raises on series shorter than `context_len + pred_len`, but the error fires deep inside `fit`
+
+**Severity:** Low (correct behavior, poor diagnostics)
+
+**Location:** `stockpy/preprocessing/_dataset.py:127`
+
+**Root cause:** The check `series_len < min_required` is enforced inside `__init__`, which is invoked only after `fit` builds the dataset. Users with short test sets get a confusing traceback originating in the training loop instead of an upfront validation error.
+
+**Suggested fix:** validate `len(X) >= context_len + pred_len` in `EncoderDecoderForecaster.fit` (or `check_data`) before any dataset/iterator construction, with a message that names both `context_len` and `pred_len`.
+
+**Related memory:** observation #843 (sliding windows produce few samples from short series).
+
+---
+
+## Bug 5 — Legacy packaging artifacts after the 0.3.x → 0.4.0 restructure
+
+**Severity:** Low (housekeeping)
+
+**Symptoms:** `setup.py` is missing / out of sync (memory #839); `stockpy_learn.egg-info/` and `build/` are checked-in stale; the README's old code samples still reference `stockpy.neural_network` / `stockpy.probabilistic` until the recent rewrite.
+
+**Suggested fix:** confirm `pyproject.toml` is the single source of truth (it is), `git rm -r build/ stockpy_learn.egg-info/`, add both to `.gitignore`, and verify `python -m build` still produces a clean wheel.
+
+---
+
+## Verification checklist for fixes
+
+- `pytest test/ -x` green.
+- `examples/quickstart.ipynb` runs end-to-end via `jupyter nbconvert --execute` with **no** workarounds (the `reloaded.device = str(...)` line in cell 15 should become unnecessary after Bug 1 is fixed).
+- New regression tests:
+  - `test/test_save_load.py::test_safetensors_roundtrip_cpu` — covers Bug 1.
+  - `test/test_valid_split.py::test_default_train_split_with_autoregressive_y` — covers Bug 2.
+  - `test/test_transforms.py::test_standard_scaler_returns_numpy_for_numpy_input` — covers Bug 3.
