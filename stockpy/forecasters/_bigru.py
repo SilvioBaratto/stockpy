@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 import torch
 import torch.nn as nn
 
 from stockpy.base import EncoderDecoderForecaster
 from stockpy.preprocessing import unpack_data
 from stockpy.utils import get_activation_function
+
+if TYPE_CHECKING:
+    from sklearn.utils._tags import Tags
 
 __all__ = ["BiGRUForecaster"]
 
@@ -37,15 +44,15 @@ class BiGRUModel(nn.Module):
 
     def __init__(
         self,
-        n_features,
-        pred_len,
-        rnn_size=32,
-        hidden_size=32,
-        num_layers=1,
-        dropout=0.0,
-        activation="relu",
-        bias=True,
-    ):
+        n_features: int,
+        pred_len: int,
+        rnn_size: int = 32,
+        hidden_size: int = 32,
+        num_layers: int = 1,
+        dropout: float = 0.0,
+        activation: str = "relu",
+        bias: bool = True,
+    ) -> None:
         super().__init__()
         self.n_features = n_features
         self.pred_len = pred_len
@@ -84,7 +91,7 @@ class BiGRUModel(nn.Module):
             nn.Linear(hidden_size, n_features, bias=bias),
         )
 
-    def _init_decoder_state(self, encoder_hidden):
+    def _init_decoder_state(self, encoder_hidden: torch.Tensor) -> torch.Tensor:
         """Reshape encoder hidden for the unidirectional decoder.
 
         PyTorch bidirectional GRU returns hidden of shape
@@ -101,7 +108,7 @@ class BiGRUModel(nn.Module):
         h = torch.cat([h[:, 0], h[:, 1]], dim=-1)  # (num_layers, batch, 2*rnn_size)
         return h
 
-    def forward(self, x, y=None):
+    def forward(self, x: torch.Tensor, y: torch.Tensor | None = None) -> torch.Tensor:
         """Forward pass.
 
         Parameters
@@ -169,16 +176,16 @@ class BiGRUForecaster(EncoderDecoderForecaster):
 
     def __init__(
         self,
-        rnn_size=32,
-        hidden_size=32,
-        num_layers=1,
-        dropout=0.2,
-        activation="relu",
-        bias=True,
-        context_len=20,
-        pred_len=1,
-        **kwargs,
-    ):
+        rnn_size: int = 32,
+        hidden_size: int = 32,
+        num_layers: int = 1,
+        dropout: float = 0.2,
+        activation: str = "relu",
+        bias: bool = True,
+        context_len: int = 20,
+        pred_len: int = 1,
+        **kwargs: Any,
+    ) -> None:
         self.rnn_size = rnn_size
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -193,7 +200,7 @@ class BiGRUForecaster(EncoderDecoderForecaster):
         )
         self._modules = ["module"]
 
-    def __sklearn_tags__(self):
+    def __sklearn_tags__(self) -> Tags:
         from sklearn.utils._tags import InputTags, Tags, TargetTags
 
         return Tags(
@@ -202,10 +209,10 @@ class BiGRUForecaster(EncoderDecoderForecaster):
             input_tags=InputTags(two_d_array=True),
         )
 
-    def _get_tags(self):
+    def _get_tags(self) -> dict[str, bool]:
         return {"requires_y": True}
 
-    def initialize_module(self):
+    def initialize_module(self) -> BiGRUForecaster:
         """Create the BiGRU encoder-decoder module and loss criterion."""
         self.module_ = BiGRUModel(
             n_features=self.n_features_in_,
@@ -220,11 +227,13 @@ class BiGRUForecaster(EncoderDecoderForecaster):
         self.criterion_ = nn.MSELoss()
         return self
 
-    def _set_training(self, training=True):
+    def _set_training(self, training: bool = True) -> None:
         """Override to set training mode on the PyTorch module."""
         self.module_.train(training)
 
-    def forward(self, x, y=None):
+    def forward(  # type: ignore[override]
+        self, x: torch.Tensor, y: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Forward pass through the BiGRU model.
 
         Parameters
@@ -241,7 +250,7 @@ class BiGRUForecaster(EncoderDecoderForecaster):
         """
         return self.module_(x, y=y)
 
-    def train_step_single(self, batch, **fit_params):
+    def train_step_single(self, batch: Any, **fit_params: Any) -> dict[str, Any]:
         """Override to pass targets to ``infer`` for teacher forcing."""
         self._set_training(True)
         Xi, yi = unpack_data(batch)
@@ -252,14 +261,16 @@ class BiGRUForecaster(EncoderDecoderForecaster):
             return {"loss": loss, "y_pred": y_pred}
         return super().train_step_single(batch, **fit_params)
 
-    def state_dict(self):
+    def state_dict(self) -> dict[str, torch.Tensor]:
         """Return the state dict of the underlying PyTorch module."""
         return self.module_.state_dict()
 
-    def load_state_dict(self, state_dict, strict=True):
+    def load_state_dict(
+        self, state_dict: dict[str, torch.Tensor], strict: bool = True
+    ) -> None:
         """Load a state dict into the underlying PyTorch module."""
         self.module_.load_state_dict(state_dict, strict=strict)
 
     @property
-    def model_type(self):
+    def model_type(self) -> str:
         return "rnn"

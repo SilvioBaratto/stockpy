@@ -62,9 +62,16 @@ Documentation = "https://stockpy.readthedocs.io/"
 Repository = "https://github.com/SilvioBaratto/stockpy"
 
 [tool.setuptools]
-packages = ["stockpy"]
 include-package-data = true
 zip-safe = false
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["stockpy*"]
+# Note: ``stock*`` would also match ``stockpy*`` under fnmatch and exclude the
+# package itself. The ``stock/`` data directory has no __init__.py, so it is
+# never discovered as a Python package and does not need an explicit exclude.
+exclude = ["test*", "docs*", "notebooks*", "stockpy_learn*"]
 
 [tool.setuptools.package-data]
 stockpy = ["py.typed"]
@@ -93,6 +100,9 @@ testpaths = ["test"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (e.g. wheel build via PEP 517)",
+]
 
 [tool.coverage.run]
 source = ["stockpy"]

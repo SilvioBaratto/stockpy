@@ -1,0 +1,90 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+sdist/
+wheels/
+*.egg
+*.egg-info/
+.eggs/
+MANIFEST
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Testing & coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.cache/
+.hypothesis/
+
+# Linters / type checkers
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# Jupyter
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
+
+# Sphinx docs build
+docs/_build/
+docs/source/_build/
+docs/build/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Project-specific
+.code-generator/
+
+# graphify: keep graph outputs, skip heavy/local-only files
+# optional: commit for shared extraction speed, skip to keep repo small
+graphify-out/cache/
+# mtime-based, invalid after git clone - always gitignore this
+graphify-out/manifest.json
+# local token tracking, not useful to share
+graphify-out/cost.json
+
+stock/
+=*.0
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+
+# Downloaded data
+data/
+*.csv
+!test/**/*.csv
+
+# Local env / secrets
+.env
+.env.local
+.env.*.local

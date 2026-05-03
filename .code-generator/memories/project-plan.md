@@ -1,8 +1,7 @@
-- #24 [priority:high] feat: implement DMMForecaster with Pyro SVI encoder-decoder — agent: python-pro
-- #25 [priority:high] feat: implement TransformerForecaster with positional encoding and cross-attention — agent: python-pro
-- #26 [priority:high] test: add comprehensive tests for DMMForecaster — agent: python-pro
-- #27 [priority:high] test: add comprehensive tests for TransformerForecaster — agent: python-pro
-- #28 [priority:medium] chore: add full type annotations to all public APIs in forecasters and base — agent: python-pro
-- #29 [priority:medium] chore: update GitHub Actions CI for pytest coverage on Python 3.10–3.12 — agent: python-pro
-- #30 [priority:medium] feat: update public API exports for DMMForecaster and TransformerForecaster — agent: python-pro
-- #31 [priority:high] chore: run full test suite and fix linting for Cycle 3 completion — agent: python-pro
+- #2 [priority:unknown] unable to fit — agent: python-pro
+- #32 [priority:high] feat: relocate DMM sub-components and delete legacy modules — agent: python-pro
+- #33 [priority:high] feat: implement TransformerForecaster encoder-decoder — agent: python-pro
+- #34 [priority:high] test: add test_transformer_forecaster.py covering encoder-decoder contract — agent: python-pro
+- #35 [priority:medium] refactor: add type annotations to all forecaster modules — agent: python-pro
+- #36 [priority:medium] ci: update python-package.yml to Python 3.10/3.11/3.12 with pytest-cov — agent: python-pro
+- #37 [priority:medium] build: remove setup.py and finalize pyproject.toml package discovery — agent: python-pro

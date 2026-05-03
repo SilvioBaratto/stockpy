@@ -4,7 +4,7 @@
 A Python library for time-series forecasting using encoder-decoder neural architectures. Designed for financial and sequential data, it provides probabilistic and deterministic encoder-decoder models that predict future sequences from past observations — not classifying or regressing on flat features.
 
 ## Tech Stack
-- **Language**: Python 3.10+
+- **Language**: Python 3.11+
 - **Framework**: PyTorch (neural networks), Pyro-PPL (probabilistic encoder-decoders)
 - **Database**: none
 - **Deploy**: local / pip install

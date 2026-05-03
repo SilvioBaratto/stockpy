@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 import pyro
 import pyro.distributions as dist
 import torch
@@ -6,9 +10,10 @@ from pyro.nn import PyroModule
 
 from stockpy.base import EncoderDecoderForecaster
 from stockpy.preprocessing import unpack_data
-from stockpy.probabilistic._combiner import Combiner
-from stockpy.probabilistic._emitter import EmitterRegressor
-from stockpy.probabilistic._transition import Transition
+from stockpy.forecasters._dmm_components import Combiner, EmitterRegressor, Transition
+
+if TYPE_CHECKING:
+    from sklearn.utils._tags import Tags
 
 __all__ = ["DMMForecaster"]
 
@@ -49,21 +54,31 @@ class DMMModel(PyroModule):
         Encoder window length.
     """
 
+    # Sub-modules below are populated by ``initialize_module``; declared at the
+    # class level so static analysis sees their concrete types.
+    emitter: EmitterRegressor
+    transition: Transition
+    combiner: Combiner
+    rnn: nn.GRU
+    z_0: nn.Parameter
+    z_q_0: nn.Parameter
+    h_0: nn.Parameter
+
     def __init__(
         self,
-        n_features,
-        pred_len,
-        z_dim=32,
-        emission_dim=32,
-        transition_dim=32,
-        rnn_dim=32,
-        num_layers=1,
-        dropout=0.2,
-        variance=0.1,
-        activation="relu",
-        bias=True,
-        context_len=20,
-    ):
+        n_features: int,
+        pred_len: int,
+        z_dim: int = 32,
+        emission_dim: int = 32,
+        transition_dim: int = 32,
+        rnn_dim: int = 32,
+        num_layers: int = 1,
+        dropout: float = 0.2,
+        variance: float = 0.1,
+        activation: str = "relu",
+        bias: bool = True,
+        context_len: int = 20,
+    ) -> None:
         super().__init__()
         self.n_features = n_features
         self.pred_len = pred_len
@@ -78,15 +93,7 @@ class DMMModel(PyroModule):
         self.bias = bias
         self.context_len = context_len
 
-        self.emitter = None
-        self.transition = None
-        self.combiner = None
-        self.rnn = None
-        self.z_0 = None
-        self.z_q_0 = None
-        self.h_0 = None
-
-    def initialize_module(self, n_features):
+    def initialize_module(self, n_features: int) -> None:
         """Create sub-modules and initial parameters."""
         self.emitter = EmitterRegressor(
             n_features, self.z_dim, self.emission_dim, n_features
@@ -105,7 +112,12 @@ class DMMModel(PyroModule):
         self.z_q_0 = nn.Parameter(torch.zeros(1, self.z_dim))
         self.h_0 = nn.Parameter(torch.zeros(self.num_layers * 2, 1, self.rnn_dim))
 
-    def model(self, x, y, annealing_factor=1.0):
+    def model(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        annealing_factor: float = 1.0,
+    ) -> None:
         """Generative model over context + future.
 
         Parameters
@@ -139,7 +151,12 @@ class DMMModel(PyroModule):
                 )
                 z_prev = z_t
 
-    def guide(self, x, y=None, annealing_factor=1.0):
+    def guide(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor | None = None,
+        annealing_factor: float = 1.0,
+    ) -> None:
         """Variational guide (inference network).
 
         Parameters
@@ -172,7 +189,7 @@ class DMMModel(PyroModule):
                     )
                 z_prev = z_t
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Autoregressive prediction from context.
 
         Parameters
@@ -243,19 +260,19 @@ class DMMForecaster(EncoderDecoderForecaster):
 
     def __init__(
         self,
-        z_dim=32,
-        emission_dim=32,
-        transition_dim=32,
-        rnn_dim=32,
-        num_layers=1,
-        dropout=0.2,
-        variance=0.1,
-        activation="relu",
-        bias=True,
-        context_len=20,
-        pred_len=1,
-        **kwargs,
-    ):
+        z_dim: int = 32,
+        emission_dim: int = 32,
+        transition_dim: int = 32,
+        rnn_dim: int = 32,
+        num_layers: int = 1,
+        dropout: float = 0.2,
+        variance: float = 0.1,
+        activation: str = "relu",
+        bias: bool = True,
+        context_len: int = 20,
+        pred_len: int = 1,
+        **kwargs: Any,
+    ) -> None:
         self.z_dim = z_dim
         self.emission_dim = emission_dim
         self.transition_dim = transition_dim
@@ -274,7 +291,7 @@ class DMMForecaster(EncoderDecoderForecaster):
         self.prob = True
         self._modules = ["module"]
 
-    def __sklearn_tags__(self):
+    def __sklearn_tags__(self) -> Tags:
         from sklearn.utils._tags import InputTags, Tags, TargetTags
 
         return Tags(
@@ -283,10 +300,10 @@ class DMMForecaster(EncoderDecoderForecaster):
             input_tags=InputTags(two_d_array=True),
         )
 
-    def _get_tags(self):
+    def _get_tags(self) -> dict[str, bool]:
         return {"requires_y": True}
 
-    def initialize_module(self):
+    def initialize_module(self) -> DMMForecaster:
         """Create the DMM encoder-decoder module."""
         self.module_ = DMMModel(
             n_features=self.n_features_in_,
@@ -305,23 +322,37 @@ class DMMForecaster(EncoderDecoderForecaster):
         self.module_.initialize_module(self.n_features_in_)
         return self
 
-    def initialize_optimizer(self, triggered_directly=None):
+    def initialize_optimizer(
+        self, triggered_directly: bool | None = None
+    ) -> DMMForecaster:
         """Override to create a Pyro optimizer for SVI."""
-        from pyro.optim import Adam
+        from pyro.optim import Adam  # type: ignore[attr-defined]
 
         optim_args = {"lr": getattr(self, "lr", 0.01)}
         self.optimizer_ = Adam(optim_args)
         return self
 
-    def model(self, x, y, annealing_factor=1.0):
+    def model(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor,
+        annealing_factor: float = 1.0,
+    ) -> None:
         """Generative model for SVI."""
         return self.module_.model(x, y, annealing_factor)
 
-    def guide(self, x, y=None, annealing_factor=1.0):
+    def guide(
+        self,
+        x: torch.Tensor,
+        y: torch.Tensor | None = None,
+        annealing_factor: float = 1.0,
+    ) -> None:
         """Variational guide for SVI."""
         return self.module_.guide(x, y, annealing_factor)
 
-    def forward(self, x, y=None):
+    def forward(  # type: ignore[override]
+        self, x: torch.Tensor, y: torch.Tensor | None = None
+    ) -> torch.Tensor:
         """Forward pass through the DMM model.
 
         Parameters
@@ -338,11 +369,11 @@ class DMMForecaster(EncoderDecoderForecaster):
         """
         return self.module_.forward(x)
 
-    def _set_training(self, training=True):
+    def _set_training(self, training: bool = True) -> None:
         """Override to set training mode on the underlying Pyro module."""
         self.module_.train(training)
 
-    def train_step_single(self, batch, **fit_params):
+    def train_step_single(self, batch: Any, **fit_params: Any) -> dict[str, Any]:
         """Override to pass targets to ``infer`` for y_pred logging."""
         self._set_training(True)
         Xi, yi = unpack_data(batch)
@@ -353,14 +384,16 @@ class DMMForecaster(EncoderDecoderForecaster):
             return {"loss": loss, "y_pred": y_pred}
         return super().train_step_single(batch, **fit_params)
 
-    def state_dict(self):
+    def state_dict(self) -> dict[str, torch.Tensor]:
         """Return the state dict of the underlying Pyro module."""
         return self.module_.state_dict()
 
-    def load_state_dict(self, state_dict, strict=True):
+    def load_state_dict(
+        self, state_dict: dict[str, torch.Tensor], strict: bool = True
+    ) -> None:
         """Load a state dict into the underlying Pyro module."""
         self.module_.load_state_dict(state_dict, strict=strict)
 
     @property
-    def model_type(self):
+    def model_type(self) -> str:
         return "rnn"

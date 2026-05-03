@@ -1,679 +1,199 @@
 {
-  "mode": "multi-cycle",
-  "started_at": "2026-04-27T09:55:58Z",
-  "updated_at": "2026-04-28T02:02:38Z",
-  "current_cycle": 3,
-  "cycles": [
+  "mode": "single",
+  "started_at": "2026-05-03T06:52:50Z",
+  "updated_at": "2026-05-03T07:46:17Z",
+  "current_cycle": null,
+  "cycles": [],
+  "phase": 6,
+  "issues": [
     {
-      "id": 1,
-      "name": "Foundation & Core Infrastructure",
-      "milestone_number": 1,
-      "milestone_title": "Cycle 1 \u2014 Foundation & Core Infrastructure",
-      "status": "completed",
-      "phase": 7,
-      "issues": [
-        {
-          "number": 3,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "chore: delete classifier classes and ClassifierMixin usage"
-        },
-        {
-          "number": 4,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "chore: delete flat-regression and deprecated probabilistic models"
-        },
-        {
-          "number": 5,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:infra",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "chore: migrate packaging from setup.py to pyproject.toml"
-        },
-        {
-          "number": 6,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: implement EncoderDecoderForecaster base class"
-        },
-        {
-          "number": 7,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: implement TimeSeriesDataset with context_len and pred_len windows"
-        },
-        {
-          "number": 8,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:infra",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: reorganize package into stockpy/forecasters/ with stub files"
-        },
-        {
-          "number": 9,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:medium",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: add preprocessing transforms (normalization and differencing)"
-        },
-        {
-          "number": 10,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "test: create conftest.py with synthetic multivariate sine-wave fixtures"
-        },
-        {
-          "number": 11,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "test: create test_dataset.py for TimeSeriesDataset"
-        },
-        {
-          "number": 12,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "test: create test_callbacks.py for callback system"
-        }
-      ],
-      "commit_sha": null,
-      "depends_on": [],
-      "scope": "Delete all classifiers and flat-regression models; implement EncoderDecoderForecaster base class; reorganize package layout; migrate to pyproject.toml; create TimeSeriesDataset with context/pred windows; set up test infrastructure (conftest, test_dataset, test_callbacks).",
-      "effort_hints": [
-        {
-          "scope_keyword": "base class redesign",
-          "effort": "high"
-        },
-        {
-          "scope_keyword": "package reorganization",
-          "effort": "medium"
-        },
-        {
-          "scope_keyword": "dataset refactoring",
-          "effort": "medium"
-        },
-        {
-          "scope_keyword": "cleanup deletion",
-          "effort": "low"
-        }
-      ],
-      "base_commit": "45b258dc8464aa3ffa936b5806effffce09b3275",
-      "token_usage": {
-        "phase1": {
-          "input": 1189197,
-          "output": 11762,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 26
-        },
-        "phase2": {
-          "input": 456947,
-          "output": 10903,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 22
-        },
-        "phase3_4": {
-          "input": 13594674,
-          "output": 55063,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 172
-        },
-        "phase5": {
-          "input": 2014210,
-          "output": 4627,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 35
-        },
-        "phase6": {
-          "input": 298620,
-          "output": 1257,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 11
-        },
-        "phase7": {
-          "input": 60276,
-          "output": 1679,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 1
-        }
-      },
-      "started_at": "2026-04-27T10:11:30Z",
-      "finished_at": "2026-04-27T20:37:46Z",
-      "cache_telemetry": {
-        "input": 17613924,
-        "output": 85291,
-        "cache_read": 0,
-        "cache_write": 0,
-        "cache_hit_pct": 0.0,
-        "wall_seconds": 5492.687576595985
-      },
-      "phase2_batch_id": null,
-      "ollama_model": "kimi-k2.6:cloud"
+      "number": 2,
+      "status": "closed",
+      "agent": "python-pro",
+      "labels": [],
+      "reviewed": true,
+      "comments": "",
+      "title": "unable to fit"
     },
     {
-      "id": 2,
-      "name": "Deterministic Forecasters",
-      "milestone_number": 2,
-      "milestone_title": "Cycle 2 \u2014 Deterministic Forecasters",
-      "status": "completed",
-      "phase": 7,
-      "issues": [
-        {
-          "number": 14,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: implement GRUForecaster with encoder-decoder and teacher-forcing"
-        },
-        {
-          "number": 15,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: implement BiLSTMForecaster with bidirectional encoder and unidirectional decoder"
-        },
-        {
-          "number": 19,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:test",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "test: add comprehensive tests for GRUForecaster"
-        },
-        {
-          "number": 23,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:medium",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: update stockpy public API exports for Cycle 2 forecasters"
-        },
-        {
-          "number": 22,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:test",
-            "agent:python-pro"
-          ],
-          "reviewed": false,
-          "comments": "",
-          "title": ""
-        },
-        {
-          "number": 21,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:test",
-            "agent:python-pro"
-          ],
-          "reviewed": false,
-          "comments": "",
-          "title": ""
-        },
-        {
-          "number": 18,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:test",
-            "agent:python-pro"
-          ],
-          "reviewed": false,
-          "comments": "",
-          "title": ""
-        },
-        {
-          "number": 17,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": false,
-          "comments": "",
-          "title": ""
-        },
-        {
-          "number": 16,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": false,
-          "comments": "",
-          "title": ""
-        },
-        {
-          "number": 13,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": false,
-          "comments": "",
-          "title": ""
-        }
+      "number": 32,
+      "status": "closed",
+      "agent": "python-pro",
+      "labels": [
+        "priority:high",
+        "phase:implement",
+        "agent:python-pro",
+        "area:forecasters"
       ],
-      "commit_sha": null,
-      "depends_on": [
-        1
-      ],
-      "scope": "Implement LSTMForecaster, GRUForecaster, BiLSTMForecaster, BiGRUForecaster, and TCNForecaster with encoder-decoder splits and teacher-forcing; add unit tests for each model (instantiation, fit, predict shape, callbacks, save/load round-trip).",
-      "effort_hints": [
-        {
-          "scope_keyword": "encoder-decoder model",
-          "effort": "medium"
-        },
-        {
-          "scope_keyword": "teacher-forcing logic",
-          "effort": "high"
-        },
-        {
-          "scope_keyword": "model unit test",
-          "effort": "low"
-        }
-      ],
-      "base_commit": "bc67b810a26a1021efdcd9bbd244611542429263",
-      "token_usage": {
-        "phase1": {
-          "input": 833067,
-          "output": 11019,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 37
-        },
-        "phase2": {
-          "input": 1724373,
-          "output": 20513,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 45
-        },
-        "phase3_4": {
-          "input": 8136125,
-          "output": 34943,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 105
-        },
-        "phase5": {
-          "input": 3225193,
-          "output": 8778,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 38
-        },
-        "phase6": {
-          "input": 464675,
-          "output": 1018,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 10
-        },
-        "phase7": {
-          "input": 57611,
-          "output": 1357,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 1
-        }
-      },
-      "started_at": "2026-04-27T20:37:47Z",
-      "finished_at": "2026-04-27T23:04:27Z",
-      "cache_telemetry": {
-        "input": 49326382,
-        "output": 186015,
-        "cache_read": 0,
-        "cache_write": 0,
-        "cache_hit_pct": 0.0,
-        "wall_seconds": 8753.007376021022
-      },
-      "phase2_batch_id": null,
-      "ollama_model": "kimi-k2.6:cloud"
+      "reviewed": true,
+      "comments": "",
+      "title": "feat: relocate DMM sub-components and delete legacy modules"
     },
     {
-      "id": 3,
-      "name": "Advanced Forecasters & QA Polish",
-      "milestone_number": 3,
-      "milestone_title": "Cycle 3 \u2014 Advanced Forecasters & QA Polish",
-      "status": "open",
-      "phase": 6,
-      "issues": [
-        {
-          "number": 24,
-          "status": "open",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: implement DMMForecaster with Pyro SVI encoder-decoder"
-        },
-        {
-          "number": 25,
-          "status": "open",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: implement TransformerForecaster with positional encoding and cross-attention"
-        },
-        {
-          "number": 26,
-          "status": "open",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:test",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "test: add comprehensive tests for DMMForecaster"
-        },
-        {
-          "number": 27,
-          "status": "open",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:test",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "test: add comprehensive tests for TransformerForecaster"
-        },
-        {
-          "number": 28,
-          "status": "open",
-          "agent": "python-pro",
-          "labels": [
-            "priority:medium",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "chore: add full type annotations to all public APIs in forecasters and base"
-        },
-        {
-          "number": 29,
-          "status": "open",
-          "agent": "python-pro",
-          "labels": [
-            "priority:medium",
-            "area:infra",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "chore: update GitHub Actions CI for pytest coverage on Python 3.10\u20133.12"
-        },
-        {
-          "number": 30,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:medium",
-            "area:api",
-            "phase:implement",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "feat: update public API exports for DMMForecaster and TransformerForecaster"
-        },
-        {
-          "number": 31,
-          "status": "closed",
-          "agent": "python-pro",
-          "labels": [
-            "priority:high",
-            "area:tests",
-            "phase:test",
-            "agent:python-pro"
-          ],
-          "reviewed": true,
-          "comments": "",
-          "title": "chore: run full test suite and fix linting for Cycle 3 completion"
-        }
+      "number": 33,
+      "status": "closed",
+      "agent": "python-pro",
+      "labels": [
+        "priority:high",
+        "phase:implement",
+        "agent:python-pro",
+        "area:forecasters"
       ],
-      "commit_sha": null,
-      "depends_on": [
-        2
+      "reviewed": true,
+      "comments": "",
+      "title": "feat: implement TransformerForecaster encoder-decoder"
+    },
+    {
+      "number": 34,
+      "status": "closed",
+      "agent": "python-pro",
+      "labels": [
+        "priority:high",
+        "area:tests",
+        "phase:implement",
+        "agent:python-pro"
       ],
-      "scope": "Implement DMMForecaster (probabilistic encoder-decoder refactor) and TransformerForecaster; add full type annotations across all public APIs; update GitHub Actions CI for pytest with coverage; finalize integration tests for DMM and Transformer.",
-      "effort_hints": [
-        {
-          "scope_keyword": "probabilistic DMM refactor",
-          "effort": "high"
-        },
-        {
-          "scope_keyword": "Transformer architecture",
-          "effort": "high"
-        },
-        {
-          "scope_keyword": "CI pipeline update",
-          "effort": "low"
-        },
-        {
-          "scope_keyword": "type annotation pass",
-          "effort": "medium"
-        }
+      "reviewed": true,
+      "comments": "",
+      "title": "test: add test_transformer_forecaster.py covering encoder-decoder contract"
+    },
+    {
+      "number": 35,
+      "status": "closed",
+      "agent": "python-pro",
+      "labels": [
+        "priority:medium",
+        "phase:implement",
+        "agent:python-pro",
+        "area:forecasters"
       ],
-      "base_commit": "4d80832bd6eae160b3fc25629c86bea8b1bea3ab",
-      "token_usage": {
-        "phase1": {
-          "input": 2730083,
-          "output": 20979,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 105
-        },
-        "phase2": {
-          "input": 812223,
-          "output": 13457,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 31
-        },
-        "phase3_4": {
-          "input": 24360658,
-          "output": 41682,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 258
-        },
-        "phase5": {
-          "input": 1087813,
-          "output": 4539,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 26
-        },
-        "phase6": {
-          "input": 466058,
-          "output": 1082,
-          "cache_read": 0,
-          "cache_write": 0,
-          "num_turns": 9
-        }
-      },
-      "started_at": "2026-04-27T23:04:28Z",
-      "finished_at": null,
-      "cache_telemetry": {
-        "input": 29456835,
-        "output": 81739,
-        "cache_read": 0,
-        "cache_write": 0,
-        "cache_hit_pct": 0.0,
-        "wall_seconds": 4463.801442287979
-      },
-      "phase2_batch_id": null,
-      "ollama_model": "kimi-k2.6:cloud"
+      "reviewed": true,
+      "comments": "",
+      "title": "refactor: add type annotations to all forecaster modules"
+    },
+    {
+      "number": 36,
+      "status": "closed",
+      "agent": "python-pro",
+      "labels": [
+        "priority:medium",
+        "phase:implement",
+        "agent:python-pro",
+        "area:ci"
+      ],
+      "reviewed": true,
+      "comments": "",
+      "title": "ci: update python-package.yml to Python 3.10/3.11/3.12 with pytest-cov"
+    },
+    {
+      "number": 37,
+      "status": "closed",
+      "agent": "python-pro",
+      "labels": [
+        "priority:medium",
+        "phase:implement",
+        "agent:python-pro",
+        "area:packaging"
+      ],
+      "reviewed": true,
+      "comments": "",
+      "title": "build: remove setup.py and finalize pyproject.toml package discovery"
     }
   ],
-  "phase": null,
-  "issues": [],
   "session_id": null,
   "paused_until": null,
   "rate_limit_type": null,
   "last_error": null,
-  "effort_hints": [],
-  "requirements_hash": "48be76ed4709b991a7c91b9b5fff7622f58f0833683fbcc21636910d32e55db7",
-  "base_commit": null,
+  "effort_hints": [
+    {
+      "scope_keyword": "transformer",
+      "effort": "high"
+    },
+    {
+      "scope_keyword": "attention",
+      "effort": "high"
+    },
+    {
+      "scope_keyword": "sklearn",
+      "effort": "medium"
+    },
+    {
+      "scope_keyword": "cleanup",
+      "effort": "medium"
+    },
+    {
+      "scope_keyword": "delete",
+      "effort": "low"
+    },
+    {
+      "scope_keyword": "github actions",
+      "effort": "medium"
+    },
+    {
+      "scope_keyword": "ci",
+      "effort": "medium"
+    },
+    {
+      "scope_keyword": "type annotations",
+      "effort": "medium"
+    },
+    {
+      "scope_keyword": "test_transformer_forecaster",
+      "effort": "medium"
+    },
+    {
+      "scope_keyword": "pyproject",
+      "effort": "low"
+    }
+  ],
+  "requirements_hash": "ccc05237c25ead77c2500dab9339f2dc695ffd2fdf990220c54150b2905471b9",
+  "base_commit": "02e2100338adbdf1be64453491d00e84c67be361",
   "token_usage": {
     "phase0": {
-      "input": 175539,
-      "output": 3941,
-      "cache_read": 0,
-      "cache_write": 0,
-      "num_turns": 3
+      "input": 8,
+      "output": 2292,
+      "cache_read": 212651,
+      "cache_write": 39357,
+      "num_turns": 4
+    },
+    "phase1": {
+      "input": 40,
+      "output": 24069,
+      "cache_read": 2459317,
+      "cache_write": 194948,
+      "num_turns": 40
+    },
+    "phase2": {
+      "input": 2908,
+      "output": 7634,
+      "cache_read": 252338,
+      "cache_write": 71058,
+      "num_turns": 15
+    },
+    "phase3_4": {
+      "input": 7231,
+      "output": 118808,
+      "cache_read": 43004432,
+      "cache_write": 317253,
+      "num_turns": 237
+    },
+    "phase5": {
+      "input": 12,
+      "output": 6236,
+      "cache_read": 2817711,
+      "cache_write": 13790,
+      "num_turns": 23
+    },
+    "phase6": {
+      "input": 5,
+      "output": 364,
+      "cache_read": 99981,
+      "cache_write": 33904,
+      "num_turns": 4
     }
   },
   "session_mode": "shared",
-  "client_alive_at": "2026-04-27T23:04:30+00:00",
+  "client_alive_at": "2026-05-03T06:55:10+00:00",
   "phase2_batch_id": null,
   "repo": {
     "host": "github.com",
@@ -684,15 +204,14 @@
   "prompt_hashes": {
     "prompt-review.md": "0441abe84a853c7debbf63c3731899adf8bf3d717349103f184c0f4b1f13fd66",
     "prompt-optimize-requirements.md": "b8b06a05012b83ed6765092e9f706e86e5591ce5972efc6578e17b079ea78f87",
-    "prompt-phase-2-issue-review.md": "4227c63fa0adbccf119c313cad2b82a072a9a74b0357763cd283bcc92f694e5d",
-    "prompt-phase-6-test.md": "ae78b25171a5a9f0c0f38e377cdeab755ebc11421f5b19d57b41d966e5f0def7",
-    "prompt-phase-2-batch-review.md": "b1bc5a926ac561c786dfb82820ec4e4c3a0fc16282b86b02108ed5e65ace9666",
-    "prompt-phase-3-implementation.md": "eed8cddcc0b24aa0a4845d24eb77905da2ec9e21cae0d42790dae1548406d7fc",
-    "prompt-cycle-specializer.md": "b2b4d0b69f16f92e3af48a8d3fb387524f3c98b6f9d1d45374a2089fb57e4236",
-    "prompt-phase-1-planning.md": "3fa9ee16de589d0c16fb039a86c126e3a63ae8f47c629c6dc4c10a07d1d0818b",
-    "prompt-phase-7-commit.md": "2eac75c647db2dfc92362305ac651bbea0c4a1e0235999719d54cec7a4035db0",
-    "prompt-phase-5-final-review.md": "e7fc4c8cd9572689f33eec64b6c13d312a47c280efe621176ca75cea8e3335e1",
-    "prompt-phase-0-complexity.md": "8fe1f5cd7d82fd2cc66d4a9d8c784342f143e3d3e61c1ed5de9cf91d2aa6d8b3"
+    "prompt-phase-6-test.md": "4ee0d26ed1f742e3dfd6c73a6312cfda052bdc8c376f68283938597b858ca784",
+    "prompt-phase-2-batch-review.md": "96bdbcf04df56e1d0b96557889d3331d35eaeb03fbfdb56e1ff89961c6beadba",
+    "prompt-phase-3-implementation.md": "1d66dc77b96ffa8ac70120027b0acf9584992e3869af6a3b7722b69d487a6015",
+    "prompt-cycle-specializer.md": "2682949330eef5952d282c618f89536bd44222f87826b0e64d6eb97fb4977764",
+    "prompt-phase-1-planning.md": "aa9940093885f6640a3126062fe270c1a3e931ea1a67b939168b39a190850877",
+    "prompt-phase-7-commit.md": "d8b1dbde847a706fa7dd479cf3960c865d11b841520f8613b2649d8869d9e46b",
+    "prompt-phase-5-final-review.md": "a91cac8467f7ee3e138c938e5878d3279dc33428cc580f99e497dbc00dcf2681",
+    "prompt-phase-0-complexity.md": "68b5a53417053d8128a3d496fcb639813ebb0caa0c4a79cb4384028157bd0daa"
   },
-  "sdk_version": "0.1.68"
+  "sdk_version": "0.1.72"
 }

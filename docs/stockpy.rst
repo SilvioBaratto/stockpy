@@ -6,8 +6,6 @@ stockpy
 
    callbacks
    preprocessing
-   neural_network
-   probabilistic
    utils
    history
    exceptions

@@ -487,7 +487,11 @@ class ValidSplit:
         intended for public use.
         """
         cv_cls = StratifiedShuffleSplit if self.stratified else ShuffleSplit
-        return cv_cls(test_size=self.cv, random_state=self.random_state)
+        return cv_cls(
+            n_splits=1,
+            test_size=self.cv,
+            random_state=self.random_state,
+        )
 
     def _check_cv_non_float(self, y=None):
         """
@@ -634,6 +638,21 @@ class ValidSplit:
                     "Cannot perform a CV split if dataset and y "
                     "have different lengths."
                 )
+
+        n_splits = getattr(cv, "n_splits", None)
+        if isinstance(n_splits, int) and n_splits > len_dataset:
+            raise ValueError(
+                f"Cannot split a dataset of {len_dataset} sample(s) into "
+                f"{n_splits} folds. For sliding-window time-series datasets "
+                f"the number of samples is "
+                f"(series_length - context_len - pred_len) // stride + 1, "
+                f"so a short series or large context_len/pred_len can fall "
+                f"below the default cv=5. Fixes: (a) provide more data, "
+                f"(b) reduce context_len or pred_len, (c) pass a smaller cv "
+                f"(e.g. ValidSplit(cv=2)), (d) use a holdout fraction "
+                f"(e.g. ValidSplit(cv=0.2)), or (e) disable validation with "
+                f"train_split=None."
+            )
 
         args = (np.arange(len_dataset),)
         if self._is_stratified(cv):
