@@ -47,7 +47,7 @@ def _first_real_statement(tree: ast.Module) -> ast.stmt | None:
 
 
 def _has_full_annotations(func: object) -> bool:
-    sig = inspect.signature(func)
+    sig = inspect.signature(func)  # type: ignore[reportArgumentType]
     for name, param in sig.parameters.items():
         if name in ("self", "cls"):
             continue

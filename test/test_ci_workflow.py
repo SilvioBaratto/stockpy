@@ -49,12 +49,14 @@ class TestTriggers:
     ) -> None:
         # ``on`` parses as boolean True under PyYAML — fall back to the truthy key.
         on = workflow.get("on") or workflow.get(True)
+        assert on is not None
         assert set(on["push"]["branches"]) >= {"main", "development"}
 
     def test_when_pull_request_event_branches_include_main_and_development(
         self, workflow: dict
     ) -> None:
         on = workflow.get("on") or workflow.get(True)
+        assert on is not None
         assert set(on["pull_request"]["branches"]) >= {"main", "development"}
 
 

@@ -3,7 +3,6 @@
 import sys
 import time
 from itertools import cycle
-from numbers import Number
 
 from tabulate import tabulate
 
@@ -175,7 +174,7 @@ class PrintLog(Callback):
         self.keys_ignored_.add("batches")
         return self
 
-    def format_row(self, row: dict, key: str, color: Ansi) -> str:
+    def format_row(self, row: dict, key: str, color: str) -> str:
         """
         Formats a single row entry for the log output based on the type of value.
 
@@ -208,7 +207,7 @@ class PrintLog(Callback):
         if isinstance(value, bool) or value is None:
             return "+" if value else ""
 
-        if not isinstance(value, Number):
+        if not isinstance(value, (int, float)):
             return value
 
         # determine if integer value

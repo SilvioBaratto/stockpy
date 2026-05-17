@@ -1,5 +1,3 @@
-- #38 [priority:high] fix: coerce self.device to str when calling safetensors safe_open — agent: python-pro
-- #39 [priority:high] fix: skip ValidSplit length check when fit(X, y=X) on windowed dataset — agent: python-pro
-- #40 [priority:medium] fix: StandardScalerTransform must return same array library as input (numpy in -> numpy out) — agent: python-pro
-- #41 [priority:low] fix: validate len(X) >= context_len + pred_len upfront in EncoderDecoderForecaster.fit — agent: python-pro
-- #42 [priority:low] chore: remove stale build/ and stockpy_learn.egg-info/ artifacts; verify clean wheel — agent: python-pro
+- #43 [priority:high] feat: implement PatchTSTForecaster (encoder-only, channel-independent) — agent: python-pro
+- #44 [priority:high] feat: implement iTransformerForecaster (encoder-only, variates-as-tokens) — agent: python-pro
+- #45 [priority:high] feat: register PatchTSTForecaster and iTransformerForecaster in public API + README — agent: python-pro

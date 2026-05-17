@@ -34,6 +34,8 @@ Available forecasters:
 | `TCNForecaster`        | Temporal Convolutional Network (causal dilated) encoder + GRU dec. |
 | `TransformerForecaster`| Encoder-decoder Transformer with multi-head self/cross attention   |
 | `DMMForecaster`        | Deep Markov Model (Pyro SVI) — probabilistic encoder-decoder       |
+| `PatchTSTForecaster`   | Encoder-only Transformer over patched series, channel-independent. Direct multi-step head. |
+| `iTransformerForecaster`| Encoder-only Transformer with variates as tokens. Per-variate direct projection to `pred_len`. |
 
 ## Usage
 Import the forecaster you want from `stockpy.forecasters`. Inputs must be 2-D arrays shaped `(time_steps, n_features)`; the library handles the sliding-window split into `context_len` / `pred_len` pairs internally via `TimeSeriesDataset`.

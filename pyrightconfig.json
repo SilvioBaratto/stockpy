@@ -1,0 +1,8 @@
+{
+  "include": ["stockpy", "test"],
+  "exclude": ["build"],
+  "analyzeUnannotatedFunctions": false,
+  "reportPrivateImportUsage": false,
+  "reportIncompatibleMethodOverride": false,
+  "reportMissingImports": false
+}

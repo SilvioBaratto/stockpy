@@ -1,12 +1,12 @@
-# Graph Report - stockpy  (2026-05-03)
+# Graph Report - stockpy  (2026-05-17)
 
 ## Corpus Check
-- 48 files · ~80,924 words
+- 49 files · ~81,524 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1678 nodes · 2428 edges · 48 communities detected
-- Extraction: 80% EXTRACTED · 20% INFERRED · 0% AMBIGUOUS · INFERRED: 491 edges (avg confidence: 0.75)
+- 1719 nodes · 2487 edges · 49 communities detected
+- Extraction: 80% EXTRACTED · 20% INFERRED · 0% AMBIGUOUS · INFERRED: 505 edges (avg confidence: 0.75)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
@@ -55,18 +55,19 @@
 - [[_COMMUNITY_Community 43|Community 43]]
 - [[_COMMUNITY_Community 44|Community 44]]
 - [[_COMMUNITY_Community 45|Community 45]]
-- [[_COMMUNITY_Community 47|Community 47]]
+- [[_COMMUNITY_Community 46|Community 46]]
 - [[_COMMUNITY_Community 48|Community 48]]
 - [[_COMMUNITY_Community 49|Community 49]]
+- [[_COMMUNITY_Community 50|Community 50]]
 
 ## God Nodes (most connected - your core abstractions)
 1. `BaseEstimator` - 88 edges
-2. `EncoderDecoderForecaster` - 57 edges
-3. `DMMForecaster` - 41 edges
-4. `TimeSeriesDataset` - 40 edges
-5. `TCNForecaster` - 33 edges
-6. `BiGRUForecaster` - 32 edges
-7. `LSTMForecaster` - 31 edges
+2. `EncoderDecoderForecaster` - 59 edges
+3. `TimeSeriesDataset` - 42 edges
+4. `DMMForecaster` - 41 edges
+5. `LSTMForecaster` - 38 edges
+6. `TCNForecaster` - 33 edges
+7. `BiGRUForecaster` - 32 edges
 8. `GRUForecaster` - 31 edges
 9. `TestTimeSeriesDataset` - 29 edges
 10. `BiLSTMForecaster` - 29 edges
@@ -104,71 +105,71 @@
 
 ### Community 0 - "Community 0"
 Cohesion: 0.02
-Nodes (92): Unpack data returned by the net's iterator into a 2-tuple.      This function is, unpack_data(), BaseEstimator, _current_init_context(), _extract_optimizer_param_name_and_group(), history(), optimizer_setter(), predict() (+84 more)
+Nodes (94): Unpack data returned by the net's iterator into a 2-tuple.      This function is, unpack_data(), BaseEstimator, _current_init_context(), _extract_optimizer_param_name_and_group(), history(), optimizer_setter(), predict() (+86 more)
 
 ### Community 1 - "Community 1"
 Cohesion: 0.02
-Nodes (64): Combiner, EmitterRegressor, Sub-modules used by ``DMMForecaster``.  Encapsulates the inference (``Combiner``, Gaussian latent-state transition p(z_t | z_{t-1}, x_t).      Implements a gated, Return ``(loc, scale)`` of p(z_t | z_{t-1}, x_t)., Parameterizes the variational distribution q(z_t | z_{t-1}, x_{t:T}).      Maps, Return ``(loc, scale)`` of q(z_t | z_{t-1}, x_{t:T})., Parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t).      Genera (+56 more)
+Nodes (65): Combiner, EmitterRegressor, Sub-modules used by ``DMMForecaster``.  Encapsulates the inference (``Combiner``, Gaussian latent-state transition p(z_t | z_{t-1}, x_t).      Implements a gated, Return ``(loc, scale)`` of p(z_t | z_{t-1}, x_t)., Parameterizes the variational distribution q(z_t | z_{t-1}, x_{t:T}).      Maps, Return ``(loc, scale)`` of q(z_t | z_{t-1}, x_{t:T})., Parameterizes the Gaussian observation likelihood p(y_t | z_t, x_t).      Genera (+57 more)
 
 ### Community 2 - "Community 2"
-Cohesion: 0.02
-Nodes (88): Prepare the scoring callback at the beginning of training.          This method, Acquire the data required for evaluating the scoring function.          This met, Dataset, Enum, NotFittedError, Custom dataset class for Stockpy designed to handle a variety of data types., Initializes the `StockpyDataset`., Get the length of the dataset.          Returns         -------         int (+80 more)
+Cohesion: 0.03
+Nodes (52): Callback, Basic callback definition., EpochTimer, filter_log_keys(), PrintLog, Callbacks for printing, logging and log information., Initializes the callback before training begins.          This method sets up th, Yield keys from an iterable that are not designated to be ignored for logging. (+44 more)
 
 ### Community 3 - "Community 3"
-Cohesion: 0.03
-Nodes (48): BiGRUModel, Forward pass.          Parameters         ----------         x : torch.Tensor, s, Forward pass.          Parameters         ----------         x : torch.Tensor, s, BiGRU-based encoder-decoder for time-series forecasting.      The encoder is a b, BiGRU-based encoder-decoder for time-series forecasting.      The encoder is a b, Reshape encoder hidden for the unidirectional decoder.          PyTorch bidirect, Reshape encoder hidden for the unidirectional decoder.          PyTorch bidirect, BiLSTMModel (+40 more)
+Cohesion: 0.02
+Nodes (85): Acquire the data required for evaluating the scoring function.          This met, Dataset, Enum, NotFittedError, Custom dataset class for Stockpy designed to handle a variety of data types., Initializes the `StockpyDataset`., Get the length of the dataset.          Returns         -------         int, Applies transformations to the data, converting it to the format required for mo (+77 more)
 
 ### Community 4 - "Community 4"
+Cohesion: 0.04
+Nodes (37): _build_decoder(), _build_encoder(), _build_table(), _PositionalEncoding, Transformer encoder-decoder forecaster.  Implements feature 11 of the v0.4.0 res, Encode ``x`` then decode ``pred_len`` future steps.          Parameters, Transformer encoder-decoder forecaster.      Parameters     ----------     d_mod, Build :class:`TransformerModel` from ``self.n_features_in_``. (+29 more)
+
+### Community 5 - "Community 5"
 Cohesion: 0.03
 Nodes (49): EncoderDecoderForecaster, BiGRU, BiGRURegressor, Gated Recurrent Unit (BiGRU) based Recurrent Neural Network for sequence process, A regressor that uses a Gated Recurrent Unit (BiGRU) network for sequence regres, Initializes the BiGRURegressor object with given or default parameters., Forward pass through the BiGRURegressor model.          The method processes the, Forecast future values for the given input sequences.          Parameters (+41 more)
 
-### Community 5 - "Community 5"
-Cohesion: 0.04
-Nodes (32): _build_decoder(), _build_encoder(), _build_table(), _PositionalEncoding, Transformer encoder-decoder forecaster.  Implements feature 11 of the v0.4.0 res, Encode ``x`` then decode ``pred_len`` future steps.          Parameters, Transformer encoder-decoder forecaster.      Parameters     ----------     d_mod, Build :class:`TransformerModel` from ``self.n_features_in_``. (+24 more)
-
 ### Community 6 - "Community 6"
 Cohesion: 0.04
-Nodes (33): _apply_to_data(), get_len(), _is_sparse(), _len(), Get the length of the input data.      If the input data `x` is a sparse matrix,, Get the consistent length of the input data.      This function is particularly, Apply a given function to the input data.      This function supports data in th, Class to perform internal train/validation split on a dataset.      This class a (+25 more)
+Nodes (35): _apply_to_data(), get_len(), _is_sparse(), _len(), Get the length of the input data.      If the input data `x` is a sparse matrix,, Get the consistent length of the input data.      This function is particularly, Apply a given function to the input data.      This function supports data in th, Class to perform internal train/validation split on a dataset.      This class a (+27 more)
 
 ### Community 7 - "Community 7"
 Cohesion: 0.03
-Nodes (45): Calculate the weighted average of scores for the latest epoch.          This met, list, Retrieve and return initialization parameters for a specific optimizer., Retrieve initialization parameters for a specified optimizer.          This publ, from_file(), _get_getitem_method(), _getitem_dict_list(), _getitem_dict_str() (+37 more)
+Nodes (37): BiGRUModel, Forward pass.          Parameters         ----------         x : torch.Tensor, s, Forward pass.          Parameters         ----------         x : torch.Tensor, s, BiGRU-based encoder-decoder for time-series forecasting.      The encoder is a b, BiGRU-based encoder-decoder for time-series forecasting.      The encoder is a b, Create the BiGRU encoder-decoder module and loss criterion., Create the BiGRU encoder-decoder module and loss criterion., Reshape encoder hidden for the unidirectional decoder.          PyTorch bidirect (+29 more)
 
 ### Community 8 - "Community 8"
 Cohesion: 0.04
-Nodes (33): Callback, Basic callback definition., GradientNormClipping, Post-process regularization steps such as gradient normalizing., Clips gradient norm of a module's parameters.      The norm is computed over all, Checkpoint, EarlyStopping, Callbacks related to training progress. (+25 more)
+Nodes (34): CausalConv1d, Stack of temporal blocks with exponentially increasing dilation.      Parameters, Causal 1-D convolution that maintains temporal ordering.      Left-pads the inpu, TCN encoder + GRU decoder for time-series forecasting.      The TCN encoder proc, TCN encoder + GRU decoder for time-series forecasting.      The TCN encoder proc, Causal 1-D convolution that maintains temporal ordering.      Left-pads the inpu, Project the last encoder timestep to decoder initial hidden state.          enco, Forward pass.          Parameters         ----------         x : torch.Tensor, s (+26 more)
 
 ### Community 9 - "Community 9"
-Cohesion: 0.05
-Nodes (20): LSTMForecaster, LSTM-based encoder-decoder forecaster.      Parameters     ----------     rnn_si, LSTM-based encoder-decoder forecaster.      Parameters     ----------     rnn_si, Create the LSTM encoder-decoder module and loss criterion., Create the LSTM encoder-decoder module and loss criterion., Override to set training mode on the PyTorch module., Forward pass through the LSTM model.          Parameters         ----------, Override to set training mode on the PyTorch module. (+12 more)
+Cohesion: 0.04
+Nodes (28): DifferenceTransform, Reverse standardization.          Parameters         ----------         data : a, Reverse standardization.          Parameters         ----------         data : a, Fit to data, then transform it.          Parameters         ----------         d, Fit to data, then transform it.          Parameters         ----------         d, First-order (or n-th order) differencing for time series.      Computes discrete, First-order (or n-th order) differencing for time series.      Computes discrete, Ensure data is a 2D numpy array. (+20 more)
 
 ### Community 10 - "Community 10"
 Cohesion: 0.05
-Nodes (19): DifferenceTransform, Reverse standardization.          Parameters         ----------         data : a, Fit to data, then transform it.          Parameters         ----------         d, First-order (or n-th order) differencing for time series.      Computes discrete, Ensure data is a 2D numpy array., No-op for DifferenceTransform (stateless).          Parameters         ---------, Apply n-th order differencing along the time axis.          Parameters         -, Inverse transform is not defined for differencing.          Raises         ----- (+11 more)
+Nodes (34): BatchScoring, _cache_net_forward_iter(), cache_net_infer(), convert_sklearn_metric_function(), EpochScoring, PassthroughScoring, Callbacks for calculating scores., Initialize the best score tracking.          Sets the best score to positive or (+26 more)
 
 ### Community 11 - "Community 11"
 Cohesion: 0.05
-Nodes (53): stockpy.callbacks API, Callbacks User Guide, Callbacks User Guide (source), BaseEstimator, BatchScoring, Bayesian Neural Network (BNN), Callback Base Class, Checkpoint (+45 more)
+Nodes (19): GRUForecaster, GRU-based encoder-decoder forecaster.      Parameters     ----------     rnn_siz, GRU-based encoder-decoder forecaster.      Parameters     ----------     rnn_siz, Override to set training mode on the PyTorch module., Forward pass through the GRU model.          Parameters         ----------, Override to set training mode on the PyTorch module., Forward pass through the GRU model.          Parameters         ----------, Override to pass targets to ``infer`` for teacher forcing. (+11 more)
 
 ### Community 12 - "Community 12"
 Cohesion: 0.05
-Nodes (32): BatchScoring, _cache_net_forward_iter(), cache_net_infer(), convert_sklearn_metric_function(), EpochScoring, PassthroughScoring, Callbacks for calculating scores., Initialize the best score tracking.          Sets the best score to positive or (+24 more)
+Nodes (21): LSTMForecaster, LSTM-based encoder-decoder forecaster.      Parameters     ----------     rnn_si, LSTM-based encoder-decoder forecaster.      Parameters     ----------     rnn_si, Override to set training mode on the PyTorch module., Forward pass through the LSTM model.          Parameters         ----------, Override to set training mode on the PyTorch module., Forward pass through the LSTM model.          Parameters         ----------, Override to pass targets to ``infer`` for teacher forcing. (+13 more)
 
 ### Community 13 - "Community 13"
-Cohesion: 0.06
-Nodes (17): TCN encoder-decoder forecaster with causal dilated convolutions.      Parameters, TCN encoder-decoder forecaster with causal dilated convolutions.      Parameters, Create the TCN encoder-decoder module and loss criterion., Create the TCN encoder-decoder module and loss criterion., Override to set training mode on the PyTorch module., Forward pass through the TCN model.          Parameters         ----------, Override to set training mode on the PyTorch module., Forward pass through the TCN model.          Parameters         ---------- (+9 more)
+Cohesion: 0.05
+Nodes (53): stockpy.callbacks API, Callbacks User Guide, Callbacks User Guide (source), BaseEstimator, BatchScoring, Bayesian Neural Network (BNN), Callback Base Class, Checkpoint (+45 more)
 
 ### Community 14 - "Community 14"
-Cohesion: 0.06
-Nodes (17): BiGRUForecaster, BiGRU-based encoder-decoder forecaster.      Parameters     ----------     rnn_s, BiGRU-based encoder-decoder forecaster.      Parameters     ----------     rnn_s, Create the BiGRU encoder-decoder module and loss criterion., Create the BiGRU encoder-decoder module and loss criterion., Override to set training mode on the PyTorch module., Forward pass through the BiGRU model.          Parameters         ----------, Override to set training mode on the PyTorch module. (+9 more)
+Cohesion: 0.05
+Nodes (36): list, Retrieve and return initialization parameters for a specific optimizer., Retrieve initialization parameters for a specified optimizer.          This publ, from_file(), _get_getitem_method(), _getitem_dict_list(), _getitem_dict_str(), _getitem_dict_tuple() (+28 more)
 
 ### Community 15 - "Community 15"
-Cohesion: 0.06
-Nodes (17): GRUForecaster, GRU-based encoder-decoder forecaster.      Parameters     ----------     rnn_siz, GRU-based encoder-decoder forecaster.      Parameters     ----------     rnn_siz, Create the GRU encoder-decoder module and loss criterion., Create the GRU encoder-decoder module and loss criterion., Override to set training mode on the PyTorch module., Forward pass through the GRU model.          Parameters         ----------, Override to set training mode on the PyTorch module. (+9 more)
+Cohesion: 0.07
+Nodes (16): BiGRUForecaster, BiGRU-based encoder-decoder forecaster.      Parameters     ----------     rnn_s, BiGRU-based encoder-decoder forecaster.      Parameters     ----------     rnn_s, Override to set training mode on the PyTorch module., Forward pass through the BiGRU model.          Parameters         ----------, Override to set training mode on the PyTorch module., Forward pass through the BiGRU model.          Parameters         ----------, Override to pass targets to ``infer`` for teacher forcing. (+8 more)
 
 ### Community 16 - "Community 16"
 Cohesion: 0.07
-Nodes (16): BiLSTMForecaster, BiLSTM-based encoder-decoder forecaster.      Parameters     ----------     rnn_, BiLSTM-based encoder-decoder forecaster.      Parameters     ----------     rnn_, Create the BiLSTM encoder-decoder module and loss criterion., Create the BiLSTM encoder-decoder module and loss criterion., Override to set training mode on the PyTorch module., Forward pass through the BiLSTM model.          Parameters         ----------, Override to set training mode on the PyTorch module. (+8 more)
+Nodes (15): BiLSTMForecaster, BiLSTM-based encoder-decoder forecaster.      Parameters     ----------     rnn_, BiLSTM-based encoder-decoder forecaster.      Parameters     ----------     rnn_, Override to set training mode on the PyTorch module., Forward pass through the BiLSTM model.          Parameters         ----------, Override to set training mode on the PyTorch module., Forward pass through the BiLSTM model.          Parameters         ----------, Override to pass targets to ``infer`` for teacher forcing. (+7 more)
 
 ### Community 17 - "Community 17"
 Cohesion: 0.07
@@ -176,23 +177,23 @@ Nodes (18): _check_lr(), LRScheduler, Simulate the learning rate schedule over a
 
 ### Community 18 - "Community 18"
 Cohesion: 0.07
-Nodes (19): EpochTimer, filter_log_keys(), PrintLog, Callbacks for printing, logging and log information., Initializes the callback before training begins.          This method sets up th, Yield keys from an iterable that are not designated to be ignored for logging., Formats a single row entry for the log output based on the type of value., Sort the keys for displaying in the log output with a predefined order. (+11 more)
-
-### Community 19 - "Community 19"
-Cohesion: 0.07
 Nodes (36): EncoderDecoderForecaster ABC, StockpyDataset, BiGRU nn.Module (legacy), BiGRUForecaster, BiGRUModel encoder-decoder, BiGRURegressor (deprecated, legacy), BiLSTM nn.Module (legacy), BiLSTMForecaster (+28 more)
 
-### Community 20 - "Community 20"
+### Community 19 - "Community 19"
 Cohesion: 0.06
 Nodes (35): stockpy.callbacks module, stockpy.callbacks autodoc page, Coding conventions (Black 88, NumPy docstrings, sklearn param pattern), DMM as primary encoder-decoder candidate, Design principle: encoder-decoder only, Design principle: no classification, Design principle: no flat regression, Design principle: no sklearn ClassifierMixin/RegressorMixin (+27 more)
 
-### Community 21 - "Community 21"
+### Community 20 - "Community 20"
 Cohesion: 0.08
 Nodes (33): BaseEstimator (training engine), BatchScoring callback, cache_net_infer context, Callback base class, Checkpoint callback, convert_sklearn_metric_function, EarlyStopping callback, EpochScoring callback (+25 more)
 
-### Community 22 - "Community 22"
+### Community 21 - "Community 21"
 Cohesion: 0.09
 Nodes (11): Structural tests for the CI workflow.  Coverage for issue #36 acceptance criteri, _step_run(), _step_uses(), TestActionVersions, TestCoverallsUpload, TestInstallStep, TestLintSteps, TestPythonMatrix (+3 more)
+
+### Community 22 - "Community 22"
+Cohesion: 0.07
+Nodes (8): Packaging tests for issue #37.  Asserts that ``setup.py`` is gone, ``pyproject.t, The original bug: subpackages must remain importable., End-to-end PEP 517 build → confirm the wheel actually ships subpackages., TestPackageDiscovery, TestPyTypedMarkerPreserved, TestSetupPyRemoved, TestSubpackageImports, TestWheelBuild
 
 ### Community 23 - "Community 23"
 Cohesion: 0.13
@@ -282,20 +283,24 @@ Nodes (1): Retrieves keyword arguments for the scheduler.          This property
 Cohesion: 1.0
 Nodes (1): Constructs the full path for the training history file.          This property a
 
-### Community 47 - "Community 47"
+### Community 46 - "Community 46"
 Cohesion: 1.0
-Nodes (1): setup() entrypoint
+Nodes (1): Forecast future time steps for the given input sequences.          Subclasses mu
 
 ### Community 48 - "Community 48"
 Cohesion: 1.0
-Nodes (1): get_activation_function
+Nodes (1): setup() entrypoint
 
 ### Community 49 - "Community 49"
+Cohesion: 1.0
+Nodes (1): get_activation_function
+
+### Community 50 - "Community 50"
 Cohesion: 1.0
 Nodes (1): ValidSplit
 
 ## Knowledge Gaps
-- **610 isolated node(s):** `Normalize a ticker symbol to Yahoo Finance form.      Yahoo Finance uses ``-`` i`, `Scrape S&P 500 ticker list from Wikipedia.      Wikipedia rejects the default ur`, `Packaging tests for issue #37.  Asserts that ``setup.py`` is gone, ``pyproject.t`, `The original bug: subpackages must remain importable.`, `End-to-end PEP 517 build → confirm the wheel actually ships subpackages.` (+605 more)
+- **632 isolated node(s):** `Normalize a ticker symbol to Yahoo Finance form.      Yahoo Finance uses ``-`` i`, `Scrape S&P 500 ticker list from Wikipedia.      Wikipedia rejects the default ur`, `Tests for safetensors save/load round-trip on encoder-decoder forecasters.  Cove`, `Round-trip save → load → predict via safetensors with no workarounds.`, `Packaging tests for issue #37.  Asserts that ``setup.py`` is gone, ``pyproject.t` (+627 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **Thin community `Community 36`** (2 nodes): `TestDifferenceTransform`, `TestStandardScalerTransform`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
@@ -317,27 +322,29 @@ Nodes (1): ValidSplit
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 - **Thin community `Community 45`** (1 nodes): `Constructs the full path for the training history file.          This property a`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 47`** (1 nodes): `setup() entrypoint`
+- **Thin community `Community 46`** (1 nodes): `Forecast future time steps for the given input sequences.          Subclasses mu`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 48`** (1 nodes): `get_activation_function`
+- **Thin community `Community 48`** (1 nodes): `setup() entrypoint`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
-- **Thin community `Community 49`** (1 nodes): `ValidSplit`
+- **Thin community `Community 49`** (1 nodes): `get_activation_function`
+  Too small to be a meaningful cluster - may be noise or needs more connections extracted.
+- **Thin community `Community 50`** (1 nodes): `ValidSplit`
   Too small to be a meaningful cluster - may be noise or needs more connections extracted.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `EncoderDecoderForecaster` connect `Community 3` to `Community 0`, `Community 1`, `Community 2`, `Community 4`, `Community 5`, `Community 7`, `Community 9`, `Community 13`, `Community 14`, `Community 15`, `Community 16`, `Community 23`?**
+- **Why does `EncoderDecoderForecaster` connect `Community 4` to `Community 0`, `Community 1`, `Community 3`, `Community 5`, `Community 7`, `Community 8`, `Community 11`, `Community 12`, `Community 14`, `Community 15`, `Community 16`, `Community 23`?**
   _High betweenness centrality (0.372) - this node is a cross-community bridge._
-- **Why does `BaseEstimator` connect `Community 0` to `Community 2`, `Community 3`, `Community 7`, `Community 23`, `Community 25`?**
-  _High betweenness centrality (0.196) - this node is a cross-community bridge._
-- **Why does `unpack_data()` connect `Community 0` to `Community 1`, `Community 5`, `Community 6`, `Community 9`, `Community 12`, `Community 13`, `Community 14`, `Community 15`, `Community 16`?**
-  _High betweenness centrality (0.086) - this node is a cross-community bridge._
+- **Why does `BaseEstimator` connect `Community 0` to `Community 3`, `Community 4`, `Community 14`, `Community 23`, `Community 25`?**
+  _High betweenness centrality (0.164) - this node is a cross-community bridge._
+- **Why does `History` connect `Community 14` to `Community 0`, `Community 17`, `Community 2`, `Community 4`?**
+  _High betweenness centrality (0.089) - this node is a cross-community bridge._
 - **Are the 7 inferred relationships involving `BaseEstimator` (e.g. with `EncoderDecoderForecaster` and `BaseEstimator`) actually correct?**
   _`BaseEstimator` has 7 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 52 inferred relationships involving `EncoderDecoderForecaster` (e.g. with `BaseEstimator` and `TestForecasterStubs`) actually correct?**
   _`EncoderDecoderForecaster` has 52 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 37 inferred relationships involving `TimeSeriesDataset` (e.g. with `.test_constructor_accepts_context_len_pred_len_stride()` and `.test_getitem_returns_tuple_of_tensors()`) actually correct?**
+  _`TimeSeriesDataset` has 37 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 25 inferred relationships involving `DMMForecaster` (e.g. with `EncoderDecoderForecaster` and `Combiner`) actually correct?**
   _`DMMForecaster` has 25 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 35 inferred relationships involving `TimeSeriesDataset` (e.g. with `.test_constructor_accepts_context_len_pred_len_stride()` and `.test_getitem_returns_tuple_of_tensors()`) actually correct?**
-  _`TimeSeriesDataset` has 35 INFERRED edges - model-reasoned connections that need verification._

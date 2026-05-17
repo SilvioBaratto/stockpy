@@ -62,7 +62,7 @@ class _PositionalEncoding(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Add positional encoding to ``x`` (shape ``(batch, seq, d_model)``)."""
-        return self.dropout(x + self.pe[: x.size(1)])
+        return self.dropout(x + self.pe[: x.size(1)])  # type: ignore[reportIndexIssue]
 
 
 class TransformerModel(nn.Module):

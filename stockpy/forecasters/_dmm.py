@@ -209,6 +209,7 @@ class DMMModel(PyroModule):
         rnn_output, _ = self.rnn(x, h_0)
 
         z_prev = self.z_q_0.expand(batch_size, self.z_dim)
+        z_t = z_prev
         for t in range(1, x.size(1) + 1):
             z_loc, _ = self.combiner(z_prev, rnn_output[:, t - 1, :])
             z_t = z_loc

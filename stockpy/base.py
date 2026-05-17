@@ -9,6 +9,7 @@ from collections.abc import Mapping
 from contextlib import contextmanager
 from functools import partial
 from itertools import chain
+from typing import Any
 
 import numpy as np
 import pyro
@@ -2321,7 +2322,7 @@ class BaseEstimator:
         self,
         X,
         y=None,
-        optimizer=torch.optim.SGD,
+        optimizer: type[torch.optim.Optimizer] = torch.optim.SGD,
         elbo=TraceMeanField_ELBO,
         callbacks=None,
         lr=0.01,
@@ -2331,7 +2332,7 @@ class BaseEstimator:
         verbose=1,
         model_params=None,
         warm_start=False,
-        train_split=ValidSplit(5),
+        train_split: ValidSplit | None = ValidSplit(5),
         **fit_params,
     ):
         """
@@ -4012,12 +4013,12 @@ class BaseEstimator:
     def _validate_data(
         self,
         X="no_validation",
-        y="no_validation",
+        y: Any = "no_validation",
         reset=True,
-        validate_separately=False,
+        validate_separately: bool | tuple = False,
         cast_to_ndarray=True,
         **check_params,
-    ):
+    ) -> Any:
         """
         Validate input data and manage `n_features_in_` attribute.
 
@@ -4059,7 +4060,7 @@ class BaseEstimator:
         """
         self._check_feature_names(X, reset=reset)
 
-        if y is None and self._get_tags()["requires_y"]:
+        if y is None and self._get_tags()["requires_y"]:  # type: ignore[reportAttributeAccessIssue]
             raise ValueError(
                 f"This {self.__class__.__name__} estimator "
                 "requires y to be passed, but the target y is None."
@@ -4091,7 +4092,7 @@ class BaseEstimator:
                 # separately, and in general, separately calling check_array()
                 # on X and y isn't equivalent to just calling check_X_y()
                 # :(
-                check_X_params, check_y_params = validate_separately
+                check_X_params, check_y_params = validate_separately  # type: ignore[reportGeneralTypeIssues]
                 if "estimator" not in check_X_params:
                     check_X_params = {**default_check_params, **check_X_params}
                 X = check_array(X, input_name="X", **check_X_params)
@@ -4678,7 +4679,7 @@ class EncoderDecoderForecaster(BaseEstimator):
         self,
         X,
         y=None,
-        optimizer=torch.optim.SGD,
+        optimizer: type[torch.optim.Optimizer] = torch.optim.SGD,
         elbo=TraceMeanField_ELBO,
         callbacks=None,
         lr=0.01,
@@ -4688,7 +4689,7 @@ class EncoderDecoderForecaster(BaseEstimator):
         verbose=1,
         model_params=None,
         warm_start=False,
-        train_split=ValidSplit(5),
+        train_split: ValidSplit | None = ValidSplit(5),
         **fit_params,
     ):
         """

@@ -1,84 +1,52 @@
 {
   "mode": "single",
-  "started_at": "2026-05-03T06:52:50Z",
-  "updated_at": "2026-05-03T08:40:20Z",
+  "started_at": "2026-05-17T12:13:07Z",
+  "updated_at": "2026-05-17T13:20:01Z",
   "current_cycle": null,
   "cycles": [],
-  "phase": 6,
+  "phase": 65,
   "issues": [
     {
-      "number": 38,
+      "number": 43,
       "status": "closed",
       "agent": "python-pro",
       "labels": [
-        "bug",
         "priority:high",
         "phase:implement",
         "agent:python-pro",
-        "area:base"
+        "area:forecasters"
       ],
       "reviewed": true,
       "comments": "",
-      "title": "fix: coerce self.device to str when calling safetensors safe_open"
+      "title": "feat: implement PatchTSTForecaster (encoder-only, channel-independent)"
     },
     {
-      "number": 39,
+      "number": 44,
       "status": "closed",
       "agent": "python-pro",
       "labels": [
-        "bug",
         "priority:high",
         "phase:implement",
         "agent:python-pro",
-        "area:preprocessing"
+        "area:forecasters"
       ],
       "reviewed": true,
       "comments": "",
-      "title": "fix: skip ValidSplit length check when fit(X, y=X) on windowed dataset"
+      "title": "feat: implement iTransformerForecaster (encoder-only, variates-as-tokens)"
     },
     {
-      "number": 40,
+      "number": 45,
       "status": "closed",
       "agent": "python-pro",
       "labels": [
-        "bug",
-        "priority:medium",
+        "priority:high",
         "phase:implement",
         "agent:python-pro",
-        "area:preprocessing"
+        "area:forecasters"
       ],
       "reviewed": true,
       "comments": "",
-      "title": "fix: StandardScalerTransform must return same array library as input (numpy in -> numpy out)"
-    },
-    {
-      "number": 41,
-      "status": "closed",
-      "agent": "python-pro",
-      "labels": [
-        "bug",
-        "priority:low",
-        "phase:implement",
-        "agent:python-pro",
-        "area:base"
-      ],
-      "reviewed": true,
-      "comments": "",
-      "title": "fix: validate len(X) >= context_len + pred_len upfront in EncoderDecoderForecaster.fit"
-    },
-    {
-      "number": 42,
-      "status": "closed",
-      "agent": "python-pro",
-      "labels": [
-        "priority:low",
-        "phase:implement",
-        "agent:python-pro",
-        "area:packaging"
-      ],
-      "reviewed": true,
-      "comments": "",
-      "title": "chore: remove stale build/ and stockpy_learn.egg-info/ artifacts; verify clean wheel"
+      "title": "feat: register PatchTSTForecaster and iTransformerForecaster in public API + README"
     }
   ],
   "session_id": null,
@@ -87,81 +55,94 @@
   "last_error": null,
   "effort_hints": [
     {
-      "scope_keyword": "safetensors",
-      "effort": "low"
-    },
-    {
-      "scope_keyword": "train_split",
+      "scope_keyword": "PatchTSTForecaster",
       "effort": "medium"
     },
     {
-      "scope_keyword": "scaler",
-      "effort": "low"
+      "scope_keyword": "iTransformerForecaster",
+      "effort": "medium"
     },
     {
-      "scope_keyword": "validation",
-      "effort": "low"
+      "scope_keyword": "test",
+      "effort": "medium"
     },
     {
-      "scope_keyword": "packaging",
+      "scope_keyword": "README",
       "effort": "low"
     }
   ],
-  "requirements_hash": "2bc602cdbe2e96ce3646628fae347b600f85bfc43b38533281aeb27400e0f950",
-  "base_commit": "02e2100338adbdf1be64453491d00e84c67be361",
+  "requirements_hash": "40bbac9347fa7852b41fcb654cf67784b9ee5e080829bff56f4b27cb3c109b56",
+  "base_commit": "6c4a156a4f9fd2dc07970e6aeb417d05bba29dcb",
   "token_usage": {
     "phase0": {
-      "input": 6,
-      "output": 427,
-      "cache_read": 62487,
-      "cache_write": 65641,
-      "num_turns": 2
+      "input": 351054,
+      "output": 1130,
+      "cache_read": 0,
+      "cache_write": 0,
+      "num_turns": 8,
+      "cache_write_5m": 0,
+      "cache_write_1h": 0,
+      "compaction_events": 0,
+      "clear_events": 0
     },
     "phase1": {
-      "input": 27,
-      "output": 15045,
-      "cache_read": 1434785,
-      "cache_write": 148354,
-      "num_turns": 28
+      "input": 703924,
+      "output": 5811,
+      "cache_read": 0,
+      "cache_write": 0,
+      "num_turns": 22,
+      "cache_write_5m": 0,
+      "cache_write_1h": 0,
+      "compaction_events": 0,
+      "clear_events": 0
     },
     "phase2": {
-      "input": 11,
-      "output": 5345,
-      "cache_read": 410502,
-      "cache_write": 77142,
-      "num_turns": 17
+      "input": 1319641,
+      "output": 7631,
+      "cache_read": 0,
+      "cache_write": 0,
+      "num_turns": 34,
+      "cache_write_5m": 0,
+      "cache_write_1h": 0,
+      "compaction_events": 0,
+      "clear_events": 0
     },
     "phase3_4": {
-      "input": 3145,
-      "output": 39291,
-      "cache_read": 12547809,
-      "cache_write": 217326,
-      "num_turns": 129
+      "input": 10221624,
+      "output": 27741,
+      "cache_read": 0,
+      "cache_write": 0,
+      "num_turns": 98,
+      "cache_write_5m": 0,
+      "cache_write_1h": 0,
+      "compaction_events": 0,
+      "clear_events": 0
     },
     "phase5": {
-      "input": 7,
-      "output": 2053,
-      "cache_read": 616113,
-      "cache_write": 14439,
-      "num_turns": 11
+      "input": 2720144,
+      "output": 10058,
+      "cache_read": 0,
+      "cache_write": 0,
+      "num_turns": 68,
+      "cache_write_5m": 0,
+      "cache_write_1h": 0,
+      "compaction_events": 0,
+      "clear_events": 0
     },
     "phase6": {
-      "input": 7,
-      "output": 572,
-      "cache_read": 190012,
-      "cache_write": 16651,
-      "num_turns": 7
-    },
-    "phase7": {
-      "input": 5,
-      "output": 138,
+      "input": 8971149,
+      "output": 31504,
       "cache_read": 0,
-      "cache_write": 59634,
-      "num_turns": 1
+      "cache_write": 0,
+      "num_turns": 130,
+      "cache_write_5m": 0,
+      "cache_write_1h": 0,
+      "compaction_events": 0,
+      "clear_events": 0
     }
   },
   "session_mode": "shared",
-  "client_alive_at": "2026-05-03T08:16:40+00:00",
+  "client_alive_at": "2026-05-17T12:14:41+00:00",
   "phase2_batch_id": null,
   "repo": {
     "host": "github.com",
@@ -170,16 +151,44 @@
     "full": "SilvioBaratto/stockpy"
   },
   "prompt_hashes": {
-    "prompt-review.md": "0441abe84a853c7debbf63c3731899adf8bf3d717349103f184c0f4b1f13fd66",
+    "prompt-review.md": "5478f82496cdf74c7d0c88fabcdb8ecad5a5de17fd5a9b69db925a3c9bd6a6a2",
     "prompt-optimize-requirements.md": "b8b06a05012b83ed6765092e9f706e86e5591ce5972efc6578e17b079ea78f87",
-    "prompt-phase-6-test.md": "4ee0d26ed1f742e3dfd6c73a6312cfda052bdc8c376f68283938597b858ca784",
-    "prompt-phase-2-batch-review.md": "96bdbcf04df56e1d0b96557889d3331d35eaeb03fbfdb56e1ff89961c6beadba",
-    "prompt-phase-3-implementation.md": "1d66dc77b96ffa8ac70120027b0acf9584992e3869af6a3b7722b69d487a6015",
-    "prompt-cycle-specializer.md": "2682949330eef5952d282c618f89536bd44222f87826b0e64d6eb97fb4977764",
-    "prompt-phase-1-planning.md": "aa9940093885f6640a3126062fe270c1a3e931ea1a67b939168b39a190850877",
-    "prompt-phase-7-commit.md": "d8b1dbde847a706fa7dd479cf3960c865d11b841520f8613b2649d8869d9e46b",
-    "prompt-phase-5-final-review.md": "a91cac8467f7ee3e138c938e5878d3279dc33428cc580f99e497dbc00dcf2681",
-    "prompt-phase-0-complexity.md": "68b5a53417053d8128a3d496fcb639813ebb0caa0c4a79cb4384028157bd0daa"
+    "prompt-phase-8-repair.md": "415168265da0c210eda39998f26655d62421f25c928a5ffc73e3c5311eb85ec2",
+    "prompt-phase-6-test.md": "fe1487725cb482b7d0046c0f70b764bf10c548885cd529e63af9ccb71a28f7c7",
+    "prompt-phase-2-batch-review.md": "34791421b2340be36434e27bbb36be175ad35a6760fe434f0eeea144e738f1af",
+    "prompt-phase-3-implementation.md": "278151632ef13f78310b61254ecf51315dce81461f3afde877b42803e5bffafa",
+    "prompt-cycle-specializer.md": "6acce464df29d949af8529cab6d89984e58ceabd0eb016e0f8f1583e960b1939",
+    "prompt-phase-1-planning.md": "558da28fe118c43b2b2883b68261bff5df0a8ba6442ccd0f2ef78d06d6bf4e93",
+    "prompt-phase-8-finalization.md": "3a9154eaafe0e7ebae7a262f388ee84ee6f02e64dd6d19095e15301d0c4abb30",
+    "prompt-phase-7-commit.md": "02803c5f72ef1783bd7965d707b27caa0d1c244e10ecedc82256a0fbd9b87267",
+    "prompt-phase-6-5-verify.md": "23f16702db95504dc028c376fd84e2ce289a9f39552733a3cfef74d54d8da652",
+    "prompt-phase-5-final-review.md": "1f031ec137d69fa84e420021e6b8dd65d13d2145b82cc805811d8d5dace5cfb2",
+    "prompt-phase-0-complexity.md": "b8008678ed77a6f30b71209407414c72eecd019f8c8d9c5a71f2197369396443"
   },
-  "sdk_version": "0.1.72"
+  "sdk_version": "0.1.72",
+  "gemini_model": null,
+  "codex_model": null,
+  "cache_prewarmed": true,
+  "cache_ttl_probe": "5m",
+  "phase6_5": {
+    "attempt": 0,
+    "last_tier": "DONE",
+    "tiers_passed": [
+      "T0"
+    ],
+    "tiers_failed": [
+      "T1",
+      "T2"
+    ],
+    "tiers_skipped": [
+      "T3",
+      "T4"
+    ],
+    "skip_reasons": {
+      "T3": "no frontend",
+      "T4": "no docker"
+    }
+  },
+  "vigil_triggered": false,
+  "phase8": null
 }
