@@ -1437,3 +1437,4 @@ Let me output the JSON.
 2026-05-17 14:14:39,536 INFO Phase 0 complete: in=351054 cache_read=0 cache_write=0 out=1130 total=352184
 2026-05-17 14:14:39,537 INFO Phase 0: mode=single, cycles=0
 2026-05-17 14:14:39,538 INFO run_single_mode: start_phase=1
+2026-05-17 15:35:31,590 INFO run_single_mode: start_phase=8
